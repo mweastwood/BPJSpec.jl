@@ -13,15 +13,19 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-module BPJSpec
+import GSL: sf_legendre_sphPlm
 
-using CasaCore.Quanta
-using CasaCore.Measures
-using CasaCore.Tables
-using HEALPix
+@doc """
+The spherical harmonic function.
+""" ->
+function Y(l,m,θ,ϕ)
+    sf_legendre_sphPlm(l,abs(m),cos(θ))*exp(1im*m*ϕ)
+end
 
-include("special.jl") # special functions
-#include("tests.jl")
-
+@doc """
+The spherical Bessel function (of the first kind).
+""" ->
+function j(l,x)
+    sqrt(π/(2x))*besselj(l+1/2,x)
 end
 
