@@ -15,12 +15,42 @@
 
 module BPJSpec
 
+export CGTable, multiply
+
+using HEALPix
 using CasaCore.Quanta
 using CasaCore.Measures
 using CasaCore.Tables
-using HEALPix
+using TTCal
+using JSON
 
 include("special.jl") # special functions
+include("clebschgordan.jl")
+
+function readbeam(filename::AbstractString)
+    dict = JSON.parsefile(filename)
+    alm = Alm(Complex128,dict["lmax"],dict["mmax"])
+    real_part = dict["alm_real"]
+    imag_part = dict["alm_imag"]
+    for i = 1:length(alm)
+        alm[i] = complex(real_part[i],imag_part[i])
+    end
+    alm
+end
+
+function writebeam(filename::AbstractString,beam::Alm)
+    dict = Dict{UTF8String,Any}()
+    dict["lmax"] = lmax(beam)
+    dict["mmax"] = mmax(beam)
+    alm = coefficients(beam)
+    dict["alm_real"] = real(alm)
+    dict["alm_imag"] = imag(alm)
+    file = open(filename,"w")
+    JSON.print(file,dict)
+    close(file)
+    nothing
+end
+
 #include("tests.jl")
 
 end
