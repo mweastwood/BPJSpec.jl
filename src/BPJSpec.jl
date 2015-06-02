@@ -16,6 +16,7 @@
 module BPJSpec
 
 export CGTable, multiply
+export readbeam, writebeam
 
 using HEALPix
 using CasaCore.Quanta
@@ -24,8 +25,12 @@ using CasaCore.Tables
 using TTCal
 using JSON
 
+import HEALPix: lmax, mmax
+
 include("special.jl") # special functions
 include("clebschgordan.jl")
+include("planewave.jl")
+include("transfermatrix.jl")
 
 function readbeam(filename::AbstractString)
     dict = JSON.parsefile(filename)
