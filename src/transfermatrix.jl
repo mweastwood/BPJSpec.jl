@@ -35,51 +35,48 @@ mmax{Nbase,Nfreq,lmax,mmax}(B::TransferMatrix{Nbase,Nfreq,lmax,mmax}) = mmax
 # β labels the frequency
 # l and m label the spherical harmonic
 
-function getindex(B::TransferMatrix,α,β,l,m)
-    blocks(B)[β,abs(m)+1][α+one(m)*Nbase(B),l-abs(m)+1]
-end
+block(B::TransferMatrix,β,m) = blocks(B)[β,abs(m)+1]
+getindex(B::TransferMatrix,α,β,l,m) = block(B,β,m)[α+one(m)*Nbase(B),l-abs(m)+1]
+setindex!(B::TransferMatrix,x,α,β,l,m) = block(B,β,m)[α+one(m)*Nbase(B),l-abs(m)+1] = x
 
-function setindex!(B::TransferMatrix,x,α,β,l,m)
-    blocks(B)[β,abs(m)+1][α+one(m)*Nbase(B),l-abs(m)+1] = x
-end
-
-function TransferMatrix(beam::Alm,
+function TransferMatrix(beam::HEALPixMap,
                         positions::Matrix{Float64},
-                        frequencies::Vector{Float64},
-                        cg::CGTable;
+                        frequencies::Vector{Float64};
                         lmax::Int = 100,
                         mmax::Int = 100)
     Nant  = size(positions,2)
     Nbase = div(Nant*(Nant-1),2)
     Nfreq = length(frequencies)
     B = TransferMatrix(Nbase,Nfreq,lmax,mmax)
-    populate!(B,beam,positions,frequencies,cg)
+    populate!(B,beam,positions,frequencies)
     B
 end
 
 function populate!(B::TransferMatrix,
-                   positions, frequencies, cg)
-    for β = 1:Nfreq
+                   beam, positions, frequencies)
+    Nant = round(Int,(1+sqrt(1+8Nbase(B)))/2)
+    for β = 1:Nfreq(B)
         ν = frequencies[β]
         λ = TTCal.c / ν
         α = 1
         for ant1 = 1:Nant, ant2 = ant1+1:Nant
-            u = (antenna_positions[1,ant2] - antenna_positions[1,ant1])/λ
-            v = (antenna_positions[2,ant2] - antenna_positions[2,ant1])/λ
-            w = (antenna_positions[3,ant2] - antenna_positions[3,ant1])/λ
-            realfringe,imagfringe = planewave(u,v,w,lmax=lmax,mmax=mmax)
-            realbeamfringe = multiply(beam,realfringe)
-            imagbeamfringe = multiply(beam,imagfringe)
+            @show ant1,ant2
+            u = (positions[1,ant2] - positions[1,ant1])/λ
+            v = (positions[2,ant2] - positions[2,ant1])/λ
+            w = (positions[3,ant2] - positions[3,ant1])/λ
+            realfringe,imagfringe = planewave(u,v,w,lmax=lmax(B),mmax=mmax(B))
+            realbeamfringe = map2alm(beam.*alm2map(realfringe,nside=512))
+            imagbeamfringe = map2alm(beam.*alm2map(imagfringe,nside=512))
             # Pack the transfer matrix
             # (the conjugations come about because Shaw et al. 2014, 2015
             # actually expands the baseline pattern in terms of the
             # spherical harmonic conjugates)
-            for l = 0:lmax
-                B[α,β,l,0] = conj(realbeamfringe[l,0]) + 1im*conj(imagebeamfringe[l,0])
+            for l = 0:lmax(B)
+                B[α,β,l,0] = conj(realbeamfringe[l,0]) + 1im*conj(imagbeamfringe[l,0])
             end
-            for m = 1:mmax, l = m:lmax
-                B[α,β,l,+m] = conj(realbeamfringe[l,m]) + 1im*conj(imagebeamfringe[l,m])
-                B[α,β,l,-m] = conj(realbeamfringe[l,m]) - 1im*conj(imagebeamfringe[l,m])
+            for m = 1:mmax(B), l = m:lmax(B)
+                B[α,β,l,+m] = conj(realbeamfringe[l,m]) + 1im*conj(imagbeamfringe[l,m])
+                B[α,β,l,-m] = conj(realbeamfringe[l,m]) - 1im*conj(imagbeamfringe[l,m])
             end
             α += 1
         end
