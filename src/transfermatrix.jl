@@ -65,8 +65,8 @@ function populate!(B::TransferMatrix,
             v = (positions[2,ant2] - positions[2,ant1])/λ
             w = (positions[3,ant2] - positions[3,ant1])/λ
             realfringe,imagfringe = planewave(u,v,w,lmax=lmax(B),mmax=mmax(B))
-            realbeamfringe = map2alm(beam.*alm2map(realfringe,nside=512))
-            imagbeamfringe = map2alm(beam.*alm2map(imagfringe,nside=512))
+            realbeamfringe = map2alm(beam.*alm2map(realfringe,nside=512),lmax=lmax(B),mmax=mmax(B))
+            imagbeamfringe = map2alm(beam.*alm2map(imagfringe,nside=512),lmax=lmax(B),mmax=mmax(B))
             # Pack the transfer matrix
             # (the conjugations come about because Shaw et al. 2014, 2015
             # actually expands the baseline pattern in terms of the
