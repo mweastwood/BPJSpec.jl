@@ -13,15 +13,15 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-function planewave(u,v,w;lmax::Int=100,mmax::Int=100)
+function planewave(u,v,w,Δphase=0.0;lmax::Int=100,mmax::Int=100)
     b = sqrt(u*u+v*v+w*w)
     θ = acos(w/b)
     ϕ = atan2(v,u)
     realpart = Alm(Complex128,lmax,mmax)
     imagpart = Alm(Complex128,lmax,mmax)
     for m = 0:mmax, l = m:lmax
-        alm1 = 4π*(1im)^l*j(l,2π*b)*conj(Y(l,+m,θ,ϕ))
-        alm2 = 4π*(1im)^l*j(l,2π*b)*conj(Y(l,-m,θ,ϕ))
+        alm1 = 4π*(1im)^l*j(l,2π*b)*conj(Y(l,+m,θ,ϕ))*exp(1im*Δphase)
+        alm2 = 4π*(1im)^l*j(l,2π*b)*conj(Y(l,-m,θ,ϕ))*exp(1im*Δphase)
         realpart[l,m] = (alm1 + conj(alm2))/2
         imagpart[l,m] = (alm1 - conj(alm2))/2im
     end

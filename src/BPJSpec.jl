@@ -15,7 +15,9 @@
 
 module BPJSpec
 
-export TransferMatrix, blocks, Nbase, Nfreq, lmax, mmax
+export TransferMatrix, MModes
+export blocks, block
+export Nbase, Nfreq, lmax, mmax
 
 using HEALPix
 using CasaCore.Quanta
@@ -24,13 +26,20 @@ using CasaCore.Tables
 using TTCal
 using JSON
 
-import HEALPix: lmax, mmax
+import HEALPix: Alm, lmax, mmax
 
 include("special.jl") # special functions
-include("planewave.jl")
-include("transfermatrix.jl")
+include("planewave.jl") # plane-wave expansion
 
-#include("tests.jl")
+# These two functions are useful to
+# handle some of the special casing
+# required for m == 0 and negative m.
+one(m) = ifelse(m  > 0, 1, 0)
+two(m) = ifelse(m != 0, 2, 1)
+
+include("transfermatrix.jl")
+include("mmodes.jl")
+include("alm.jl")
 
 end
 
