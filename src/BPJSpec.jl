@@ -18,6 +18,7 @@ module BPJSpec
 export TransferMatrix, MModes
 export blocks, block
 export Nbase, Nfreq, lmax, mmax
+export visibilities
 
 using HEALPix
 using CasaCore.Quanta
