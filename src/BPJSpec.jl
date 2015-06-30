@@ -25,7 +25,6 @@ using CasaCore.Quanta
 using CasaCore.Measures
 using CasaCore.Tables
 using TTCal
-using JSON
 
 import HEALPix: Alm, lmax, mmax
 

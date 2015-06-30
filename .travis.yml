@@ -14,6 +14,7 @@ before_install:
     - julia -e "Pkg.clone(\"CasaCore\")"
     - julia -e "Pkg.build(\"CasaCore\")"
     - julia -e "Pkg.clone(\"https://github.com/mweastwood/TTCal.jl.git\")"
+    - julia -e "Pkg.add(\"GSL\")"
 script:
     - if [[ -a .git/shallow ]]; then git fetch --unshallow; fi
     - julia --check-bounds=yes -e "Pkg.clone(pwd()); Pkg.test(\"BPJSpec\"; coverage=true)"
