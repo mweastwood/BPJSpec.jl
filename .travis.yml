@@ -4,6 +4,7 @@ julia:
 notifications:
     email: false
 before_install:
+    - sudo apt-get install libcfitsio3-dev -y
     - sudo add-apt-repository ppa:ska-sa/main -y
     - sudo apt-get update -qq -y
     - sudo apt-get install libcasacore-dev -y
