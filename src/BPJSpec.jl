@@ -24,9 +24,10 @@ using HEALPix
 using CasaCore.Quanta
 using CasaCore.Measures
 using CasaCore.Tables
-using TTCal
 
 import HEALPix: Alm, lmax, mmax
+
+const c = 2.99792e+8
 
 include("special.jl") # special functions
 include("planewave.jl") # plane-wave expansion

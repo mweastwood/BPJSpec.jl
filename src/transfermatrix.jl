@@ -50,7 +50,7 @@ end
 function populate!(B::TransferMatrix,
                    beam, positions, frequency, phasecenter)
     Nant = round(Int,(1+sqrt(1+8Nbase(B)))/2)
-    λ = TTCal.c / frequency
+    λ = c / frequency
     α = 1
     for ant1 = 1:Nant, ant2 = ant1+1:Nant
         @show ant1,ant2
