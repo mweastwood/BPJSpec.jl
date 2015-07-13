@@ -13,6 +13,7 @@ before_install:
     - julia -e "Pkg.clone(\"https://github.com/mweastwood/CLI.jl.git\")"
     - julia -e "Pkg.clone(\"https://github.com/mweastwood/HEALPix.jl.git\")"
     - julia -e "Pkg.clone(\"CasaCore\")"
+    - julia -e "Pkg.clone(\"https://github.com/mweastwood/MeasurementSets.jl.git\")"
     - julia -e "Pkg.build(\"HEALPix\")"
     - julia -e "Pkg.build(\"CasaCore\")"
 script:
