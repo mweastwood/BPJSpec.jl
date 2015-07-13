@@ -14,3 +14,12 @@ let Nant = 3, mmax = 5
     @test_approx_eq data data′
 end
 
+# Check that the gridded data I/O is lossless.
+let data = rand(Complex64,12,34), weights = rand(Float64,34)
+    filename = tempname()*".h5"
+    BPJSpec.write_data(filename,data,weights)
+    newdata,newweights = BPJSpec.read_data(filename)
+    @test data == newdata
+    @test weights == newweights
+end
+

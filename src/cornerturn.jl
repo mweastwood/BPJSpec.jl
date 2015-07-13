@@ -14,38 +14,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 @doc """
-This is a container that stores some basic information about
-the interferometer and thed data being processed.
-""" ->
-immutable ObsParam
-    freq::Vector{Float64}
-    Nfreq::Int
-    Nant::Int
-    Nbase::Int
-    Ntime::Int
-end
-
-function ObsParam(ms::Table,mmax)
-    # Populate the observational parameters from the information
-    # attached to a measurement set and the desired mmax to use
-    # in m-mode analysis.
-    lock(ms)
-    freq  = MeasurementSets.frequency(ms)
-    Nfreq = length(freq)
-    Nant  = numrows(Table(ms[kw"ANTENNA"]))
-    Nbase = div(Nant*(Nant-1),2) # no autocorrelations!
-    Ntime = 2mmax+1
-    unlock(ms)
-    ObsParam(freq,Nfreq,Nant,Nbase,Ntime)
-end
-
-freq(obs::ObsParam) = obs.freq
-Nfreq(obs::ObsParam) = obs.Nfreq
-Nant(obs::ObsParam) = obs.Nant
-Nbase(obs::ObsParam) = obs.Nbase
-Ntime(obs::ObsParam) = obs.Ntime
-
-@doc """
 The data coming off the correlator is grouped by time.
 We would instead like to have the data grouped by frequency
 so that we can Fourier transform each visibility with
@@ -143,26 +111,5 @@ function grid!(data_by_channel, weights_by_channel,
     end
 end
 
-filename(ν) = @sprintf("%.3fMHz.pjd",ν/1e6)
-
-function write_data(filename,data,weights)
-    Nbase,Ntime = size(data)
-    open(filename,"w") do f
-        write(f,Nbase)
-        write(f,Ntime)
-        write(f,data)
-        write(f,weights)
-    end
-end
-
-function read_data(filename)
-    local data, weights
-    open(filename,"r") do f
-        Nbase   = read(f,Int)
-        Ntime   = read(f,Int)
-        data    = read(f,Complex64,(Nbase,Ntime))
-        weights = read(f,Float64,Ntime)
-    end
-    data, weights
-end
+filename(ν) = @sprintf("%.3fMHz_data.h5",ν/1e6)
 

@@ -22,6 +22,7 @@ export visibilities
 
 export ObsParam
 
+using HDF5
 using HEALPix
 using CasaCore.Quanta
 using CasaCore.Measures
@@ -42,9 +43,12 @@ include("planewave.jl") # plane-wave expansion
 one(m) = ifelse(m  > 0, 1, 0)
 two(m) = ifelse(m != 0, 2, 1)
 
+include("obs.jl")
 include("transfermatrix.jl")
 include("mmodes.jl")
 include("alm.jl")
+
+include("io.jl")
 
 include("cornerturn.jl")
 
