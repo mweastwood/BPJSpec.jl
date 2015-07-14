@@ -80,8 +80,8 @@ function write_transfermatrix(filename,
         # so we circumvent this by reinterpreting
         # the complex numbers as two floating point
         # numbers.
-        for m = 0:mmax
-            blocks_group[string(m)] = reinterpret(Float64,block(B,m),(2*two(m)*Nbase,lmax-m+1))
+        for m = 0:mmax(B)
+            blocks_group[string(m)] = reinterpret(Float64,block(B,m),(2*two(m)*Nbase(B),lmax(B)-m+1))
         end
     end
     nothing

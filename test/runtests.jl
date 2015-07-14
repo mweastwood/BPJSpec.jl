@@ -23,3 +23,14 @@ let data = rand(Complex64,12,34), weights = rand(Float64,34)
     @test weights == newweights
 end
 
+# Check that the transfer matrix I/O is lossless.
+let B = TransferMatrix(5,10,10)
+    for m = 0:mmax(B)
+        rand!(BPJSpec.block(B,m))
+    end
+    filename = tempname()*".h5"
+    BPJSpec.write_transfermatrix(filename,B)
+    newB = BPJSpec.read_transfermatrix(filename)
+    @test B == newB
+end
+

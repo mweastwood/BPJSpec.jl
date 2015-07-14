@@ -27,6 +27,13 @@ Nbase{Nbase,lmax,mmax}(B::TransferMatrix{Nbase,lmax,mmax}) = Nbase
 lmax{Nbase,lmax,mmax}(B::TransferMatrix{Nbase,lmax,mmax}) = lmax
 mmax{Nbase,lmax,mmax}(B::TransferMatrix{Nbase,lmax,mmax}) = mmax
 
+function ==(lhs::TransferMatrix,rhs::TransferMatrix)
+    blocks(lhs) == blocks(rhs) &&
+        Nbase(lhs) == Nbase(rhs) &&
+        lmax(lhs) == lmax(rhs) &&
+        mmax(lhs) == mmax(rhs)
+end
+
 # α labels the baseline
 # l and m label the spherical harmonic
 
