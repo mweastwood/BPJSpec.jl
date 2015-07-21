@@ -24,7 +24,7 @@ let data = rand(Complex64,12,34), weights = rand(Float64,34)
 end
 
 # Check that the m-mode I/O is lossless.
-let v = TransferMatrix(5,10)
+let v = MModes(5,10)
     for m = 0:mmax(v)
         rand!(BPJSpec.block(v,m))
     end

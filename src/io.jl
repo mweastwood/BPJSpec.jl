@@ -101,7 +101,7 @@ function write_mmodes(filename,
         attrs(file)["mmax"] = mmax(v)
         g_create(file,"blocks")
         blocks_group = file["blocks"]
-        for m = 0:mmax(B)
+        for m = 0:mmax(v)
             blocks_group[string(m)] = to_float(Float64,block(v,m))
         end
     end
@@ -119,7 +119,7 @@ function read_mmodes(filename)
         Nbase = read(attrs(file)["Nbase"])
         mmax = read(attrs(file)["mmax"])
         blocks_group = file["blocks"]
-        blocks = Matrix{Complex128}[to_complex(Complex128,read(blocks_group[string(m)]))
+        blocks = Vector{Complex128}[to_complex(Complex128,read(blocks_group[string(m)]))
                                         for m = 0:mmax]
     end
     MModes{Nbase,mmax}(blocks)
