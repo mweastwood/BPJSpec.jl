@@ -13,6 +13,46 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+macro write_metadata(file,description,version)
+    quote
+        attrs($file)["description"] = $description
+        attrs($file)["version_major"] = $version.major
+        attrs($file)["version_minor"] = $version.minor
+    end
+end
+
+macro check_version(file,desired_version)
+    quote
+        version = VersionNumber(read(attrs($file)["version_major"]),
+                                read(attrs($file)["version_minor"]))
+        if version != $desired_version
+            error("Incorrect version $version.")
+        end
+    end
+end
+
+@doc """
+Reinterpret a complex array as a float array.
+This is necessary because HDF5 does not support
+complex numbers.
+""" ->
+function to_float{T<:FloatingPoint}(::Type{T},x)
+    sz = size(x)
+    sz = (2sz[1],sz[2:end]...)
+    reinterpret(T,x,sz)
+end
+
+@doc """
+Reinterpret a float array as a complex array.
+This is necessary because HDF5 does not support
+complex numbers.
+""" ->
+function to_complex{T<:Complex}(::Type{T},x)
+    sz = size(x)
+    sz = (div(sz[1],2),sz[2:end]...)
+    reinterpret(T,x,sz)
+end
+
 const DATA_VER = v"1.0"
 
 @doc """
@@ -23,16 +63,10 @@ function write_data(filename,
                     weights::Vector{Float64})
     Nbase,Ntime = size(data)
     h5open(filename,"w") do file
-        attrs(file)["description"] = "BPJSpec data file"
-        attrs(file)["version_major"] = DATA_VER.major
-        attrs(file)["version_minor"] = DATA_VER.minor
+        @write_metadata file "BPJSpec data file" DATA_VER
         attrs(file)["Nbase"] = Nbase
         attrs(file)["Ntime"] = Ntime
-        # HDF5 doesn't support complex numbers,
-        # so we circumvent this by reinterpreting
-        # the complex numbers as two floating point
-        # numbers.
-        file["data"] = reinterpret(Float32,data,(2Nbase,Ntime))
+        file["data"] = to_float(Float32,data)
         file["weights"] = weights
     end
     nothing
@@ -42,22 +76,53 @@ end
 Read gridded visibility data from disk.
 """ ->
 function read_data(filename)
-    local description, version
     local Nbase, Ntime
     local data, weights
     h5open(filename,"r") do file
-        description = read(attrs(file)["description"])
-        version = VersionNumber(read(attrs(file)["version_major"]),
-                                read(attrs(file)["version_minor"]))
-        if version != DATA_VER
-            error("Incorrect version $version.")
-        end
+        @check_version file DATA_VER
         Nbase = read(attrs(file)["Nbase"])
         Ntime = read(attrs(file)["Ntime"])
-        data = reinterpret(Complex64,read(file["data"]),(Nbase,Ntime))
+        data = to_complex(Complex64,read(file["data"]))
         weights = read(file["weights"])
     end
     data, weights
+end
+
+const MMODE_VER = v"1.0"
+
+@doc """
+Write m-modes to disk.
+""" ->
+function write_mmodes(filename,
+                      v::MModes)
+    h5open(filename,"w") do file
+        @write_metadata file "BPJSpec m-modes" MMODE_VER
+        attrs(file)["Nbase"] = Nbase(v)
+        attrs(file)["mmax"] = mmax(v)
+        g_create(file,"blocks")
+        blocks_group = file["blocks"]
+        for m = 0:mmax(B)
+            blocks_group[string(m)] = to_float(Float64,block(v,m))
+        end
+    end
+    nothing
+end
+
+@doc """
+Read m-modes from disk.
+""" ->
+function read_mmodes(filename)
+    local Nbase, mmax
+    local blocks
+    h5open(filename,"r") do file
+        @check_version file MMODE_VER
+        Nbase = read(attrs(file)["Nbase"])
+        mmax = read(attrs(file)["mmax"])
+        blocks_group = file["blocks"]
+        blocks = Matrix{Complex128}[to_complex(Complex128,read(blocks_group[string(m)]))
+                                        for m = 0:mmax]
+    end
+    MModes{Nbase,mmax}(blocks)
 end
 
 const TRANSFER_VER = v"1.0"
@@ -68,20 +133,14 @@ Write a transfer matrix to disk.
 function write_transfermatrix(filename,
                               B::TransferMatrix)
     h5open(filename,"w") do file
-        attrs(file)["description"] = "BPJSpec transfer matrix"
-        attrs(file)["version_major"] = TRANSFER_VER.major
-        attrs(file)["version_minor"] = TRANSFER_VER.minor
+        @write_metadata file "BPJSpec transfer matrix" TRANSFER_VER
         attrs(file)["Nbase"] = Nbase(B)
         attrs(file)["lmax"] = lmax(B)
         attrs(file)["mmax"] = mmax(B)
         g_create(file,"blocks")
         blocks_group = file["blocks"]
-        # HDF5 doesn't support complex numbers,
-        # so we circumvent this by reinterpreting
-        # the complex numbers as two floating point
-        # numbers.
         for m = 0:mmax(B)
-            blocks_group[string(m)] = reinterpret(Float64,block(B,m),(2*two(m)*Nbase(B),lmax(B)-m+1))
+            blocks_group[string(m)] = to_float(Float64,block(B,m))
         end
     end
     nothing
@@ -95,19 +154,13 @@ function read_transfermatrix(filename)
     local Nbase, lmax, mmax
     local blocks
     h5open(filename,"r") do file
-        description = read(attrs(file)["description"])
-        version = VersionNumber(read(attrs(file)["version_major"]),
-                                read(attrs(file)["version_minor"]))
-        if version != DATA_VER
-            error("Incorrect version $version.")
-        end
+        @check_version file TRANSFER_VER
         Nbase = read(attrs(file)["Nbase"])
         lmax = read(attrs(file)["lmax"])
         mmax = read(attrs(file)["mmax"])
         blocks_group = file["blocks"]
-        blocks = Matrix{Complex128}[reinterpret(Complex128,
-                                                read(blocks_group[string(m)]),
-                                                (two(m)*Nbase,lmax-m+1)) for m = 0:mmax]
+        blocks = Matrix{Complex128}[to_complex(Complex128,read(blocks_group[string(m)]))
+                                        for m = 0:mmax]
     end
     TransferMatrix{Nbase,lmax,mmax}(blocks)
 end

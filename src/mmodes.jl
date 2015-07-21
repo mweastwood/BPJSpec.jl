@@ -26,6 +26,12 @@ blocks(v::MModes) = v.blocks
 Nbase{Nbase,mmax}(v::MModes{Nbase,mmax}) = Nbase
 mmax{Nbase,mmax}(v::MModes{Nbase,mmax}) = mmax
 
+function ==(lhs::MModes,rhs::MModes)
+    blocks(lhs) == blocks(rhs) &&
+        Nbase(lhs) == Nbase(rhs) &&
+        mmax(lhs) == mmax(rhs)
+end
+
 # α labels the baseline
 # m labels the mode
 

@@ -23,6 +23,17 @@ let data = rand(Complex64,12,34), weights = rand(Float64,34)
     @test weights == newweights
 end
 
+# Check that the m-mode I/O is lossless.
+let v = TransferMatrix(5,10)
+    for m = 0:mmax(v)
+        rand!(BPJSpec.block(v,m))
+    end
+    filename = tempname()*".h5"
+    BPJSpec.write_mmodes(filename,v)
+    newv = BPJSpec.read_mmodes(filename)
+    @test v == newv
+end
+
 # Check that the transfer matrix I/O is lossless.
 let B = TransferMatrix(5,10,10)
     for m = 0:mmax(B)
