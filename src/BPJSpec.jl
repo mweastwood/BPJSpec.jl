@@ -47,11 +47,11 @@ two(m) = ifelse(m != 0, 2, 1)
 include("obs.jl")
 include("transfermatrix.jl")
 include("mmodes.jl")
+include("projection.jl")
 include("alm.jl")
 
-include("io.jl")
 include("cornerturn.jl")
-include("projection.jl")
+include("io.jl")
 
 end
 

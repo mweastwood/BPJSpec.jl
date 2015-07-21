@@ -150,7 +150,6 @@ end
 Read a transfer matrix from disk.
 """ ->
 function read_transfermatrix(filename)
-    local description, version
     local Nbase, lmax, mmax
     local blocks
     h5open(filename,"r") do file
@@ -163,5 +162,40 @@ function read_transfermatrix(filename)
                                         for m = 0:mmax]
     end
     TransferMatrix{Nbase,lmax,mmax}(blocks)
+end
+
+const PROJECTION_VER = v"1.0"
+
+@doc """
+Write a projection matrix to disk.
+""" ->
+function write_projectionmatrix(filename,
+                                P::ProjectionMatrix)
+    h5open(filename,"w") do file
+        @write_metadata file "BPJSpec projection matrix" PROJECTION_VER
+        attrs(file)["mmax"] = mmax(P)
+        g_create(file,"blocks")
+        blocks_group = file["blocks"]
+        for m = 0:mmax(P)
+            blocks_group[string(m)] = to_float(Float64,block(P,m))
+        end
+    end
+    nothing
+end
+
+@doc """
+Read a projection matrix from disk.
+""" ->
+function read_projectionmatrix(filename)
+    local mmax
+    local blocks
+    h5open(filename,"r") do file
+        @check_version file TRANSFER_VER
+        mmax = read(attrs(file)["mmax"])
+        blocks_group = file["blocks"]
+        blocks = Matrix{Complex128}[to_complex(Complex128,read(blocks_group[string(m)]))
+                                        for m = 0:mmax]
+    end
+    ProjectionMatrix{mmax}(blocks)
 end
 
