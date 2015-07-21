@@ -42,6 +42,18 @@ getindex(B::TransferMatrix,α,l,m) = block(B,m)[α+one(m)*Nbase(B),l-abs(m)+1]
 setindex!(B::TransferMatrix,x,α,l,m) = block(B,m)[α+one(m)*Nbase(B),l-abs(m)+1] = x
 
 function TransferMatrix(beam::HEALPixMap,
+                        obs::ObsParam,
+                        channel;
+                        lmax::Int = 100,
+                        mmax::Int = 100)
+    positions = antpos(obs)
+    frequency = freq(obs)[channel]
+    TransferMatrix(beam,positions,frequency,
+                   phasecenter(obs),
+                   lmax=lmax,mmax=mmax)
+end
+
+function TransferMatrix(beam::HEALPixMap,
                         positions::Matrix{Float64},
                         frequency::Float64,
                         phasecenter::NTuple{3,Float64};

@@ -16,6 +16,7 @@
 module BPJSpec
 
 export TransferMatrix, MModes
+export ProjectionMatrix
 export blocks, block
 export Nbase, Nfreq, lmax, mmax
 export visibilities
@@ -49,8 +50,8 @@ include("mmodes.jl")
 include("alm.jl")
 
 include("io.jl")
-
 include("cornerturn.jl")
+include("projection.jl")
 
 end
 

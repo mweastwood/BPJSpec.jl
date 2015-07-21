@@ -18,9 +18,9 @@ This is a container that stores some basic information about
 the interferometer and thed data being processed.
 """ ->
 immutable ObsParam
-    freq::Vector{Float64}        # list of frequency channels
-    antpos::Matrix{Float64}      # 3 by Nant array containing the (x,y,z) ITRF positions of each antenna
-    phasecenter::Vector{Float64} # unit vector specifying the ITRF phase center
+    freq::Vector{Float64}          # list of frequency channels
+    antpos::Matrix{Float64}        # 3 by Nant array containing the (x,y,z) ITRF positions of each antenna
+    phasecenter::NTuple{3,Float64} # unit vector specifying the ITRF phase center
     Nfreq::Int
     Nant::Int
     Nbase::Int
