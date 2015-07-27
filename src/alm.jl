@@ -28,13 +28,14 @@ function block(alm::Alm,m)
 end
 
 function Alm(transfermatrix::TransferMatrix,mmodes::MModes;
-             regularization_parameter::Float64=1.0)
+             tol::Float64=1.0)
     alm = Alm(Complex128,lmax(transfermatrix),
                          mmax(transfermatrix))
     for m = 0:mmax(transfermatrix)
         B = block(transfermatrix,m)
         v = block(mmodes,m)
-        a = (B'*B + regularization_parameter*I)\B'*v
+        # `tol` acts as a Tikhonov regularization parameter.
+        a = (B'*B + tol*I)\B'*v
         idx = 1
         for l = m:lmax(transfermatrix)
             alm[l,m] = a[idx]
