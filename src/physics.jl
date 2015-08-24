@@ -23,5 +23,5 @@ const cosmology = Cosmology.cosmology()
 comoving_distance(z) = Cosmology.comoving_radial_dist_mpc(cosmology,z)
 age(z) = Cosmology.age_gyr(cosmology,z)
 frequency(z) = HI/(1+z)
-redshift(ν)  = HI/ν-1.
+redshift(ν)  = HI/ν-1
 
