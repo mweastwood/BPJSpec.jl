@@ -33,10 +33,9 @@ using MeasurementSets
 import Base: touch
 import HEALPix: Alm, lmax, mmax
 
-const c = 2.99792e+8
-
-include("special.jl") # special functions
+include("special.jl")   # special functions
 include("planewave.jl") # plane-wave expansion
+include("physics.jl")   # physical constants and cosmology
 
 # These two functions are useful to
 # handle some of the special casing

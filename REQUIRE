@@ -1,6 +1,7 @@
 julia 0.4-
 CasaCore
-MeasurementSets
+Cosmology
+GSL
 HEALPix
 HDF5
-GSL
+MeasurementSets
