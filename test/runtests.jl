@@ -3,6 +3,10 @@ using Base.Test
 
 srand(123)
 
+let A = rand(Complex128,50,50), B = rand(Complex128,50,50)
+    @test trace(A*B) ≈ BPJSpec.tr(A,B)
+end
+
 # Verify that the visibilities -> m-modes -> visibilities
 # round-trip works.
 let Nant = 3, mmax = 5

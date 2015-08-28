@@ -15,17 +15,32 @@
 
 import GSL: sf_legendre_sphPlm
 
-@doc """
+"""
 The spherical harmonic function.
-""" ->
+"""
 function Y(l,m,θ,ϕ)
     sf_legendre_sphPlm(l,abs(m),cos(θ))*exp(1im*m*ϕ)
 end
 
-@doc """
+"""
 The spherical Bessel function (of the first kind).
-""" ->
+"""
 function j(l,x)
     sqrt(π/(2x))*besselj(l+1/2,x)
+end
+
+"""
+The trace of the product of two matrices, computed
+without first computing the product itself.
+
+    tr(AB)
+"""
+function tr{T}(A::Matrix{T},B::Matrix{T})
+    trace = zero(T)
+    Bt = transpose(B)
+    for i in eachindex(A)
+        trace += A[i]*Bt[i]
+    end
+    trace
 end
 
