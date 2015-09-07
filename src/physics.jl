@@ -15,7 +15,9 @@
 
 # constants
 const c = 2.99792e8 # m/s
+const k = 1.38065e-23 # J/K
 const HI = 1420.40575177 # MHz
+const Jy = 1e-26 # one Jansky in mks unints
 
 # cosmology
 import Cosmology
