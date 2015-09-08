@@ -5,9 +5,9 @@ notifications:
     email: false
 before_install:
     - sudo apt-get install libcfitsio3-dev -y
-    - sudo add-apt-repository ppa:ska-sa/main -y
+    - sudo add-apt-repository ppa:radio-astro/main -y
     - sudo apt-get update -qq -y
-    - sudo apt-get install libcasacore-dev -y
+    - sudo apt-get install libcasacore2-dev -y
     - sudo apt-get install casacore-data -y
     - julia -e "Pkg.add(\"GSL\")"
     - julia -e "Pkg.clone(\"https://github.com/mweastwood/CLI.jl.git\")"
