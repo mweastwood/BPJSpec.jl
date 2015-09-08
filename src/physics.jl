@@ -22,8 +22,33 @@ const Jy = 1e-26 # one Jansky in mks unints
 # cosmology
 import Cosmology
 const cosmology = Cosmology.cosmology()
+
+"""
+    comoving_distance(z)
+
+Calculate the comoving distance (in units of Mpc) to the redshift `z`.
+"""
 comoving_distance(z) = Cosmology.comoving_radial_dist_mpc(cosmology,z)
+
+"""
+    age(z)
+
+Calculate the age of the universe (in units of Gyr) to the redshift `z`.
+"""
 age(z) = Cosmology.age_gyr(cosmology,z)
+
+"""
+    frequency(z)
+
+Calculate the frequency of the 21 cm line of Hydrogen at the redshift `z`.
+"""
 frequency(z) = HI/(1+z)
+
+"""
+    redshift(ν)
+
+Calculate the redshift from which the emission originates if the 21 cm line
+is observed at the frequency `ν`.
+"""
 redshift(ν)  = HI/ν-1
 
