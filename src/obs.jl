@@ -13,12 +13,14 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-@doc """
+"""
+    ObsParam
+
 This is a container that stores some basic information about
 the interferometer and thed data being processed.
-""" ->
+"""
 immutable ObsParam
-    freq::Vector{Float64}          # list of frequency channels
+    freq::Vector{Float64}          # list of frequency channels (in Hz)
     antpos::Matrix{Float64}        # 3 by Nant array containing the (x,y,z) ITRF positions of each antenna
     phasecenter::NTuple{3,Float64} # unit vector specifying the ITRF phase center
     Nfreq::Int
