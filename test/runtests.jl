@@ -4,7 +4,8 @@ using Base.Test
 srand(123)
 
 for i = 1:10
-    A = rand(Complex128,50,50), B = rand(Complex128,50,50)
+    A = rand(Complex128,50,50)
+    B = rand(Complex128,50,50)
     @test trace(A*B) ≈ BPJSpec.tr(A,B)
 end
 

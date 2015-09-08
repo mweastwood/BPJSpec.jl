@@ -16,6 +16,8 @@
 import GSL: sf_legendre_sphPlm
 
 """
+    Y(l,m,θ,ϕ)
+
 The spherical harmonic function.
 """
 function Y(l,m,θ,ϕ)
@@ -23,6 +25,8 @@ function Y(l,m,θ,ϕ)
 end
 
 """
+    j(l,x)
+
 The spherical Bessel function (of the first kind).
 """
 function j(l,x)
@@ -30,10 +34,10 @@ function j(l,x)
 end
 
 """
+    tr(A,B) -> tr(AB)
+
 The trace of the product of two matrices, computed
 without first computing the product itself.
-
-    tr(AB)
 """
 function tr{T}(A::Matrix{T},B::Matrix{T})
     trace = zero(T)

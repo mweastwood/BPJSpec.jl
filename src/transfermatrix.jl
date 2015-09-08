@@ -13,34 +13,90 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-immutable TransferMatrix{Nbase,lmax,mmax}
-    blocks::Vector{Matrix{Complex128}}
+"""
+    TransferMatrixBlock{lmax,mmax}
+
+This type stores a single block of the transfer matrix. These blocks
+correspond to a single frequency channel and a single value of `m`.
+"""
+immutable TransferMatrixBlock{lmax,mmax}
+    m::Int
+    block::Matrix{Complex128}
+end
+
+function TransferMatrixBlock(Nbase,lmax,mmax,m)
+    TransferMatrixBlock{lmax,mmax}(m,zeros(Complex128,two(m)*Nbase,lmax-m+1))
+end
+
+"""
+    TransferMatrix{lmax,max}
+
+This type stores all blocks of the transfer matrix corresponding to
+a single frequency channel, but all values of `m`.
+"""
+immutable TransferMatrix{lmax,mmax}
+    blocks::Vector{TransferMatrixBlock{lmax,mmax}}
 end
 
 function TransferMatrix(Nbase,lmax,mmax)
-    blocks = [zeros(Complex128,two(m)*Nbase,lmax-m+1) for m = 0:mmax]
-    TransferMatrix{Nbase,lmax,mmax}(blocks)
+    blocks = [TransferMatrixBlock(Nbase,lmax,mmax,m) for m = 0:mmax]
+    TransferMatrix{lmax,mmax}(blocks)
 end
 
-blocks(B::TransferMatrix) = B.blocks
-Nbase{Nbase,lmax,mmax}(B::TransferMatrix{Nbase,lmax,mmax}) = Nbase
-lmax{Nbase,lmax,mmax}(B::TransferMatrix{Nbase,lmax,mmax}) = lmax
-mmax{Nbase,lmax,mmax}(B::TransferMatrix{Nbase,lmax,mmax}) = mmax
+"""
+    SpectralTransferMatrix{lmax,max}
+
+This type stores all blocks of the transfer matrix corresponding to
+a single value of `m`, but all frequency channels.
+"""
+immutable SpectralTransferMatrix{lmax,mmax}
+    m::Int
+    blocks::Vector{TransferMatrixBlock{lmax,mmax}}
+end
+
+function SpectralTransferMatrix(Nbase,Nfreq,lmax,mmax,m)
+    blocks = [TransferMatrixBlock(Nbase,lmax,mmax,m) for β = 1:Nfreq]
+    SpectralTransferMatrix{lmax,mmax}(m,blocks)
+end
+
+for T in (:TransferMatrixBlock,:TransferMatrix,:SpectralTransferMatrix)
+    @eval lmax{l,m}(B::$T{l,m}) = l
+    @eval mmax{l,m}(B::$T{l,m}) = m
+end
+
+Nfreq(B::SpectralTransferMatrix) = length(B.blocks)
+
+function ==(lhs::TransferMatrixBlock,rhs::TransferMatrixBlock)
+    lhs.block == rhs.block && lhs.m == rhs.m &&
+        lmax(lhs) == lmax(rhs) && mmax(lhs) == mmax(rhs)
+end
 
 function ==(lhs::TransferMatrix,rhs::TransferMatrix)
-    blocks(lhs) == blocks(rhs) &&
-        Nbase(lhs) == Nbase(rhs) &&
-        lmax(lhs) == lmax(rhs) &&
-        mmax(lhs) == mmax(rhs)
+    lhs.blocks == rhs.blocks && lmax(lhs) == lmax(rhs) && mmax(lhs) == mmax(rhs)
 end
 
+Base.svd(B::TransferMatrixBlock) = svd(B.block)
+
 # α labels the baseline
+# β labels the frequency channel
 # l and m label the spherical harmonic
 
-block(B::TransferMatrix,m) = blocks(B)[abs(m)+1]
-getindex(B::TransferMatrix,α,l,m) = block(B,m)[α+one(m)*Nbase(B),l-abs(m)+1]
-setindex!(B::TransferMatrix,x,α,l,m) = block(B,m)[α+one(m)*Nbase(B),l-abs(m)+1] = x
+getindex(B::TransferMatrixBlock,α,l) = B.block[α,l-B.m+1]
+setindex!(B::TransferMatrixBlock,x,α,l) = B.block[α,l-B.m+1] = x
 
+getindex(B::TransferMatrix,m) = B.blocks[m+1]
+getindex(B::TransferMatrix,α,l,m) = B[m][α,l]
+setindex!(B::TransferMatrix,x,α,l,m) = B[m][α,l] = x
+
+getindex(B::SpectralTransferMatrix,β) = B.blocks[β]
+getindex(B::SpectralTransferMatrix,α,β,l) = B[β][α,l]
+setindex!(B::SpectralTransferMatrix,x,α,β,l) = B[β][α,l] = x
+
+"""
+    TransferMatrix(beam::HEALPixMap,obs::ObsParam,channel;lmax=100,mmax=100)
+
+Construct a transfer matrix for the given beam model and observational parameters.
+"""
 function TransferMatrix(beam::HEALPixMap,
                         obs::ObsParam,
                         channel;
@@ -48,42 +104,35 @@ function TransferMatrix(beam::HEALPixMap,
                         mmax::Int = 100)
     positions = antpos(obs)
     frequency = freq(obs)[channel]
-    TransferMatrix(beam,positions,frequency,
-                   phasecenter(obs),
-                   lmax=lmax,mmax=mmax)
-end
-
-function TransferMatrix(beam::HEALPixMap,
-                        positions::Matrix{Float64},
-                        frequency::Float64,
-                        phasecenter::NTuple{3,Float64};
-                        lmax::Int = 100,
-                        mmax::Int = 100)
-    Nant  = size(positions,2)
-    Nbase = div(Nant*(Nant-1),2)
-    B = TransferMatrix(Nbase,lmax,mmax)
-    populate!(B,beam,positions,frequency,phasecenter)
+    phase     = phasecenter(obs)
+    B = TransferMatrix(Nbase(obs),lmax,mmax)
+    populate!(B,beam,obs,channel)
     B
 end
 
 function populate!(B::TransferMatrix,
-                   beam, positions, frequency, phasecenter)
-    Nant = round(Int,(1+sqrt(1+8Nbase(B)))/2)
-    λ = c / frequency
+                   beam::HEALPixMap,
+                   obs::ObsParam,
+                   channel)
+    positions = antpos(obs)
+    λ = c / freq(obs)[channel]
+    phase = phasecenter(obs)
     α = 1
-    for ant1 = 1:Nant, ant2 = ant1+1:Nant
+    for ant1 = 1:Nant(obs), ant2 = ant1+1:Nant(obs)
         @show ant1,ant2
         u = (positions[1,ant1] - positions[1,ant2])/λ
         v = (positions[2,ant1] - positions[2,ant2])/λ
         w = (positions[3,ant1] - positions[3,ant2])/λ
         # Account for the extra phase due to the fact that the phase
         # center is likely not perfectly orthogonal to the baseline.
-        extraphase = -2π*(u*phasecenter[1]+v*phasecenter[2]+w*phasecenter[3])
+        extraphase = -2π*(u*phase[1]+v*phase[2]+w*phase[3])
         # Use spherical harmonic transforms to incorporate the effects
         # of the beam.
         realfringe,imagfringe = planewave(u,v,w,extraphase,lmax=lmax(B),mmax=mmax(B))
-        realbeamfringe = map2alm(beam.*alm2map(realfringe,nside=512),lmax=lmax(B),mmax=mmax(B))
-        imagbeamfringe = map2alm(beam.*alm2map(imagfringe,nside=512),lmax=lmax(B),mmax=mmax(B))
+        realbeamfringe = map2alm(beam.*alm2map(realfringe,nside=512),
+                                 lmax=lmax(B),mmax=mmax(B))
+        imagbeamfringe = map2alm(beam.*alm2map(imagfringe,nside=512),
+                                 lmax=lmax(B),mmax=mmax(B))
         # Pack the transfer matrix
         # (the conjugations come about because Shaw et al. 2014, 2015
         # actually expand the baseline pattern in terms of the
@@ -92,11 +141,32 @@ function populate!(B::TransferMatrix,
             B[α,l,0] = conj(realbeamfringe[l,0]) + 1im*conj(imagbeamfringe[l,0])
         end
         for m = 1:mmax(B), l = m:lmax(B)
-            B[α,l,+m] = conj(realbeamfringe[l,m]) + 1im*conj(imagbeamfringe[l,m])
-            B[α,l,-m] = conj(realbeamfringe[l,m]) - 1im*conj(imagbeamfringe[l,m])
+            α1 = α              # positive m
+            α2 = α + Nbase(obs) # negative m
+            B[α1,l,m] = conj(realbeamfringe[l,m]) + 1im*conj(imagbeamfringe[l,m])
+            B[α2,l,m] = conj(realbeamfringe[l,m]) - 1im*conj(imagbeamfringe[l,m])
         end
         α += 1
     end
     nothing
+end
+
+"""
+    SpectralTransferMatrix(m,matrices::Vector{TransferMatrix})
+
+Construct a SpectralTransferMatrix from the given list of transfer matrices.
+Each transfer matrix should correspond to a different frequency channel.
+"""
+function SpectralTransferMatrix(m,matrices::Vector{TransferMatrix})
+    lmax′ = lmax(matrices[1])
+    mmax′ = mmax(matrices[1])
+    blocks = TransferMatrixBlock[]
+    for matrix in matrices
+        if lmax(matrix) != lmax′ || mmax(matrix) != mmax′
+            error("The transfer matrices must all have the same lmax and mmax.")
+        end
+        push!(blocks,matrix[m])
+    end
+    SpectralTransferMatrix{lmax′,mmax′}(m,blocks)
 end
 

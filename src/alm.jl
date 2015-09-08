@@ -17,6 +17,11 @@
 # however we will need some additional definitions to make things
 # consistent with the language of m-mode analysis.
 
+"""
+    block(alm::Alm,m)
+
+Get all the coefficients corresponding to a single value of m.
+"""
 function block(alm::Alm,m)
     a = zeros(Complex128,lmax(alm)-m+1)
     idx = 1
@@ -27,23 +32,26 @@ function block(alm::Alm,m)
     a
 end
 
-function Alm(transfermatrix::TransferMatrix,mmodes::MModes;
-             tol::Float64=1.0)
-    alm = Alm(Complex128,lmax(transfermatrix),
-                         mmax(transfermatrix))
-    for m = 0:mmax(transfermatrix)
-        B = block(transfermatrix,m)
-        v = block(mmodes,m)
-        # `tol` acts as a Tikhonov regularization parameter.
-        a = (B'*B + tol*I)\B'*v
+"""
+    tikhonov(B::TransferMatrix,v::MModes;tolerance=0.0) -> Alm
+
+Solve for the spherical harmonic coefficients with the given
+transfer matrix and m-modes. `tolerance` acts as Tikhonov
+regularization parameter that alleviates some of the numerical
+problems with this process.
+"""
+function tikhonov(B::TransferMatrix,v::MModes;tolerance::Float64=0.0)
+    alm = Alm(Complex128,lmax(B),mmax(B))
+    for m = 0:mmax(B)
+        Bm = B[m].block
+        vm = v[m].block
+        am = (Bm'*Bm + tolerance*I)\Bm'*vm
         idx = 1
-        for l = m:lmax(transfermatrix)
-            alm[l,m] = a[idx]
+        for l = m:lmax(B)
+            alm[l,m] = am[idx]
             idx += 1
         end
     end
     alm
 end
-
-\(transfermatrix::TransferMatrix,mmodes::MModes) = Alm(transfermatrix,mmodes)
 

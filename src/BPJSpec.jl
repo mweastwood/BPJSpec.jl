@@ -17,33 +17,25 @@ __precompile__()
 
 module BPJSpec
 
-export TransferMatrix, MModes
-export ProjectionMatrix
-export blocks, block
-export Nbase, Nfreq, lmax, mmax
-export visibilities
-
 export ObsParam
+export TransferMatrix
+export MModes, visibilities, tikhonov
+export ProjectionMatrix, compression
 
-using HDF5
+importall Base.Operators
 using HEALPix
+import HEALPix: Alm, lmax, mmax
 using CasaCore.Quanta
 using CasaCore.Measures
 using CasaCore.Tables
 using MeasurementSets
 
-importall Base.Operators
-import Base: touch
-import HEALPix: Alm, lmax, mmax
-
 include("special.jl")   # special functions
 include("planewave.jl") # plane-wave expansion
 include("physics.jl")   # physical constants and cosmology
 
-# These two functions are useful to
-# handle some of the special casing
-# required for m == 0 and negative m.
-one(m) = ifelse(m  > 0, 1, 0)
+# This function is useful to hand some of the
+# special casing required for m == 0
 two(m) = ifelse(m != 0, 2, 1)
 
 include("obs.jl")

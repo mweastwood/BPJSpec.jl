@@ -29,6 +29,11 @@ immutable ObsParam
     Ntime::Int
 end
 
+"""
+    ObsParam(ms::Table;mmax=100)
+
+Read the observational parameters from the given measurement set.
+"""
 function ObsParam(ms::Table;mmax::Int=100)
     # Populate the observational parameters from the information
     # attached to a measurement set and the desired mmax to use
