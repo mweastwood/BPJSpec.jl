@@ -10,8 +10,7 @@ for i = 1:10
     @test BPJSpec.Y(0,0,θ,ϕ) ≈ 1/2 * sqrt(1/π)
     @test BPJSpec.Y(1,0,θ,ϕ) ≈ 1/2 * sqrt(3/π) * cos(θ)
     @test BPJSpec.Y(1,+1,θ,ϕ) ≈ -1/2 * sqrt(3/(2π)) * sin(θ) * exp(+1im*ϕ)
-    # TODO: fix Condon-Shortley phase?
-    #@test BPJSpec.Y(1,-1,θ,ϕ) ≈ +1/2 * sqrt(3/(2π)) * sin(θ) * exp(-1im*ϕ)
+    @test BPJSpec.Y(1,-1,θ,ϕ) ≈ +1/2 * sqrt(3/(2π)) * sin(θ) * exp(-1im*ϕ)
 end
 
 # Test the plane wave expansion
