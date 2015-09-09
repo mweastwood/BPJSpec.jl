@@ -21,6 +21,7 @@ export ObsParam
 export TransferMatrix
 export MModes, visibilities, tikhonov
 export ProjectionMatrix, compression
+export CovarianceMatrix, ForegroundModel
 
 importall Base.Operators
 using HEALPix
@@ -43,6 +44,7 @@ include("transfermatrix.jl")
 include("mmodes.jl")
 include("projection.jl")
 include("alm.jl")
+include("covariancematrix.jl")
 
 include("cornerturn.jl")
 
