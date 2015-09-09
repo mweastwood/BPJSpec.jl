@@ -117,3 +117,68 @@ function call(model::ForegroundModel,l,ν1,ν2)
     Cforeground(l,ν1,ν2,model.ν0,model.A,model.α,model.β,model.ζ)
 end
 
+"""
+    Csignal_spherical(l,ν1,ν2,kedges,P) -> Cl::Float64
+
+Project a model of a spherically averaged spatial power spectrum
+to calculate the corresponding multifrequency angular power spectrum.
+There are two branches because a limit must be taken as `ν1-ν2` tends
+to zero.
+
+This projection assumes that the power spectrum is constant within
+the bins defined by `kedges`. The integral is then analytically
+evaluated within each bin.
+
+    1/(π*r1*r2) * ∫dk*P(k)*cos(sqrt(k^2-k⟂^2)*Δr)*k/sqrt(k^2-k⟂^2)
+
+Note that because `kedges` defines the edges of each of the bins,
+the length of `kedges` should be one greater than the length of `P`.
+"""
+function Csignal_spherical(l,ν1,ν2,kedges,P)
+    if ν1 == ν2
+        z = redshift(ν1)
+        r = comoving_distance(z)
+        kperp = l/r
+        out = 0.0
+        for i = 1:length(P)
+            kperp ≥ kedges[i+1] && continue
+            kmax = kedges[i+1]
+            kmin = max(kedges[i],kperp)
+            out += (sqrt(kmax^2-kperp^2)
+                   -sqrt(kmin^2-kperp^2))*P[i]/(π*r^2)
+        end
+        return out
+    else
+        z1 = redshift(ν1)
+        z2 = redshift(ν2)
+        r1 = comoving_distance(z1)
+        r2 = comoving_distance(z2)
+        Δr = r2-r1
+        rmean = (r1+r2)/2
+        kperp = l/rmean
+        out = 0.0
+        for i = 1:length(P)
+            kperp ≥ kedges[i+1] && continue
+            kmax = kedges[i+1]
+            kmin = max(kedges[i],kperp)
+            out += (sin(sqrt(kmax^2-kperp^2)*Δr)
+                   -sin(sqrt(kmin^2-kperp^2)*Δr))*P[i]/(π*Δr*r1*r2)
+        end
+        return out
+    end
+end
+
+immutable SphericalSignalModel <: AbstractComponent
+    kedges::Vector{Float64} # These define the edges of power spectrum bins
+    power::Vector{Float64}
+end
+
+function call(model::ForegroundModel,l,ν1,ν2)
+    Csignal_spherical(l,ν1,ν2,model.kedges,model.P)
+end
+
+# TODO: implement CylindricalSignalModel
+# This will have cylindrical binning of the power spectrum.
+# That is, allow the power spectrum to be specified as a
+# function of kperp and kpara.
+

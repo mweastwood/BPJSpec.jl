@@ -56,3 +56,12 @@ let Nant = 3, mmax = 5
     @test data ≈ data′
 end
 
+let
+    ν = 45.0
+    z = BPJSpec.redshift(ν)
+    r = BPJSpec.comoving_distance(z)
+    k = logspace(log10(0.03),log10(0.3))
+    P = ones(length(k)-1)
+    @test BPJSpec.Csignal_spherical(0,ν,ν,k,P) ≈ (k[end]-k[1])/(π*r^2)
+end
+
