@@ -18,10 +18,16 @@ import GSL: sf_legendre_sphPlm
 """
     Y(l,m,θ,ϕ)
 
-The spherical harmonic function.
+The spherical harmonic function (using the Condon-Shortley phase
+convention).
 """
 function Y(l,m,θ,ϕ)
-    sf_legendre_sphPlm(l,abs(m),cos(θ))*exp(1im*m*ϕ)
+    out = sf_legendre_sphPlm(l,abs(m),cos(θ))*exp(1im*m*ϕ)
+    # GSL already applies the Condon-Shortley phase convention
+    # to this result, so if we want m < 0 we need to undo the
+    # factor of (-1)^m.
+    out *= m < 0? (-1)^(-m) : 1
+    out
 end
 
 """

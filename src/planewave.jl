@@ -20,8 +20,8 @@ function planewave(u,v,w,Δphase=0.0;lmax::Int=100,mmax::Int=100)
     realpart = Alm(Complex128,lmax,mmax)
     imagpart = Alm(Complex128,lmax,mmax)
     for m = 0:mmax, l = m:lmax
-        alm1 = 4π*(1im)^l*j(l,2π*b)*conj(Y(l,+m,θ,ϕ))*exp(1im*Δphase)
-        alm2 = 4π*(1im)^l*j(l,2π*b)*conj(Y(l,-m,θ,ϕ))*exp(1im*Δphase)
+        alm1 = 4π*(1im)^l*j(l,2π*b)*conj(       Y(l,+m,θ,ϕ))*exp(1im*Δphase)
+        alm2 = 4π*(1im)^l*j(l,2π*b)*conj((-1)^m*Y(l,-m,θ,ϕ))*exp(1im*Δphase)
         realpart[l,m] = (alm1 + conj(alm2))/2
         imagpart[l,m] = (alm1 - conj(alm2))/2im
     end
