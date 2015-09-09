@@ -13,76 +13,67 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-@doc """
+"""
+    cornerturn(mslist::Vector{Table},obs::ObsParam)
+
 The data coming off the correlator is grouped by time.
 We would instead like to have the data grouped by frequency
 so that we can Fourier transform each visibility with
 respect to time. This requires a corner turn.
-""" ->
-function cornerturn(mslist::Vector{Table},
-                    obs::ObsParam;
-                    outputdir::ASCIIString = "")
-    @time data_by_channel, weights_by_channel = touch(obs,outputdir)
-    @time for ms in mslist
-        grid!(data_by_channel,weights_by_channel,ms,obs,outputdir)
-    end
-    @time for β = 1:Nfreq(obs)
-        file = joinpath(outputdir,filename(freq(obs)[β]))
-        write_data(file,data_by_channel[β],weights_by_channel[β])
-    end
-end
-
-@doc """
-If the output files don't exist, initialize them to zero.
-Returns the current set of gridded data and weights
-(ie. zero if the files don't already exist).
-""" ->
-function touch(obs::ObsParam,outputdir)
-    data_by_channel = Matrix{Complex64}[]
-    weights_by_channel = Vector{Float64}[]
+"""
+function cornerturn(mslist::Vector{Table},obs::ObsParam)
+    Nms = length(mslist)
+    data    = Array{Matrix{Complex64}}(Nfreq(obs))
+    weights = Array{Vector{Float64}}(Nfreq(obs))
     for β = 1:Nfreq(obs)
-        file = joinpath(outputdir,filename(freq(obs)[β]))
-        if isfile(file)
-            data, weights = read_data(file)
-        else
-            data = zeros(Complex64,Nbase(obs),Ntime(obs))
-            weights = zeros(Float64,Ntime(obs))
-            write_data(file,data,weights)
-        end
-        push!(data_by_channel,data)
-        push!(weights_by_channel,weights)
+        data[β]    = zeros(Complex64,Nbase(obs),Ntime(obs))
+        weights[β] = zeros(Float64,Ntime(obs))
     end
-    data_by_channel,weights_by_channel
+    for ms in mslist
+        grid!(data,weights,ms,obs)
+    end
+    for β = 1:Nfreq(obs)
+        normalize!(data[β],weights[β])
+    end
+    data
 end
 
-@doc """
-Grid the data in LST.
-""" ->
-function grid!(data_by_channel, weights_by_channel,
-               ms::Table,obs::ObsParam,outputdir)
+"""
+Grid the data in sidereal time.
+"""
+function grid!(data_by_channel,
+               weights_by_channel,
+               ms::Table,
+               obs::ObsParam)
     lock(ms)
 
     pos   = MeasurementSets.position(ms)
     time  = MeasurementSets.time(ms)
     frame = ReferenceFrame()
     set!(frame,pos)
-    lst = days(measure(frame,time,Measures.LAST))
-    lst = mod(lst,1) # Discard the information on which day it is
+    set!(frame,time)
+    zenith = Direction(Measures.AZEL,Quantity(0.0,Degree),Quantity(90.0,Degree))
+    zenith_app  = measure(frame,zenith,Measures.APP)
+    zenith_itrf = measure(frame,zenith,Measures.ITRFDIR)
+    time = longitude(zenith_app,Quanta.Degree) - longitude(zenith_itrf,Quanta.Degree)
+    time = mod(time/360,1)
 
     data  = MeasurementSets.corrected_data(ms)
     flags = MeasurementSets.flags(ms)
 
-    grid!(data_by_channel, weights_by_channel,
-          lst,data,flags,obs,outputdir)
+    grid!(data_by_channel,
+          weights_by_channel,
+          time,data,flags,obs)
 
     unlock(ms)
 end
 
-function grid!(data_by_channel, weights_by_channel,
-               lst,data,flags,obs,outputdir)
+function grid!(data_by_channel,
+               weights_by_channel,
+               time,data,flags,obs)
     # Identify the two nearest time gridpoints
     # and calculate their corresponding weights
-    pseudo_idx = lst*Ntime(obs)+1
+    pseudo_idx = time*Ntime(obs)+1
     idx1 = floor(Int,pseudo_idx)
     idx2 =  ceil(Int,pseudo_idx)
     weight1 =  (pseudo_idx-idx1)/(idx2-idx1)
@@ -92,8 +83,6 @@ function grid!(data_by_channel, weights_by_channel,
     for β = 1:Nfreq(obs)
         gridded_data = data_by_channel[β]
         weights = weights_by_channel[β]
-        # TODO: verify that Ntime and Nbase are consistent with
-        # the sizes of gridded_data and weights
         weights[idx1] += weight1
         weights[idx2] += weight2
         α1 = 1 # baseline index into data (counts autocorrelations)
@@ -111,5 +100,9 @@ function grid!(data_by_channel, weights_by_channel,
     end
 end
 
-filename(ν) = @sprintf("%.3fMHz_data.h5",ν/1e6)
+function normalize!(data,weights)
+    for idx = 1:size(data,2), α = 1:size(data,1)
+        data[α,idx] /= weights[idx]
+    end
+end
 
