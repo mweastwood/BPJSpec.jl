@@ -18,10 +18,10 @@ __precompile__()
 module BPJSpec
 
 export ObsParam
-export TransferMatrix
+export TransferMatrix, SpectralTransferMatrix
 export MModes, visibilities, tikhonov
 export ProjectionMatrix, compression
-export CovarianceMatrix, ForegroundModel
+export CovarianceMatrix, ForegroundModel, congruence
 
 importall Base.Operators
 using HEALPix

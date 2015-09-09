@@ -33,9 +33,14 @@ immutable CovarianceMatrix
     blocks::Matrix{CovarianceMatrixBlock}
 end
 
+function CovarianceMatrix(Nfreq)
+    CovarianceMatrix(Array{CovarianceMatrixBlock}(Nfreq,Nfreq))
+end
+
 Nfreq(C::CovarianceMatrix) = size(C.blocks,1)
 blocksize(C::CovarianceMatrix) = size(C[1,1].block,1)
 getindex(C::CovarianceMatrix,β1,β2) = C.blocks[β1,β2]
+setindex!(C::CovarianceMatrix,x,β1,β2) = C.blocks[β1,β2] = x
 
 """
     congruence(B::SpectralTransferMatrix,C::CovarianceMatrix) -> B*C*B'
@@ -45,7 +50,12 @@ the transfer matrix. That is, change the basis of the covariance matrix
 from spherical harmonic coefficients to m-modes.
 """
 function congruence(B::SpectralTransferMatrix,C::CovarianceMatrix)
-    # TODO: write this
+    Nfreq(B) == Nfreq(C) || error("The values of Nfreq must be the same.")
+    out = CovarianceMatrix(Nfreq(C))
+    for β2 = 1:Nfreq(C), β1 = 1:Nfreq(C)
+        out[β1,β2] = CovarianceMatrixBlock(B[β1].block*C[β1,β2].block*B[β2].block')
+    end
+    out
 end
 
 abstract AbstractComponent
