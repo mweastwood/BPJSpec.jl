@@ -32,7 +32,6 @@ using CasaCore.Tables
 using MeasurementSets
 
 include("special.jl")   # special functions
-include("planewave.jl") # plane-wave expansion
 include("physics.jl")   # physical constants and cosmology
 
 # This function is useful to hand some of the
