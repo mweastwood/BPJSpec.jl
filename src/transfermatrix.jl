@@ -92,6 +92,26 @@ getindex(B::SpectralTransferMatrix,β) = B.blocks[β]
 getindex(B::SpectralTransferMatrix,α,β,l) = B[β][α,l]
 setindex!(B::SpectralTransferMatrix,x,α,β,l) = B[β][α,l] = x
 
+Base.size(B::TransferMatrixBlock) = size(B.block)
+function Base.size(B::TransferMatrix)
+    x = 0; y = 0
+    for m = 0:mmax(B)
+        sz = size(B[m])
+        x += sz[1]
+        y += sz[2]
+    end
+    x,y
+end
+function Base.size(B::SpectralTransferMatrix)
+    x = 0; y = 0
+    for β = 1:Nfreq(B)
+        sz = size(B[β])
+        x += sz[1]
+        y += sz[2]
+    end
+    x,y
+end
+
 """
     TransferMatrix(beam::HEALPixMap,obs::ObsParam,channel;lmax=100,mmax=100)
 
@@ -168,5 +188,18 @@ function SpectralTransferMatrix(m,matrices::Vector{TransferMatrix})
         push!(blocks,matrix[m])
     end
     SpectralTransferMatrix{lmax′,mmax′}(m,blocks)
+end
+
+function Base.full(B::SpectralTransferMatrix)
+    out = zeros(Complex128,size(B))
+    idx1 = 1; idx2 = 1
+    for β = 1:Nfreq(B)
+        block = B[β].block
+        out[idx1:idx1+size(block,1)-1,
+            idx2:idx2+size(block,2)-1] = block
+        idx1 += size(block,1)
+        idx2 += size(block,2)
+    end
+    out
 end
 

@@ -62,6 +62,8 @@ for T in (:MModeBlock,:MModes,:SpectralMModes)
     @eval mmax{m}(v::$T{m}) = m
 end
 
+Nfreq(v::SpectralMModes) = length(v.blocks)
+
 function ==(lhs::MModeBlock,rhs::MModeBlock)
     lhs.block == rhs.block && lhs.m == rhs.m && mmax(lhs) == mmax(rhs)
 end
@@ -84,6 +86,10 @@ setindex!(v::MModes,x,α,m) = v[m][α] = x
 getindex(v::SpectralMModes,β) = v.blocks[β]
 getindex(v::SpectralMModes,α,β) = v.blocks[β][α]
 setindex!(v::SpectralMModes,x,α,β) = v.blocks[β][α] = x
+
+Base.length(v::MModeBlock) = length(v.block)
+Base.length(v::MModes) = sum([length(v[m]) for m = 0:mmax(v)])
+Base.length(v::SpectralMModes) = sum([length(v[β]) for β = 1:Nfreq(v)])
 
 function *(B::TransferMatrix,alm::Alm)
     lmax(B) == lmax(alm) || error("The values of lmax must be the same.")
@@ -140,5 +146,16 @@ function visibilities(v::MModes)
         M[α,Ntime+1-m] = conj(v[α2,m])
     end
     ifft(M,2)*Ntime
+end
+
+function Base.full(v::SpectralMModes)
+    out = zeros(Complex128,length(v))
+    idx = 1
+    for β = 1:Nfreq(v)
+        block = v[β].block
+        out[idx:idx+length(block)-1] = block
+        idx += length(block)
+    end
+    out
 end
 

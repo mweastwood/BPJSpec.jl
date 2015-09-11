@@ -19,7 +19,7 @@ module BPJSpec
 
 export ObsParam
 export TransferMatrix, SpectralTransferMatrix
-export MModes, visibilities, tikhonov
+export MModes, SpectralMModes, visibilities, tikhonov
 export ProjectionMatrix, compression
 export CovarianceMatrix, ForegroundModel, SphericalSignalModel, congruence
 
