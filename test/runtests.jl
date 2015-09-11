@@ -38,6 +38,14 @@ for i = 1:10
     @test trace(A*B) ≈ BPJSpec.tr(A,B)
 end
 
+# Test force_hermitian and force_posdef
+let
+    A = rand(10,10)
+    @test ishermitian(BPJSpec.force_hermitian(A))
+    B = diagm(linspace(1,-1e-11,10))
+    @test isposdef(BPJSpec.force_posdef(B))
+end
+
 # Tests against Ned Wright's cosmology calculator
 # (www.astro.ucla.edu/~wright/CosmoCalc.html)
 # - remember to set H0 = 69, OmegaM = 0.29, flat

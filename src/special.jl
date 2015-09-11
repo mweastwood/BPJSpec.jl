@@ -77,3 +77,21 @@ function planewave(u,v,w,Δphase=0.0;lmax::Int=100,mmax::Int=100)
     realpart,imagpart
 end
 
+"""
+    force_hermitian(A) -> 0.5*(A+A')
+
+Force the matrix `A` to be Hermitian. This is intended to be used
+on matrices that are nearly Hermitian, but not
+to the numerical precision required by `ishermitian`.
+"""
+force_hermitian(A) = 0.5*(A+A')
+
+"""
+    force_posdef(A,ϵ=1e-10) -> A+ϵ*I
+
+If the matrix `A`, is nearly positive definite, but has small
+negative eigenvalues, this function can be used to make the matrix
+positive definite.
+"""
+force_posdef(A,ϵ=1e-10) = A+ϵ*I
+
