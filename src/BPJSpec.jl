@@ -21,7 +21,7 @@ export ObsParam
 export TransferMatrix, SpectralTransferMatrix
 export MModes, visibilities, tikhonov
 export ProjectionMatrix, compression
-export CovarianceMatrix, ForegroundModel, congruence
+export CovarianceMatrix, ForegroundModel, SphericalSignalModel, congruence
 
 importall Base.Operators
 using HEALPix

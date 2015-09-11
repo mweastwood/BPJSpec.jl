@@ -100,7 +100,7 @@ a foreground component. Note that `ν0`, `A`, `α`, `β`, and `ζ` are
 all parameters of the model.
 """
 function Cforeground(l,ν1,ν2,ν0,A,α,β,ζ)
-    (A * ((l+1)/100)^(-α)
+    (A * (l+1)^(-α)
         * (ν1*ν2/ν0^2)^(-β)
         * exp(-log(ν1/ν2)^2/(2*ζ^2)))
 end
@@ -173,8 +173,8 @@ immutable SphericalSignalModel <: AbstractComponent
     power::Vector{Float64}
 end
 
-function call(model::ForegroundModel,l,ν1,ν2)
-    Csignal_spherical(l,ν1,ν2,model.kedges,model.P)
+function call(model::SphericalSignalModel,l,ν1,ν2)
+    Csignal_spherical(l,ν1,ν2,model.kedges,model.power)
 end
 
 # TODO: implement CylindricalSignalModel
