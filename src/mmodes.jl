@@ -50,12 +50,13 @@ This type stores the m-modes corresponding to a single value of
 `m`, but all frequency channels.
 """
 immutable SpectralMModes{mmax}
+    m::Int
     blocks::Vector{MModeBlock{mmax}}
 end
 
 function SpectralMModes(Nbase,Nfreq,mmax,m)
     blocks = [MModeBlock(Nbase,mmax,m) for β = 1:Nfreq]
-    MModes{mmax}(blocks)
+    MModes{mmax}(m,blocks)
 end
 
 for T in (:MModeBlock,:MModes,:SpectralMModes)
@@ -146,6 +147,24 @@ function visibilities(v::MModes)
         M[α,Ntime+1-m] = conj(v[α2,m])
     end
     ifft(M,2)*Ntime
+end
+
+"""
+    SpectralMModes(m,vectors::Vector{MModes})
+
+Construct a SpectralMModes vector from the given list of m-modes.
+Each m-mode vector should correspond to a different frequency channel.
+"""
+function SpectralMModes(m,vectors::Vector{MModes})
+    mmax′ = mmax(vectors[1])
+    blocks = MModeBlock[]
+    for vector in vectors
+        if mmax(vector) != mmax′
+            error("The m-modes must all have the same mmax.")
+        end
+        push!(blocks,vector[m])
+    end
+    SpectralMModes{mmax′}(m,blocks)
 end
 
 function Base.full(v::SpectralMModes)

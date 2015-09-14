@@ -104,7 +104,7 @@ let
     mmax = 10
     a = BPJSpec.MModeBlock{mmax}(0,complex(randn(5),randn(5)))
     b = BPJSpec.MModeBlock{mmax}(0,complex(randn(5),randn(5)))
-    v = SpectralMModes{mmax}([a,b])
+    v = SpectralMModes{mmax}(0,[a,b])
     @test full(v) == [a.block; b.block]
 end
 
