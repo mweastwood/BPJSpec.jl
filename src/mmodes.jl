@@ -126,6 +126,24 @@ function MModes{T<:Complex}(visibilities::Matrix{T};
 end
 
 """
+    MModes(β,vectors::Vector{SpectralMModes})
+
+Construct an `MModes` vector by picking a single frequency channel `β`.
+The `SpectralMModes` vectors must be sorted in order of increasing `m`.
+"""
+function MModes(β,vectors::Vector{SpectralMModes})
+    mmax′ = mmax(vectors[1])
+    length(vectors) == mmax′+1 || error("Missing a complete set of m-modes.")
+    blocks = MModeBlock[]
+    for (i,vector) in enumerate(vectors)
+        mmax(vector) == mmax′ || error("The m-modes must all have the same mmax.")
+        vector.m+1 == i || error("The m-modes must be sorted in order of increasing `m`.")
+        push!(blocks,vector[β])
+    end
+    MModes{mmax′}(blocks)
+end
+
+"""
     visibilities(v::MModes)
 
 Calculate the visibilities from the given m-modes. The visibilities
@@ -152,19 +170,29 @@ end
 """
     SpectralMModes(m,vectors::Vector{MModes})
 
-Construct a SpectralMModes vector from the given list of m-modes.
+Construct a `SpectralMModes` vector from the given list of m-modes.
 Each m-mode vector should correspond to a different frequency channel.
 """
 function SpectralMModes(m,vectors::Vector{MModes})
     mmax′ = mmax(vectors[1])
     blocks = MModeBlock[]
     for vector in vectors
-        if mmax(vector) != mmax′
-            error("The m-modes must all have the same mmax.")
-        end
+        mmax(vector) == mmax′ || error("The m-modes must all have the same mmax.")
         push!(blocks,vector[m])
     end
     SpectralMModes{mmax′}(m,blocks)
+end
+
+"""
+    SpectralMModes(Nfreq,mmax,m,vector::Vector{Complex128})
+
+This is the inverse to `Base.full(v::SpectralMModes)`. That is,
+construct a `SpectralMModes` vector from a `Vector{Complex128}`.
+"""
+function SpectralMModes(Nfreq,mmax,m,vector::Vector{Complex128})
+    N = div(length(vector),Nfreq)
+    blocks = [MModeBlock{mmax}(m,vector[(β-1)*N+1:β*N]) for β = 1:Nfreq]
+    SpectralMModes{mmax}(m,blocks)
 end
 
 function Base.full(v::SpectralMModes)
