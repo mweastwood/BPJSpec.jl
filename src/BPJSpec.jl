@@ -18,6 +18,7 @@ __precompile__()
 module BPJSpec
 
 export ObsParam
+export lmax, mmax, Nfreq
 export TransferMatrix, SpectralTransferMatrix
 export MModes, SpectralMModes, visibilities, tikhonov
 export ProjectionMatrix, compression
