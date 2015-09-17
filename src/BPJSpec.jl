@@ -25,8 +25,8 @@ export ProjectionMatrix, compression
 export CovarianceMatrix, ForegroundModel, SphericalSignalModel, congruence
 
 importall Base.Operators
-using HEALPix
-import HEALPix: Alm, lmax, mmax
+using LibHealpix
+import LibHealpix: Alm, lmax, mmax
 using CasaCore.Quanta
 using CasaCore.Measures
 using CasaCore.Tables

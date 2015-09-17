@@ -113,11 +113,11 @@ function Base.size(B::SpectralTransferMatrix)
 end
 
 """
-    TransferMatrix(beam::HEALPixMap,obs::ObsParam,channel;lmax=100,mmax=100)
+    TransferMatrix(beam::HealpixMap,obs::ObsParam,channel;lmax=100,mmax=100)
 
 Construct a transfer matrix for the given beam model and observational parameters.
 """
-function TransferMatrix(beam::HEALPixMap,
+function TransferMatrix(beam::HealpixMap,
                         obs::ObsParam,
                         channel;
                         lmax::Int = 100,
@@ -131,7 +131,7 @@ function TransferMatrix(beam::HEALPixMap,
 end
 
 function populate!(B::TransferMatrix,
-                   beam::HEALPixMap,
+                   beam::HealpixMap,
                    obs::ObsParam,
                    channel)
     positions = antpos(obs)
