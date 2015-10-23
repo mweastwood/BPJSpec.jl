@@ -27,10 +27,9 @@ export CovarianceMatrix, ForegroundModel, SphericalSignalModel, congruence
 importall Base.Operators
 using LibHealpix
 import LibHealpix: Alm, lmax, mmax
-using CasaCore.Quanta
 using CasaCore.Measures
 using CasaCore.Tables
-using MeasurementSets
+using TTCal
 
 include("special.jl")   # special functions
 include("physics.jl")   # physical constants and cosmology

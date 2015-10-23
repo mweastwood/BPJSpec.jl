@@ -14,15 +14,15 @@ for i = 1:10
 end
 
 # Test the plane wave expansion
-using HEALPix
+using LibHealpix
 let u = 2.0, v = -3.0, w = 2.0
     alm_real, alm_imag = BPJSpec.planewave(u,v,w)
     map_real = alm2map(alm_real,nside=512)
     map_imag = alm2map(alm_imag,nside=512)
-    map_test_real = HEALPixMap(Float64,512)
-    map_test_imag = HEALPixMap(Float64,512)
+    map_test_real = HealpixMap(Float64,512)
+    map_test_imag = HealpixMap(Float64,512)
     for i = 1:nside2npix(512)
-        vec = HEALPix.pix2vec_ring(512,i)
+        vec = LibHealpix.pix2vec_ring(512,i)
         phase = 2π*(u*vec[1]+v*vec[2]+w*vec[3])
         map_test_real[i] = cos(phase)
         map_test_imag[i] = sin(phase)
