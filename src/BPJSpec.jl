@@ -17,6 +17,8 @@ __precompile__()
 
 module BPJSpec
 
+using HDF5
+
 export ObsParam
 export lmax, mmax, Nfreq
 export TransferMatrix, SpectralTransferMatrix

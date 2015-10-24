@@ -1,7 +1,10 @@
 using BPJSpec
 using Base.Test
+using HDF5
 
 srand(123)
+
+include("cornerturn.jl")
 
 # Test special functions
 for i = 1:10
