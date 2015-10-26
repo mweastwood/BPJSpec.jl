@@ -62,7 +62,7 @@ function grid(filename, ms::MeasurementSet)
     grid(filename, time, reduced_data, reduced_flags)
 end
 
-"""
+doc"""
     sidereal_time(ms::MeasurementSet)
 
 Get the local sidereal time on the interval $\left(0,1\right]$ for
