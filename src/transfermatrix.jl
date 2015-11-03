@@ -13,8 +13,39 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+doc"""
+    healpix(frame::ReferenceFrame, beam::BeamModel, frequency)
+
+Create a Healpix map of a TTCal beam model.
+
+At the moment only the $I \rightarrow I$ element of the Mueller
+matrix is used.
 """
-    TransferMatrixBlock{lmax,mmax}
+function healpix(frame::ReferenceFrame, beam::BeamModel, frequency)
+    zenith = measure(frame,Direction(dir"AZEL",Quantity(0.0,"deg"),Quantity(90.0,"deg")),dir"APP")
+    zenith_dec = latitude(zenith,"rad")
+    zenith_vec = LibHealpix.ang2vec(π/2-zenith_dec,0.0)
+    global_north = [0.0,0.0,1.0]
+    local_north  = gramschmidt(global_north,zenith_vec)
+    map = HealpixMap(zeros(nside2npix(512)))
+    for i = 1:length(map)
+        vec = LibHealpix.pix2vec_ring(512,i)
+        el  = π/2 - angle_between(vec,zenith_vec)
+        vec = gramschmidt(vec,zenith_vec)
+        az  = angle_between(vec,local_north)
+        if el < 0
+            map[i] = 0
+        else
+            J = beam(frequency,az,el)
+            M = mueller(J)
+            map[i] = M[1,1]
+        end
+    end
+    map
+end
+
+"""
+    immutable TransferMatrixBlock{lmax,mmax}
 
 This type stores a single block of the transfer matrix. These blocks
 correspond to a single frequency channel and a single value of `m`.
