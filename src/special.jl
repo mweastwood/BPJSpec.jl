@@ -95,3 +95,41 @@ positive definite.
 """
 force_posdef(A,ϵ=1e-10) = A+ϵ*I
 
+doc"""
+    gramschmidt(u,v)
+
+Remove the projection of $u$ onto $v$ from $u$ for unit vectors $u$ and $v$.
+That is, compute $u - u\cdot u$ but the output is normalized.
+"""
+function gramschmidt(u,v)
+    u = u - dot(u,v)*v
+    normalize!(u)
+end
+
+doc"""
+    angle_between(u,v)
+
+Compute the angle between the vectors $u$ and $v$.
+"""
+function angle_between(u,v)
+    normalize!(u)
+    normalize!(v)
+    # if u and v are unit vectors, only numerical errors
+    # will push the dot product out of the range [-1,+1]
+    dot_product = clamp(dot(u,v),-1.0,1.0)
+    acos(dot_product)
+end
+
+doc"""
+    normalize!(u)
+
+Normalize the vector $u$.
+"""
+function normalize!(u)
+    n = norm(u,2)
+    for i in eachindex(u)
+        u[i] = u[i]/n
+    end
+    u
+end
+
