@@ -32,7 +32,7 @@ It is used to compress the dataset and remove unwanted
 foreground power.
 """
 immutable ProjectionMatrix{mmax}
-    blocks::Vector{Matrix{Complex128}}
+    blocks::Vector{ProjectionMatrixBlock{mmax}}
 end
 
 mmax{m}(P::ProjectionMatrixBlock{m}) = m
@@ -78,10 +78,10 @@ because we're not actually discarding any of the singular
 values.
 """
 function compression(B::TransferMatrix)
-    blocks = Array{Matrix{Complex128}}(mmax(B)+1)
+    blocks = Array{ProjectionMatrixBlock{mmax(B)}}(mmax(B)+1)
     for m = 0:mmax(B)
         U,σ,V = svd(B[m])
-        blocks[m+1] = U[:,1:length(σ)]'
+        blocks[m+1] = ProjectionMatrixBlock{mmax(B)}(m,U[:,1:length(σ)]')
     end
     ProjectionMatrix{mmax(B)}(blocks)
 end
