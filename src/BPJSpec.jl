@@ -17,8 +17,6 @@ __precompile__()
 
 module BPJSpec
 
-using HDF5
-
 export ObsParam
 export lmax, mmax, Nfreq
 export TransferMatrix, SpectralTransferMatrix
@@ -26,12 +24,15 @@ export MModes, SpectralMModes, visibilities, tikhonov
 export ProjectionMatrix, compression
 export CovarianceMatrix, ForegroundModel, SphericalSignalModel, congruence
 
+export load_visibilities
+
 importall Base.Operators
 using LibHealpix
 import LibHealpix: Alm, lmax, mmax
 using CasaCore.Measures
 using CasaCore.Tables
 using TTCal
+using HDF5
 
 include("special.jl")   # special functions
 include("physics.jl")   # physical constants and cosmology

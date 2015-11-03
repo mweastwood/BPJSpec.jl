@@ -18,7 +18,8 @@ let Nfreq = 2, Nbase = 10, Ntime = 11
 end
 
 # test grid
-let Nfreq = 2, Nbase = 10, Ntime = 11
+let Nfreq = 2, Nant = 5, Ntime = 11
+    Nbase = div(Nant*(Nant-1),2)
     filename = tempname()*".h5"
     BPJSpec.touch(filename,Nfreq,Nbase,Ntime)
 
@@ -39,5 +40,9 @@ let Nfreq = 2, Nbase = 10, Ntime = 11
             @test group["weights"][:,2:Ntime] == zeros(Nbase,Ntime-1)
         end
     end
+
+    name,ms = createms(Nant,Nfreq)
+    t = BPJSpec.sidereal_time(ms)
+    @show t
 end
 

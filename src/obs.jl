@@ -14,7 +14,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 """
-    ObsParam
+    immutable ObsParam
 
 This is a container that stores some basic information about
 the interferometer and thed data being processed.

@@ -37,11 +37,25 @@ function touch(filename, Nfreq, Nbase, Ntime)
     end
 end
 
-function grid(filename, ms::MeasurementSet)
+"""
+    grid(filename, ms::MeasurementSet)
+
+Grid the data from the measurement set.
+"""
+grid(filename, ms::MeasurementSet) = grid(filename, ms, 1:ms.Nfreq)
+
+"""
+    grid(filename, ms::MeasurementSet, channels)
+
+Grid the data from the measurement set, but select a subset
+of the frequency channels.
+"""
+function grid(filename, ms::MeasurementSet, channels)
     isfile(filename) || error("$filename does not exist!")
     time  = sidereal_time(ms)
     data  = TTCal.get_corrected_data(ms)
     flags = TTCal.get_flags(ms)
+    Nfreq = length(channels)
 
     # keep only the "Stokes I" visibilities and discard the
     # autocorrelations because they have an additive noise bias
@@ -52,9 +66,9 @@ function grid(filename, ms::MeasurementSet)
     idx = 1
     for α = 1:ms.Nbase
         ms.ant1[α] == ms.ant2[α] && continue
-        for β = 1:ms.Nbase
-            reduced_data[idx,β]  = 0.5*(data[1,β,α] + data[4,β,α])
-            reduced_flags[idx,β] = flags[1,β,α] || flags[4,β,α]
+        for β = 1:Nfreq
+            reduced_data[idx,β]  = 0.5*(data[1,channels[β],α] + data[4,channels[β],α])
+            reduced_flags[idx,β] = flags[1,channels[β],α] || flags[4,channels[β],α]
         end
         idx += 1
     end
@@ -65,20 +79,24 @@ end
 doc"""
     sidereal_time(ms::MeasurementSet)
 
-Get the local sidereal time on the interval $\left(0,1\right]$ for
+Get the local sidereal time on the interval $0 \le t < 1$ for
 the given measurement set.
 """
 function sidereal_time(ms::MeasurementSet)
     zenith = Direction(dir"AZEL",Quantity(0.0,"deg"),Quantity(90.0,"deg"))
-    zenith_app = measure(ms.frame,zenith,Measures.APP)
-    time = longitude(zenith_app,Quanta.Degree)
+    zenith_app = measure(ms.frame,zenith,dir"APP")
+    time = longitude(zenith_app,"deg")
+    # BEGIN TEMP FIX (until I regenerate transfer matrices)
+    zenith_itrf = measure(ms.frame,zenith,dir"ITRF")
+    time -= longitude(zenith_itrf,"deg")
+    # END TEMP FIX
     mod(time/360,1)
 end
 
 doc"""
     grid(filename, time, data, flags)
 
-For a sidereal time on the interval $\left(0,1\right]$, grid and
+For a sidereal time on the interval $0 \le t < 1$, grid and
 add the data to the given file.
 
 Here "grid" means to put the data onto a set of points that are
@@ -100,30 +118,62 @@ function grid(filename, time, data, flags)
         Δt = 1/Ntime
         grid = 0.0:Δt:(1.0-Δt)
         idx1 = searchsortedlast(grid,time)
-        idx2 = idx1 == Ntime? 0 : idx1+1
+        idx2 = idx1 == Ntime? 1 : idx1+1
         weight1 = 1 - abs(time - grid[idx1])/Δt
         weight2 = 1 - abs(time - grid[idx2])/Δt
 
         for β = 1:Nfreq
             group = file[string(β)]
-            realpart = group["real"][:,idx1:idx2]::Matrix{Float64}
-            imagpart = group["imag"][:,idx1:idx2]::Matrix{Float64}
-            weights  = group["weights"][:,idx1:idx2]::Matrix{Float64}
+
+            realpart1 = group["real"][:,idx1]::Matrix{Float64}
+            imagpart1 = group["imag"][:,idx1]::Matrix{Float64}
+            realpart2 = group["real"][:,idx2]::Matrix{Float64}
+            imagpart2 = group["imag"][:,idx2]::Matrix{Float64}
+            weights1  = group["weights"][:,idx1]::Matrix{Float64}
+            weights2  = group["weights"][:,idx2]::Matrix{Float64}
 
             for α = 1:Nbase
                 flags[α,β] && continue
-                realpart[α,1] += weight1 * real(data[α,β])
-                imagpart[α,1] += weight1 * imag(data[α,β])
-                realpart[α,2] += weight2 * real(data[α,β])
-                imagpart[α,2] += weight2 * imag(data[α,β])
-                weights[α,1] += weight1
-                weights[α,2] += weight2
+                realpart1[α] += weight1 * real(data[α,β])
+                imagpart1[α] += weight1 * imag(data[α,β])
+                realpart2[α] += weight2 * real(data[α,β])
+                imagpart2[α] += weight2 * imag(data[α,β])
+                weights1[α] += weight1
+                weights2[α] += weight2
             end
 
-            group["real"][:,idx1:idx2]  = realpart
-            group["imag"][:,idx1:idx2]  = imagpart
-            group["weights"][:,idx1:idx2] = weights
+            group["real"][:,idx1]  = realpart1
+            group["imag"][:,idx1]  = imagpart1
+            group["real"][:,idx2]  = realpart2
+            group["imag"][:,idx2]  = imagpart2
+            group["weights"][:,idx1] = weights1
+            group["weights"][:,idx2] = weights2
         end
     end
+end
+
+function load_visibilities(filename, channel)
+    local Nfreq, Nbase
+    local data, weights
+    h5open(filename,"r") do file
+        Nfreq = attrs(file)["Nfreq"] |> read
+        Nbase = attrs(file)["Nbase"] |> read
+
+        group = file[string(channel)]
+        realpart = group["real"] |> read
+        imagpart = group["imag"] |> read
+        weights  = group["weights"] |> read
+        data = complex(realpart,imagpart)
+    end
+    for i in eachindex(data,weights)
+        weights[i] == 0 && continue
+        data[i] = data[i] / weights[i]
+    end
+    # Zero any baselines that are missing data
+    #for α = 1:Nbase
+    #    any(slice(weights,α,:) .== 0) || continue
+    #    data[α,:] = 0
+    #end
+    data
 end
 
