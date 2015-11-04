@@ -10,8 +10,7 @@ let Nfreq = 2, Nbase = 10, Ntime = 11
         for β = 1:Nfreq
             @test string(β) in names(file)
             group = file[string(β)]
-            @test group["real"] |> read == zeros(Nbase,Ntime)
-            @test group["imag"] |> read == zeros(Nbase,Ntime)
+            @test group["data"] |> read == zeros(2,Nbase,Ntime)
             @test group["weights"] |> read == zeros(Nbase,Ntime)
         end
     end
@@ -30,19 +29,11 @@ let Nfreq = 2, Nant = 5, Ntime = 11
     h5open(filename,"r") do file
         for β = 1:Nfreq
             group = file[string(β)]
-
-            @test squeeze(group["real"][:,1],2) == data[:,β] |> real
-            @test squeeze(group["imag"][:,1],2) == data[:,β] |> imag
+            @test squeeze(group["data"][:,:,1],3) == reinterpret(Float32,data[:,β],(2,Nbase))
             @test squeeze(group["weights"][:,1],2) == ones(Nbase)
-
-            @test group["real"][:,2:Ntime] == zeros(Nbase,Ntime-1)
-            @test group["imag"][:,2:Ntime] == zeros(Nbase,Ntime-1)
+            @test group["data"][:,:,2:Ntime] == zeros(2,Nbase,Ntime-1)
             @test group["weights"][:,2:Ntime] == zeros(Nbase,Ntime-1)
         end
     end
-
-    name,ms = createms(Nant,Nfreq)
-    t = BPJSpec.sidereal_time(ms)
-    @show t
 end
 

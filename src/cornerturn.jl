@@ -26,12 +26,7 @@ function touch(filename, Nfreq, Nbase, Ntime)
         attrs(file)["Ntime"] = Ntime
         for β = 1:Nfreq
             group = g_create(file,string(β))
-            # create datasets to store the real and imaginary
-            # components of the visibilities
-            group["real"] = zeros(Nbase,Ntime)
-            group["imag"] = zeros(Nbase,Ntime)
-            # create a dataset that essentially counts the fractional
-            # number of integrations that go into each sidereal time
+            group["data"] = zeros(2,Nbase,Ntime)
             group["weights"] = zeros(Nbase,Ntime)
         end
     end
@@ -86,10 +81,6 @@ function sidereal_time(ms::MeasurementSet)
     zenith = Direction(dir"AZEL",Quantity(0.0,"deg"),Quantity(90.0,"deg"))
     zenith_app = measure(ms.frame,zenith,dir"APP")
     time = longitude(zenith_app,"deg")
-    # BEGIN TEMP FIX (until I regenerate transfer matrices)
-    zenith_itrf = measure(ms.frame,zenith,dir"ITRF")
-    time -= longitude(zenith_itrf,"deg")
-    # END TEMP FIX
     mod(time/360,1)
 end
 
@@ -125,27 +116,23 @@ function grid(filename, time, data, flags)
         for β = 1:Nfreq
             group = file[string(β)]
 
-            realpart1 = group["real"][:,idx1]::Matrix{Float64}
-            imagpart1 = group["imag"][:,idx1]::Matrix{Float64}
-            realpart2 = group["real"][:,idx2]::Matrix{Float64}
-            imagpart2 = group["imag"][:,idx2]::Matrix{Float64}
-            weights1  = group["weights"][:,idx1]::Matrix{Float64}
-            weights2  = group["weights"][:,idx2]::Matrix{Float64}
+            data1 = group["data"][:,:,idx1]::Array{Float64,3}
+            data2 = group["data"][:,:,idx2]::Array{Float64,3}
+            weights1 = group["weights"][:,idx1]::Array{Float64,2}
+            weights2 = group["weights"][:,idx2]::Array{Float64,2}
 
             for α = 1:Nbase
                 flags[α,β] && continue
-                realpart1[α] += weight1 * real(data[α,β])
-                imagpart1[α] += weight1 * imag(data[α,β])
-                realpart2[α] += weight2 * real(data[α,β])
-                imagpart2[α] += weight2 * imag(data[α,β])
+                data1[1,α] += weight1 * real(data[α,β])
+                data1[2,α] += weight1 * imag(data[α,β])
+                data2[1,α] += weight2 * real(data[α,β])
+                data2[2,α] += weight2 * imag(data[α,β])
                 weights1[α] += weight1
                 weights2[α] += weight2
             end
 
-            group["real"][:,idx1]  = realpart1
-            group["imag"][:,idx1]  = imagpart1
-            group["real"][:,idx2]  = realpart2
-            group["imag"][:,idx2]  = imagpart2
+            group["data"][:,:,idx1] = data1
+            group["data"][:,:,idx2] = data2
             group["weights"][:,idx1] = weights1
             group["weights"][:,idx2] = weights2
         end
@@ -153,27 +140,21 @@ function grid(filename, time, data, flags)
 end
 
 function load_visibilities(filename, channel)
-    local Nfreq, Nbase
     local data, weights
     h5open(filename,"r") do file
         Nfreq = attrs(file)["Nfreq"] |> read
         Nbase = attrs(file)["Nbase"] |> read
+        Ntime = attrs(file)["Ntime"] |> read
 
         group = file[string(channel)]
-        realpart = group["real"] |> read
-        imagpart = group["imag"] |> read
-        weights  = group["weights"] |> read
-        data = complex(realpart,imagpart)
+        rawdata = group["data"] |> read
+        weights = group["weights"] |> read
+        data = reinterpret(Complex128,rawdata,(Nbase,Ntime))
     end
     for i in eachindex(data,weights)
         weights[i] == 0 && continue
         data[i] = data[i] / weights[i]
     end
-    # Zero any baselines that are missing data
-    #for α = 1:Nbase
-    #    any(slice(weights,α,:) .== 0) || continue
-    #    data[α,:] = 0
-    #end
     data
 end
 
