@@ -26,18 +26,20 @@ export MModes, SpectralMModes, visibilities, tikhonov
 export ProjectionMatrix, compression
 export CovarianceMatrix, ForegroundModel, SphericalSignalModel, congruence
 
-importall Base.Operators
-using LibHealpix
-import LibHealpix: Alm, lmax, mmax
 using CasaCore.Measures
 using CasaCore.Tables
+using LibHealpix
 using TTCal
 using JLD
+
+importall Base.Operators
+import GSL
+import LibHealpix: Alm, lmax, mmax
 
 include("special.jl")   # special functions
 include("physics.jl")   # physical constants and cosmology
 
-# This function is useful to hand some of the
+# This function is useful to handle some of the
 # special casing required for m == 0
 two(m) = ifelse(m != 0, 2, 1)
 
@@ -49,7 +51,6 @@ include("mmodes.jl")
 include("projection.jl")
 include("alm.jl")
 include("covariancematrix.jl")
-
 
 end
 
