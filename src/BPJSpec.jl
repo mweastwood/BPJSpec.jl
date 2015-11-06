@@ -41,6 +41,8 @@ include("physics.jl")   # physical constants and cosmology
 # special casing required for m == 0
 two(m) = ifelse(m != 0, 2, 1)
 
+include("visibilities.jl")
+
 include("obs.jl")
 include("transfermatrix.jl")
 include("mmodes.jl")
@@ -48,7 +50,6 @@ include("projection.jl")
 include("alm.jl")
 include("covariancematrix.jl")
 
-include("cornerturn.jl")
 
 end
 

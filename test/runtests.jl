@@ -88,7 +88,7 @@ function createms(Nant,Nfreq)
 end
 
 srand(123)
-include("cornerturn.jl")
+include("visibilities.jl")
 
 #=
 # Test special functions
