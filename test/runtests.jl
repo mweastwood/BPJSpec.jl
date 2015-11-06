@@ -2,8 +2,8 @@ using BPJSpec
 using Base.Test
 using CasaCore.Measures
 using CasaCore.Tables
-using HDF5
 using TTCal
+using JLD
 
 function xyz2uvw(x,y,z)
     Nant = length(x)

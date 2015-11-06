@@ -14,49 +14,53 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 doc"""
-    touch(filename, Nfreq, Nbase, Ntime)
+    create_empty_visibilities(filename, Nfreq, Nbase, Ntime)
 
-Create the HDF5 file that will store the data that
+Create the JLD file that will store the data that
 feeds into $m$-mode analysis.
 """
-function touch(filename, Nfreq, Nbase, Ntime)
-    h5open(filename,"w") do file
-        attrs(file)["Nfreq"] = Nfreq
-        attrs(file)["Nbase"] = Nbase
-        attrs(file)["Ntime"] = Ntime
+function create_empty_visibilities(filename, Nfreq, Nbase, Ntime)
+    jldopen(filename,"w") do file
+        file["Nfreq"] = Nfreq
+        file["Nbase"] = Nbase
+        file["Ntime"] = Ntime
         for β = 1:Nfreq
-            group = g_create(file,string(β))
-            group["data"] = zeros(2,Nbase,Ntime)
-            group["weights"] = zeros(Nbase,Ntime)
+            file["$β/data"] = zeros(Complex128,Nbase,Ntime)
+            file["$β/weights"] = zeros(Float64,Nbase,Ntime)
         end
     end
 end
 
 """
-    grid(filename, ms::MeasurementSet)
+    grid_visibilities(filename, ms::MeasurementSet)
 
 Grid the data from the measurement set.
 """
-grid(filename, ms::MeasurementSet) = grid(filename, ms, 1:ms.Nfreq)
+grid_visibilities(filename, ms::MeasurementSet) = grid_visibilities(filename, ms, 1:ms.Nfreq)
 
 """
-    grid(filename, ms::MeasurementSet, channels)
+    grid_visibilities(filename, ms::MeasurementSet, channels)
 
 Grid the data from the measurement set, but select a subset
 of the frequency channels.
 """
-function grid(filename, ms::MeasurementSet, channels)
+function grid_visibilities(filename, ms::MeasurementSet, channels)
     isfile(filename) || error("$filename does not exist!")
+
+    # Note that the following value for Nbase does not count the autocorrelations.
+    # On the other hand ms.Nbase does count the autocorrelations, so these two
+    # quantities are not equal.
+    Nbase = div(ms.Nant*(ms.Nant-1),2)
+    Nfreq = length(channels)
+
     time  = sidereal_time(ms)
     data  = TTCal.get_corrected_data(ms)
     flags = TTCal.get_flags(ms)
-    Nfreq = length(channels)
 
     # keep only the "Stokes I" visibilities and discard the
     # autocorrelations because they have an additive noise bias
-    reduced_Nbase = div(ms.Nant*(ms.Nant-1),2)
-    reduced_data  = zeros(Complex64,reduced_Nbase,ms.Nfreq)
-    reduced_flags = zeros(     Bool,reduced_Nbase,ms.Nfreq)
+    reduced_data  = zeros(Complex64,Nbase,ms.Nfreq)
+    reduced_flags = zeros(     Bool,Nbase,ms.Nfreq)
 
     idx = 1
     for α = 1:ms.Nbase
@@ -68,7 +72,7 @@ function grid(filename, ms::MeasurementSet, channels)
         idx += 1
     end
 
-    grid(filename, time, reduced_data, reduced_flags)
+    grid_visibilities(filename, time, reduced_data, reduced_flags)
 end
 
 doc"""
@@ -85,7 +89,7 @@ function sidereal_time(ms::MeasurementSet)
 end
 
 doc"""
-    grid(filename, time, data, flags)
+    grid_visibilities(filename, time, data, flags)
 
 For a sidereal time on the interval $0 \le t < 1$, grid and
 add the data to the given file.
@@ -98,11 +102,11 @@ day so that these integrations will slowly start slipping with
 respect to sidereal time as we begin to average more days together.
 By gridding onto a sidereal time grid, we avoid this problem.
 """
-function grid(filename, time, data, flags)
-    h5open(filename,"r+") do file
-        Nfreq = attrs(file)["Nfreq"] |> read
-        Nbase = attrs(file)["Nbase"] |> read
-        Ntime = attrs(file)["Ntime"] |> read
+function grid_visibilities(filename, time, data, flags)
+    jldopen(filename,"r+") do file
+        Nfreq = file["Nfreq"] |> read
+        Nbase = file["Nbase"] |> read
+        Ntime = file["Ntime"] |> read
 
         # Identify the two nearest time gridpoints
         # and calculate their corresponding weights
@@ -114,41 +118,38 @@ function grid(filename, time, data, flags)
         weight2 = 1 - abs(time - grid[idx2])/Δt
 
         for β = 1:Nfreq
-            group = file[string(β)]
-
-            data1 = group["data"][:,:,idx1]::Array{Float64,3}
-            data2 = group["data"][:,:,idx2]::Array{Float64,3}
-            weights1 = group["weights"][:,idx1]::Array{Float64,2}
-            weights2 = group["weights"][:,idx2]::Array{Float64,2}
+            # use type assertions here to prevent type uncertainty
+            # from slowing down the inner loop
+            data1 = file["$β/data"][:,idx1]::Array{Complex128,2}
+            data2 = file["$β/data"][:,idx2]::Array{Complex128,2}
+            weights1 = file["$β/weights"][:,idx1]::Array{Float64,2}
+            weights2 = file["$β/weights"][:,idx2]::Array{Float64,2}
 
             for α = 1:Nbase
                 flags[α,β] && continue
-                data1[1,α] += weight1 * real(data[α,β])
-                data1[2,α] += weight1 * imag(data[α,β])
-                data2[1,α] += weight2 * real(data[α,β])
-                data2[2,α] += weight2 * imag(data[α,β])
+                data1[α] += weight1 * data[α,β]
+                data2[α] += weight2 * data[α,β]
                 weights1[α] += weight1
                 weights2[α] += weight2
             end
 
-            group["data"][:,:,idx1] = data1
-            group["data"][:,:,idx2] = data2
-            group["weights"][:,idx1] = weights1
-            group["weights"][:,idx2] = weights2
+            file["$β/data"][:,idx1] = data1
+            file["$β/data"][:,idx2] = data2
+            file["$β/weights"][:,idx1] = weights1
+            file["$β/weights"][:,idx2] = weights2
         end
     end
 end
 
 function load_visibilities(filename, channel)
     local data, weights
-    h5open(filename,"r") do file
-        Nfreq = attrs(file)["Nfreq"] |> read
-        Nbase = attrs(file)["Nbase"] |> read
-        Ntime = attrs(file)["Ntime"] |> read
+    jldopen(filename,"r") do file
+        Nfreq = file["Nfreq"] |> read
+        Nbase = file["Nbase"] |> read
+        Ntime = file["Ntime"] |> read
 
-        group = file[string(channel)]
-        rawdata = group["data"] |> read
-        weights = group["weights"] |> read
+        rawdata = file["$channel/data"] |> read
+        weights = file["$channel/weights"] |> read
         data = reinterpret(Complex128,rawdata,(Nbase,Ntime))
     end
     for i in eachindex(data,weights)
