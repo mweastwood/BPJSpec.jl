@@ -30,12 +30,15 @@ let Nbase = 1, lmax = 3, mmax = 3
     ν = 45e6
     phasecenter = (0,0,1)
     B = gentransfer(beam,u,v,w,ν,phasecenter,lmax=lmax,mmax=mmax)
-    for m = 0:mmax, l = m:lmax, α = 1:Nbase
-        if m == l == 0
-            @test abs(B[α,l,m]) > 1
-        else
-            @test abs(B[α,l,m]) < 1e-5 # likeley limited by accuracy of spherical harmonic transform
-        end
+
+    for α = 1:Nbase
+        @test abs(B[α,0,0]) > 1
+    end
+    for l = 1:lmax, α = 1:Nbase
+        @test abs(B[α,l,0]) < 1e-5 # likeley limited by accuracy of spherical harmonic transform
+    end
+    for m = 1:mmax, l = m:lmax, α = 1:2Nbase
+        @test abs(B[α,l,m]) < 1e-5 # likeley limited by accuracy of spherical harmonic transform
     end
 
 end
