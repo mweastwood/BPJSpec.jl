@@ -19,38 +19,42 @@ module BPJSpec
 
 export create_empty_visibilities, grid_visibilities, load_visibilities
 
-export ObsParam
-export lmax, mmax, Nfreq
-export TransferMatrix, SpectralTransferMatrix
-export MModes, SpectralMModes, visibilities, tikhonov
-export ProjectionMatrix, compression
-export CovarianceMatrix, ForegroundModel, SphericalSignalModel, congruence
+export TransferMatrix, gentransfer, one_ν, one_m
+
+#export ObsParam
+#export lmax, mmax, Nfreq
+#export MModes, SpectralMModes, visibilities, tikhonov
+#export ProjectionMatrix, compression
+#export CovarianceMatrix, ForegroundModel, SphericalSignalModel, congruence
 
 using CasaCore.Measures
 using CasaCore.Tables
-using LibHealpix
-using TTCal
 using JLD
+using LibHealpix
+using ProgressMeter
+using TTCal
 
 importall Base.Operators
+import Cosmology
 import GSL
 import LibHealpix: Alm, lmax, mmax
 
-include("special.jl")   # special functions
-include("physics.jl")   # physical constants and cosmology
+include("special.jl") # special functions
+include("physics.jl") # physical constants and cosmology
+include("blocks.jl")  # block vectors and matrices
 
 # This function is useful to handle some of the
 # special casing required for m == 0
 two(m) = ifelse(m != 0, 2, 1)
 
 include("visibilities.jl")
-
-include("obs.jl")
 include("transfermatrix.jl")
-include("mmodes.jl")
-include("projection.jl")
-include("alm.jl")
-include("covariancematrix.jl")
+
+#include("obs.jl")
+#include("mmodes.jl")
+#include("projection.jl")
+#include("alm.jl")
+#include("covariancematrix.jl")
 
 end
 

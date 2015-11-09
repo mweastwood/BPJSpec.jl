@@ -20,7 +20,6 @@ const HI = 1420.40575177 # MHz
 const Jy = 1e-26 # one Jansky in mks unints
 
 # cosmology
-import Cosmology
 const cosmology = Cosmology.cosmology()
 
 """
