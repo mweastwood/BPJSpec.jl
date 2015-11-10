@@ -9,7 +9,7 @@ let Nfreq = 2, Nbase = 10, Ntime = 11
         @test file["Nbase"] |> read == Nbase
         @test file["Ntime"] |> read == Ntime
         for β = 1:Nfreq
-            name  = @sprintf("%.3f",frequencies[β]/1e6)
+            name  = @sprintf("%.3fMHz",frequencies[β]/1e6)
             @test name in names(file)
             group = file[name]
             @test group["data"] |> read == zeros(Complex128,Nbase,Ntime)
@@ -31,7 +31,7 @@ let Nfreq = 2, Nant = 5, Ntime = 11
 
     jldopen(filename,"r") do file
         for β = 1:Nfreq
-            name  = @sprintf("%.3f",frequencies[β]/1e6)
+            name  = @sprintf("%.3fMHz",frequencies[β]/1e6)
             @test name in names(file)
             group = file[name]
             @test squeeze(group["data"][:,1],2) == data[:,β]

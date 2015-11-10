@@ -26,7 +26,7 @@ function create_empty_visibilities(filename, Nbase, Ntime, frequencies)
         file["Nbase"] = Nbase
         file["Ntime"] = Ntime
         for β = 1:Nfreq
-            name  = @sprintf("%.3f",frequencies[β]/1e6)
+            name  = @sprintf("%.3fMHz",frequencies[β]/1e6)
             group = g_create(file,name)
             group["data"] = zeros(Complex128,Nbase,Ntime)
             group["weights"] = zeros(Float64,Nbase,Ntime)
@@ -112,7 +112,7 @@ function grid_visibilities(filename, data, flags, frequencies, time)
         weight2 = 1 - abs(time - grid[idx2])/Δt
 
         for β = 1:Nfreq
-            name  = @sprintf("%.3f",frequencies[β]/1e6)
+            name  = @sprintf("%.3fMHz",frequencies[β]/1e6)
             group = file[name]
 
             # use type assertions here to prevent type uncertainty
@@ -145,7 +145,7 @@ function load_visibilities(filename, frequency)
         Nbase = file["Nbase"] |> read
         Ntime = file["Ntime"] |> read
 
-        name  = @sprintf("%.3f",frequency/1e6)
+        name  = @sprintf("%.3fMHz",frequency/1e6)
         group = file[name]
         rawdata = group["data"] |> read
         weights = group["weights"] |> read
