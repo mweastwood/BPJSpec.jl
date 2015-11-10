@@ -1,3 +1,18 @@
+let
+    frame = ReferenceFrame()
+    set!(frame,Position(pos"ITRF",q"0.0m",q"0.0deg",q"90.0deg"))
+    set!(frame,Epoch(epoch"UTC",Quantity(50237.29,"d")))
+    beam = healpix(frame,SineBeam(1.0),45e6)
+    for i = 1:length(beam)
+        θ,ϕ = LibHealpix.pix2ang_ring(512,i)
+        if θ < π/2
+            @test abs(beam[i] - cos(θ)) < 1e-5
+        else
+            @test abs(beam[i]) < 1e-5
+        end
+    end
+end
+
 let Nbase = 10, lmax = 10
     @test BPJSpec.default_size(BPJSpec.TransferMatrixBlock,Nbase,lmax,0) == (10,11)
     @test BPJSpec.default_size(BPJSpec.TransferMatrixBlock,Nbase,lmax,1) == (20,10)

@@ -19,7 +19,7 @@ module BPJSpec
 
 export create_empty_visibilities, grid_visibilities, load_visibilities
 
-export TransferMatrix, gentransfer, one_ν, one_m
+export TransferMatrix, healpix, gentransfer, one_ν, one_m
 
 #export ObsParam
 #export lmax, mmax, Nfreq

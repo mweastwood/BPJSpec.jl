@@ -28,7 +28,7 @@ function healpix(frame::ReferenceFrame, beam::BeamModel, frequency)
     global_north = [0.0,0.0,1.0]
     local_north  = gramschmidt(global_north,zenith_vec)
     map = HealpixMap(zeros(nside2npix(512)))
-    for i = 1:length(map)
+    @showprogress 1 "Creating map of the beam..." for i = 1:length(map)
         vec = LibHealpix.pix2vec_ring(512,i)
         el  = π/2 - angle_between(vec,zenith_vec)
         vec = gramschmidt(vec,zenith_vec)
