@@ -29,7 +29,7 @@ export TransferMatrix, healpix, gentransfer, one_ν, one_m
 
 using CasaCore.Measures
 using CasaCore.Tables
-using JLD
+using HDF5, JLD
 using LibHealpix
 using ProgressMeter
 using TTCal

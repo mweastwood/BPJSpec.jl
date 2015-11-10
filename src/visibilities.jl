@@ -14,19 +14,22 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 doc"""
-    create_empty_visibilities(filename, Nfreq, Nbase, Ntime)
+    create_empty_visibilities(filename, Nbase, Ntime, frequencies)
 
 Create the JLD file that will store the data that
 feeds into $m$-mode analysis.
 """
-function create_empty_visibilities(filename, Nfreq, Nbase, Ntime)
+function create_empty_visibilities(filename, Nbase, Ntime, frequencies)
+    Nfreq = length(frequencies)
     jldopen(filename,"w",compress=true) do file
         file["Nfreq"] = Nfreq
         file["Nbase"] = Nbase
         file["Ntime"] = Ntime
         for β = 1:Nfreq
-            file["$β/data"] = zeros(Complex128,Nbase,Ntime)
-            file["$β/weights"] = zeros(Float64,Nbase,Ntime)
+            name  = @sprintf("%.3f",frequencies[β]/1e6)
+            group = g_create(file,name)
+            group["data"] = zeros(Complex128,Nbase,Ntime)
+            group["weights"] = zeros(Float64,Nbase,Ntime)
         end
     end
 end
@@ -36,22 +39,13 @@ end
 
 Grid the data from the measurement set.
 """
-grid_visibilities(filename, ms::MeasurementSet) = grid_visibilities(filename, ms, 1:ms.Nfreq)
-
-"""
-    grid_visibilities(filename, ms::MeasurementSet, channels)
-
-Grid the data from the measurement set, but select a subset
-of the frequency channels.
-"""
-function grid_visibilities(filename, ms::MeasurementSet, channels)
+function grid_visibilities(filename, ms::MeasurementSet)
     isfile(filename) || error("$filename does not exist!")
 
     # Note that the following value for Nbase does not count the autocorrelations.
-    # On the other hand ms.Nbase does count the autocorrelations, so these two
+    # On the other hand ms.Nbase does count the autocorrelations. These two
     # quantities are not equal.
     Nbase = div(ms.Nant*(ms.Nant-1),2)
-    Nfreq = length(channels)
 
     time  = sidereal_time(ms)
     data  = TTCal.get_corrected_data(ms)
@@ -65,14 +59,14 @@ function grid_visibilities(filename, ms::MeasurementSet, channels)
     idx = 1
     for α = 1:ms.Nbase
         ms.ant1[α] == ms.ant2[α] && continue
-        for β = 1:Nfreq
-            reduced_data[idx,β]  = 0.5*(data[1,channels[β],α] + data[4,channels[β],α])
-            reduced_flags[idx,β] = flags[1,channels[β],α] || flags[4,channels[β],α]
+        for β = 1:ms.Nfreq
+            reduced_data[idx,β]  = 0.5*(data[1,β,α] + data[4,β,α])
+            reduced_flags[idx,β] = flags[1,β,α] || flags[4,β,α]
         end
         idx += 1
     end
 
-    grid_visibilities(filename, time, reduced_data, reduced_flags)
+    grid_visibilities(filename, reduced_data, reduced_flags, frequencies, time)
 end
 
 doc"""
@@ -89,7 +83,7 @@ function sidereal_time(ms::MeasurementSet)
 end
 
 doc"""
-    grid_visibilities(filename, time, data, flags)
+    grid_visibilities(filename, data, flags, frequencies, time)
 
 For a sidereal time on the interval $0 \le t < 1$, grid and
 add the data to the given file.
@@ -102,7 +96,7 @@ day so that these integrations will slowly start slipping with
 respect to sidereal time as we begin to average more days together.
 By gridding onto a sidereal time grid, we avoid this problem.
 """
-function grid_visibilities(filename, time, data, flags)
+function grid_visibilities(filename, data, flags, frequencies, time)
     jldopen(filename,"r+",compress=true) do file
         Nfreq = file["Nfreq"] |> read
         Nbase = file["Nbase"] |> read
@@ -118,12 +112,15 @@ function grid_visibilities(filename, time, data, flags)
         weight2 = 1 - abs(time - grid[idx2])/Δt
 
         for β = 1:Nfreq
+            name  = @sprintf("%.3f",frequencies[β]/1e6)
+            group = file[name]
+
             # use type assertions here to prevent type uncertainty
             # from slowing down the inner loop
-            data1 = file["$β/data"][:,idx1]::Array{Complex128,2}
-            data2 = file["$β/data"][:,idx2]::Array{Complex128,2}
-            weights1 = file["$β/weights"][:,idx1]::Array{Float64,2}
-            weights2 = file["$β/weights"][:,idx2]::Array{Float64,2}
+            data1 = group["data"][:,idx1]::Array{Complex128,2}
+            data2 = group["data"][:,idx2]::Array{Complex128,2}
+            weights1 = group["weights"][:,idx1]::Array{Float64,2}
+            weights2 = group["weights"][:,idx2]::Array{Float64,2}
 
             for α = 1:Nbase
                 flags[α,β] && continue
@@ -133,23 +130,25 @@ function grid_visibilities(filename, time, data, flags)
                 weights2[α] += weight2
             end
 
-            file["$β/data"][:,idx1] = data1
-            file["$β/data"][:,idx2] = data2
-            file["$β/weights"][:,idx1] = weights1
-            file["$β/weights"][:,idx2] = weights2
+            group["data"][:,idx1] = data1
+            group["data"][:,idx2] = data2
+            group["weights"][:,idx1] = weights1
+            group["weights"][:,idx2] = weights2
         end
     end
 end
 
-function load_visibilities(filename, channel)
+function load_visibilities(filename, frequency)
     local data, weights
     jldopen(filename,"r") do file
         Nfreq = file["Nfreq"] |> read
         Nbase = file["Nbase"] |> read
         Ntime = file["Ntime"] |> read
 
-        rawdata = file["$channel/data"] |> read
-        weights = file["$channel/weights"] |> read
+        name  = @sprintf("%.3f",frequency/1e6)
+        group = file[name]
+        rawdata = group["data"] |> read
+        weights = group["weights"] |> read
         data = reinterpret(Complex128,rawdata,(Nbase,Ntime))
     end
     for i in eachindex(data,weights)
