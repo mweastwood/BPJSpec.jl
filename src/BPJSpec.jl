@@ -19,7 +19,8 @@ module BPJSpec
 
 export create_empty_visibilities, grid_visibilities, load_visibilities
 
-export TransferMatrix, healpix, gentransfer, one_ν, one_m
+export geocentric_baselines, geocentric_phasecenter, geocentric_beam
+export TransferMatrix, save_transfermatrix, load_transfermatrix, gentransfer
 
 #export ObsParam
 #export lmax, mmax, Nfreq

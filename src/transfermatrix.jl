@@ -14,16 +14,55 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 doc"""
-    healpix(frame::ReferenceFrame, beam::BeamModel, frequency)
+    geocentric_baselines(ms::MeasurementSet)
+
+Calculate the $(u,v,w)$ coordinates in the ITRF coordinate system with the phase
+center at geocentric north.
+"""
+function geocentric_baselines(ms::MeasurementSet)
+    antenna_table = Table(ms.table[kw"ANTENNA"])
+    positions = antenna_table["POSITION"]
+    unlock(antenna_table)
+
+    u = zeros(ms.Nbase)
+    v = zeros(ms.Nbase)
+    w = zeros(ms.Nbase)
+    for α = 1:ms.Nbase
+        u[α] = positions[1,ms.ant1[α]] - positions[1,ms.ant2[α]]
+        v[α] = positions[2,ms.ant1[α]] - positions[2,ms.ant2[α]]
+        w[α] = positions[3,ms.ant1[α]] - positions[3,ms.ant2[α]]
+    end
+    u,v,w
+end
+
+doc"""
+    geocentric_phasecenter(ms::MeasurementSet)
+
+Calculate the geocentric $(l,m,n)$ coordinates corresponding to the phase
+center of the array. The longitude is chosen such that zenith is at 0 degrees.
+"""
+function geocentric_phasecenter(ms::MeasurementSet)
+    t = sidereal_time(ms)
+    phasecenter_app = measure(ms.frame,ms.phase_direction,dir"APP")
+    phasecenter_ra  = longitude(phasecenter_app,"rad")
+    phasecenter_dec =  latitude(phasecenter_app,"rad")
+    LibHealpix.ang2vec(π/2-phasecenter_dec, phasecenter_ra - 2π*t)
+end
+
+doc"""
+    geocentric_beam(frame::ReferenceFrame, beam::BeamModel, frequency)
 
 Create a Healpix map of a TTCal beam model.
-
 At the moment only the $I \rightarrow I$ element of the Mueller
 matrix is used.
+
+The coordinate system is geocentric and the longitude is chosen
+such that zenith is at 0 degrees longitude.
 """
-function healpix(frame::ReferenceFrame, beam::BeamModel, frequency)
-    zenith = measure(frame,Direction(dir"AZEL",Quantity(0.0,"deg"),Quantity(90.0,"deg")),dir"APP")
-    zenith_dec = latitude(zenith,"rad")
+function geocentric_beam(frame::ReferenceFrame, beam::BeamModel, frequency)
+    zenith = Direction(dir"AZEL",Quantity(0.0,"deg"),Quantity(90.0,"deg"))
+    zenith_app = measure(frame,zenith,dir"APP")
+    zenith_dec = latitude(zenith_app,"rad")
     zenith_vec = LibHealpix.ang2vec(π/2-zenith_dec,0.0)
     global_north = [0.0,0.0,1.0]
     local_north  = gramschmidt(global_north,zenith_vec)
@@ -165,6 +204,18 @@ getindex(B::TransferMatrix{one_m},β) = B.blocks[β]
 getindex(B::TransferMatrix{one_m},α,β,l) = B[β][α,l]
 setindex!(B::TransferMatrix{one_m},x,α,β,l) = B[β][α,l] = x
 
+frequency(B::TransferMatrix{one_ν}) = B[0].ν
+lmax(B::TransferMatrix{one_ν}) = B[0].lmax
+mmax(B::TransferMatrix{one_ν}) = length(B.blocks)-1
+
+function ==(lhs::TransferMatrixBlock, rhs::TransferMatrixBlock)
+    lhs.lmax == rhs.lmax && lhs.m == rhs.m && lhs.ν == rhs.ν && lhs.block == rhs.block
+end
+
+function =={rep}(lhs::TransferMatrix{rep}, rhs::TransferMatrix{rep})
+    lhs.blocks == rhs.blocks
+end
+
 #=
 function TransferMatrix(Nbase,lmax,mmax)
     blocks = [TransferMatrixBlock(Nbase,lmax,mmax,m) for m = 0:mmax]
@@ -183,15 +234,6 @@ for T in (:TransferMatrixBlock,:TransferMatrix,:SpectralTransferMatrix)
 end
 
 Nfreq(B::SpectralTransferMatrix) = length(B.blocks)
-
-function ==(lhs::TransferMatrixBlock,rhs::TransferMatrixBlock)
-    lhs.block == rhs.block && lhs.m == rhs.m &&
-        lmax(lhs) == lmax(rhs) && mmax(lhs) == mmax(rhs)
-end
-
-function ==(lhs::TransferMatrix,rhs::TransferMatrix)
-    lhs.blocks == rhs.blocks && lmax(lhs) == lmax(rhs) && mmax(lhs) == mmax(rhs)
-end
 
 Base.svd(B::TransferMatrixBlock) = svd(B.block)
 
@@ -260,6 +302,47 @@ function gentransfer!(B::TransferMatrix{one_ν},
         α += 1
     end
     B
+end
+
+function save_transfermatrix(filename, B::TransferMatrix{one_ν})
+    if !isfile(filename)
+        jldopen(filename,"w",compress=true) do file
+            file["lmax"] = lmax(B)
+            file["mmax"] = mmax(B)
+        end
+    end
+
+    jldopen(filename,"r+",compress=true) do file
+        read(file["lmax"]) == lmax(B) || error("lmax is inconsistent")
+        read(file["mmax"]) == mmax(B) || error("mmax is inconsistent")
+
+        name_ν  = @sprintf("%.3fMHz",frequency(B)/1e6)
+        name_ν in names(file) && error("group $(name_ν) already exists in file")
+        group_ν = g_create(file,name_ν)
+
+        for m = 0:mmax(B)
+            group_m = g_create(group_ν,string(m))
+            group_m["block"] = B[m].block
+        end
+    end
+end
+
+function load_transfermatrix(filename, frequency)
+    blocks = TransferMatrixBlock[]
+    jldopen(filename,"r") do file
+        lmax = file["lmax"] |> read
+        mmax = file["mmax"] |> read
+
+        name_ν  = @sprintf("%.3fMHz",frequency/1e6)
+        group_ν = file[name_ν]
+
+        for m = 0:mmax
+            group_m = group_ν[string(m)]
+            block = group_m["block"] |> read
+            push!(blocks,TransferMatrixBlock(block,lmax,m,frequency))
+        end
+    end
+    TransferMatrix(blocks)
 end
 
 #=

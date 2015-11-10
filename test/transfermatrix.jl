@@ -2,7 +2,7 @@ let
     frame = ReferenceFrame()
     set!(frame,Position(pos"ITRF",q"0.0m",q"0.0deg",q"90.0deg"))
     set!(frame,Epoch(epoch"UTC",Quantity(50237.29,"d")))
-    beam = healpix(frame,SineBeam(1.0),45e6)
+    beam = geocentric_beam(frame,SineBeam(1.0),45e6)
     for i = 1:length(beam)
         θ,ϕ = LibHealpix.pix2ang_ring(512,i)
         if θ < π/2
@@ -29,11 +29,11 @@ end
 let Nbase = 10, lmax = 10, mmax = 10
     blocks = [BPJSpec.TransferMatrixBlock(Nbase,lmax,m,45e6) for m = 0:mmax]
     B = TransferMatrix(blocks)
-    @test typeof(B) == TransferMatrix{one_ν}
+    @test typeof(B) == TransferMatrix{BPJSpec.one_ν}
 
     blocks = [BPJSpec.TransferMatrixBlock(Nbase,lmax,3,ν) for ν in linspace(45e6,50e6,5)]
     B = TransferMatrix(blocks)
-    @test typeof(B) == TransferMatrix{one_m}
+    @test typeof(B) == TransferMatrix{BPJSpec.one_m}
 end
 
 # infinitesimally short baselines should only have nonzero elements when l=m=0
@@ -50,11 +50,25 @@ let Nbase = 1, lmax = 3, mmax = 3
         @test abs(B[α,0,0]) > 1
     end
     for l = 1:lmax, α = 1:Nbase
-        @test abs(B[α,l,0]) < 1e-5 # likeley limited by accuracy of spherical harmonic transform
+        @test abs(B[α,l,0]) < 1e-5 # likely limited by accuracy of spherical harmonic transform
     end
     for m = 1:mmax, l = m:lmax, α = 1:2Nbase
-        @test abs(B[α,l,m]) < 1e-5 # likeley limited by accuracy of spherical harmonic transform
+        @test abs(B[α,l,m]) < 1e-5 # likely limited by accuracy of spherical harmonic transform
     end
+end
 
+# test transfermatrix i/o
+let Nbase = 100, lmax = 20, mmax = 20
+    filename = tempname()*".jld"
+    ν = 45e6
+
+    B1 = [BPJSpec.TransferMatrixBlock(Nbase,lmax,m,ν) for m = 0:mmax] |> TransferMatrix
+    for m = 0:mmax
+        rand!(B1[m].block)
+    end
+    save_transfermatrix(filename,B1)
+
+    B2 = load_transfermatrix(filename,ν)
+    @test B1 == B2
 end
 
