@@ -70,5 +70,17 @@ let Nbase = 100, lmax = 20, mmax = 20
 
     B2 = load_transfermatrix(filename,ν)
     @test B1 == B2
+
+    # and make sure we can write multiple frequencies to the same file
+    B3 = [BPJSpec.TransferMatrixBlock(Nbase,lmax,m,ν+1e6) for m = 0:mmax] |> TransferMatrix
+    for m = 0:mmax
+        rand!(B3[m].block)
+    end
+    save_transfermatrix(filename,B3)
+
+    B4 = load_transfermatrix(filename,ν)
+    B5 = load_transfermatrix(filename,ν+1e6)
+    @test B1 == B4
+    @test B3 == B5
 end
 
