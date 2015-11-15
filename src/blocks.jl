@@ -13,10 +13,14 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-abstract VectorBlock
+abstract VectorBlock # block that composes a vector
 abstract MatrixBlock
 typealias Block Union{VectorBlock,MatrixBlock}
 
 Base.size(A::Block) = size(A.block)
+Base.length(A::Block) = length(A.block)
 Base.svd(A::Block) = svd(A.block)
+
+abstract BlockVector # a vector composed of blocks
+abstract BlockDiagonalMatrix
 

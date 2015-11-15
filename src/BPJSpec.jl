@@ -17,14 +17,14 @@ __precompile__()
 
 module BPJSpec
 
-export create_empty_visibilities, grid_visibilities, load_visibilities
-
-export geocentric_baselines, geocentric_phasecenter, geocentric_beam
 export TransferMatrix, save_transfermatrix, load_transfermatrix, gentransfer
+export MModes, save_mmodes, load_mmodes, tikhonov
+
+export itrf_baselines, itrf_phasecenter, itrf_beam
+export visibilities, create_empty_visibilities, grid_visibilities, load_visibilities
 
 #export ObsParam
 #export lmax, mmax, Nfreq
-#export MModes, SpectralMModes, visibilities, tikhonov
 #export ProjectionMatrix, compression
 #export CovarianceMatrix, ForegroundModel, SphericalSignalModel, congruence
 
@@ -50,11 +50,11 @@ two(m) = ifelse(m != 0, 2, 1)
 
 include("visibilities.jl")
 include("transfermatrix.jl")
+include("mmodes.jl")
+include("alm.jl")
 
 #include("obs.jl")
-#include("mmodes.jl")
 #include("projection.jl")
-#include("alm.jl")
 #include("covariancematrix.jl")
 
 end

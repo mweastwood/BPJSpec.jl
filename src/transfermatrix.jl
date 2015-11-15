@@ -14,56 +14,54 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 doc"""
-    geocentric_baselines(ms::MeasurementSet)
+    itrf_baselines(ms::MeasurementSet)
 
 Calculate the $(u,v,w)$ coordinates in the ITRF coordinate system with the phase
-center at geocentric north.
+center at true north.
 """
-function geocentric_baselines(ms::MeasurementSet)
+function itrf_baselines(ms::MeasurementSet)
     antenna_table = Table(ms.table[kw"ANTENNA"])
     positions = antenna_table["POSITION"]
     unlock(antenna_table)
 
-    u = zeros(ms.Nbase)
-    v = zeros(ms.Nbase)
-    w = zeros(ms.Nbase)
+    # calculate the baselines while skipping the autocorrelations
+    Nbase = ms.Nbase - ms.Nant
+    u = zeros(Nbase)
+    v = zeros(Nbase)
+    w = zeros(Nbase)
+    idx = 1
     for α = 1:ms.Nbase
-        u[α] = positions[1,ms.ant1[α]] - positions[1,ms.ant2[α]]
-        v[α] = positions[2,ms.ant1[α]] - positions[2,ms.ant2[α]]
-        w[α] = positions[3,ms.ant1[α]] - positions[3,ms.ant2[α]]
+        ms.ant1[α] == ms.ant2[α] && continue
+        u[idx] = positions[1,ms.ant1[α]] - positions[1,ms.ant2[α]]
+        v[idx] = positions[2,ms.ant1[α]] - positions[2,ms.ant2[α]]
+        w[idx] = positions[3,ms.ant1[α]] - positions[3,ms.ant2[α]]
+        idx += 1
     end
     u,v,w
 end
 
 doc"""
-    geocentric_phasecenter(ms::MeasurementSet)
+    itrf_phasecenter(ms::MeasurementSet)
 
-Calculate the geocentric $(l,m,n)$ coordinates corresponding to the phase
-center of the array. The longitude is chosen such that zenith is at 0 degrees.
+Calculate the $(l,m,n)$ coordinates corresponding to the actual phase
+center of the array with respsect to true north.
 """
-function geocentric_phasecenter(ms::MeasurementSet)
-    t = sidereal_time(ms)
-    phasecenter_app = measure(ms.frame,ms.phase_direction,dir"APP")
-    phasecenter_ra  = longitude(phasecenter_app,"rad")
-    phasecenter_dec =  latitude(phasecenter_app,"rad")
-    LibHealpix.ang2vec(π/2-phasecenter_dec, phasecenter_ra - 2π*t)
+function itrf_phasecenter(ms::MeasurementSet)
+    itrf = measure(ms.frame,ms.phase_direction,dir"ITRF")
+    vector(itrf)
 end
 
 doc"""
-    geocentric_beam(frame::ReferenceFrame, beam::BeamModel, frequency)
+    itrf_beam(frame::ReferenceFrame, beam::BeamModel, frequency)
 
 Create a Healpix map of a TTCal beam model.
 At the moment only the $I \rightarrow I$ element of the Mueller
 matrix is used.
-
-The coordinate system is geocentric and the longitude is chosen
-such that zenith is at 0 degrees longitude.
 """
-function geocentric_beam(frame::ReferenceFrame, beam::BeamModel, frequency)
+function itrf_beam(frame::ReferenceFrame, beam::TTCal.BeamModel, frequency)
     zenith = Direction(dir"AZEL",Quantity(0.0,"deg"),Quantity(90.0,"deg"))
-    zenith_app = measure(frame,zenith,dir"APP")
-    zenith_dec = latitude(zenith_app,"rad")
-    zenith_vec = LibHealpix.ang2vec(π/2-zenith_dec,0.0)
+    zenith_itrf = measure(frame,zenith,dir"ITRF")
+    zenith_vec  = [vector(zenith_itrf)...]
     global_north = [0.0,0.0,1.0]
     local_north  = gramschmidt(global_north,zenith_vec)
     map = HealpixMap(zeros(nside2npix(512)))
@@ -76,8 +74,8 @@ function geocentric_beam(frame::ReferenceFrame, beam::BeamModel, frequency)
             map[i] = 0
         else
             J = beam(frequency,az,el)
-            M = mueller(J)
-            map[i] = M[1,1]
+            M = MuellerMatrix(J)
+            map[i] = M.mat[1,1]
         end
     end
     map
@@ -118,7 +116,7 @@ end
 @enum Representation one_ν one_m
 
 doc"""
-    immutable TransferMatrix{sym}
+    immutable TransferMatrix{rep}
 
 The transfer matrix represents the instrumental response of the
 interferometer to the spherical harmonic coefficients of the sky.
@@ -144,8 +142,6 @@ representation or the second.
 **Fields:**
 
 * `blocks` is a list of `TransferMatrixBlock`s
-* `lmax` and `mmax` stores the maximum values of $l$ and $m$ (the spherical
-   harmonic quantum numbers) respectively.
 """
 immutable TransferMatrix{rep}
     blocks::Vector{TransferMatrixBlock}
@@ -168,15 +164,13 @@ function TransferMatrix(blocks)
     mmax = length(m) - 1
 
     # if all the blocks are the same frequency and are sorted in order
-    # of increasing m, we have the one_ν representation of the transfer
-    # matrix
+    # of increasing m, we have the one_ν representation
     if length(unique(ν)) == 1 && m == collect(0:mmax)
         return TransferMatrix{one_ν}(blocks)
     end
 
     # if all the blocks have different frequencies (not necessarily sorted)
-    # but only have one value of m, we have the one_m representation of
-    # the transfer matrix
+    # but only have one value of m, we have the one_m
     if length(unique(ν)) == length(ν) && length(unique(m)) == 1
         return TransferMatrix{one_m}(blocks)
     end
@@ -187,6 +181,10 @@ function TransferMatrix(blocks)
     * have a consistent frequency channel representing all values of m from 0 to some mmax, or
     * have different frequency channels, but a consistent value of m
     """)
+end
+
+function TransferMatrix(Nbase,lmax,mmax,ν::Float64)
+    [TransferMatrixBlock(Nbase,lmax,m,ν) for m = 0:mmax] |> TransferMatrix
 end
 
 # α labels the baseline
@@ -217,27 +215,13 @@ function =={rep}(lhs::TransferMatrix{rep}, rhs::TransferMatrix{rep})
 end
 
 #=
-function TransferMatrix(Nbase,lmax,mmax)
-    blocks = [TransferMatrixBlock(Nbase,lmax,mmax,m) for m = 0:mmax]
-    TransferMatrix{lmax,mmax}(blocks)
-end
-
-
 function SpectralTransferMatrix(Nbase,Nfreq,lmax,mmax,m)
     blocks = [TransferMatrixBlock(Nbase,lmax,mmax,m) for β = 1:Nfreq]
     SpectralTransferMatrix{lmax,mmax}(m,blocks)
 end
 
-for T in (:TransferMatrixBlock,:TransferMatrix,:SpectralTransferMatrix)
-    @eval lmax{l,m}(B::$T{l,m}) = l
-    @eval mmax{l,m}(B::$T{l,m}) = m
-end
-
 Nfreq(B::SpectralTransferMatrix) = length(B.blocks)
 
-Base.svd(B::TransferMatrixBlock) = svd(B.block)
-
-Base.size(B::TransferMatrixBlock) = size(B.block)
 function Base.size(B::TransferMatrix)
     x = 0; y = 0
     for m = 0:mmax(B)
@@ -259,6 +243,21 @@ end
 =#
 
 """
+    gentransfer(ms::MeasurementSet, beam::TTCal.BeamModel, channel; lmax = 100, mmax = 100)
+
+Generate a transfer matrix where the instrumental parameters are read from a
+measurement set.
+"""
+function gentransfer(ms::MeasurementSet, beam::TTCal.BeamModel, channel;
+                     lmax::Int = 100, mmax::Int = 100)
+    healpix_beam = itrf_beam(ms.frame,beam,ms.ν[channel])
+    u,v,w = itrf_baselines(ms)
+    phasecenter = itrf_phasecenter(ms)
+    gentransfer(healpix_beam, u, v, w, ms.ν[channel],
+                phasecenter, lmax=lmax, mmax=mmax)
+end
+
+"""
     gentransfer(beam::HealpixMap, u, v, w, ν, phasecenter; lmax = 100, mmax = 100)
 
 Construct a transfer matrix for the given beam model and observational parameters.
@@ -266,7 +265,7 @@ Construct a transfer matrix for the given beam model and observational parameter
 function gentransfer(beam::HealpixMap, u, v, w, ν, phasecenter;
                      lmax::Int = 100, mmax::Int = 100)
     Nbase = length(u)
-    B = [TransferMatrixBlock(Nbase,lmax,m,ν) for m = 0:mmax] |> TransferMatrix
+    B = TransferMatrix(Nbase,lmax,mmax,ν)
     gentransfer!(B,beam,u,v,w,ν,phasecenter,lmax=lmax,mmax=mmax)
     B
 end
@@ -276,32 +275,68 @@ function gentransfer!(B::TransferMatrix{one_ν},
                       lmax::Int = 100, mmax::Int = 100)
     Nbase = length(u)
     λ = c / ν
-    @showprogress 1 "Computing transfer matrix..." for α = 1:Nbase
-        uλ = u[α]/λ
-        vλ = v[α]/λ
-        wλ = w[α]/λ
-        # Account for the extra phase due to the fact that the phase
-        # center is likely not perfectly orthogonal to the baseline.
-        extraphase = -2π*(uλ*phasecenter[1]+vλ*phasecenter[2]+wλ*phasecenter[3])
-        realfringe,imagfringe = planewave(uλ,vλ,wλ,extraphase,lmax=lmax,mmax=mmax)
-        # Use spherical harmonic transforms to incorporate the effects of the beam.
-        realbeamfringe = map2alm(beam.*alm2map(realfringe,nside=512),lmax=lmax,mmax=mmax)
-        imagbeamfringe = map2alm(beam.*alm2map(imagfringe,nside=512),lmax=lmax,mmax=mmax)
-        # Pack the transfer matrix
-        # (the conjugations come about because Shaw et al. 2014, 2015 actually expand the
-        # baseline pattern in terms of the spherical harmonic conjugates)
-        for l = 0:lmax
-            B[α,l,0] = conj(realbeamfringe[l,0]) + 1im*conj(imagbeamfringe[l,0])
+    u = u / λ
+    v = v / λ
+    w = w / λ
+
+    # distribute the workload across all the available workers
+    idx = 1
+    nextidx() = (myidx = idx; idx += 1; myidx)
+    p = Progress(Nbase, 1, "Dreaming...", 50)
+    increment_progress() = next!(p)
+    @sync for worker in workers()
+        @async while true
+            α = nextidx()
+            α ≤ Nbase || break
+            realfringe,imagfringe = remotecall_fetch(worker,fringes,beam,u[α],v[α],w[α],
+                                                                    phasecenter,lmax,mmax)
+            pack!(B,realfringe,imagfringe,α,Nbase,lmax,mmax)
+            increment_progress()
         end
-        for m = 1:mmax, l = m:lmax
-            α1 = α         # positive m
-            α2 = α + Nbase # negative m
-            B[α1,l,m] = conj(realbeamfringe[l,m]) + 1im*conj(imagbeamfringe[l,m])
-            B[α2,l,m] = conj(realbeamfringe[l,m]) - 1im*conj(imagbeamfringe[l,m])
-        end
-        α += 1
     end
     B
+end
+
+"""
+    fringes(beam, u, v, w, phasecenter, lmax, mmax)
+
+Generate the spherical harmonic expansion of the fringe pattern on the sky.
+Note that because the Healpix library assumes you are asking for the coefficients
+of a real field, there must be one set of coefficients for the real part of
+the fringe pattern and one set of coefficients for the imaginary part of the
+fringe pattern.
+"""
+function fringes(beam,u,v,w,phasecenter,lmax,mmax)
+    # Account for the extra phase due to the fact that the phase
+    # center is not perfectly orthogonal to the baseline.
+    extraphase = -2π*(u*phasecenter[1]+v*phasecenter[2]+w*phasecenter[3])
+    realfringe,imagfringe = planewave(u,v,w,extraphase,lmax=lmax,mmax=mmax)
+    # Use spherical harmonic transforms to incorporate the effects of the beam.
+    realfringe = map2alm(beam.*alm2map(realfringe,nside=512),lmax=lmax,mmax=mmax)
+    imagfringe = map2alm(beam.*alm2map(imagfringe,nside=512),lmax=lmax,mmax=mmax)
+    realfringe,imagfringe
+end
+
+"""
+    pack!(B, realfringe, imagfringe, α, Nbase, lmax, mmax)
+
+Having calculated the spherical harmonic expansion of the fringe pattern,
+pack those numbers into the transfer matrix.
+"""
+function pack!(B,realfringe,imagfringe,α,Nbase,lmax,mmax)
+    # Note that all the conjugations in this function come about because
+    # Shaw et al. 2014, 2015 expand the fringe pattern in terms of the
+    # spherical harmonic conjugates while we've expanded the fringe pattern
+    # in terms of the spherical harmonics.
+    for l = 0:lmax
+        B[α,l,0] = conj(realfringe[l,0]) + 1im*conj(imagfringe[l,0])
+    end
+    for m = 1:mmax, l = m:lmax
+        α1 = α         # positive m
+        α2 = α + Nbase # negative m
+        B[α1,l,m] = conj(realfringe[l,m]) + 1im*conj(imagfringe[l,m])
+        B[α2,l,m] = conj(realfringe[l,m]) - 1im*conj(imagfringe[l,m])
+    end
 end
 
 function save_transfermatrix(filename, B::TransferMatrix{one_ν})

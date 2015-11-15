@@ -21,7 +21,7 @@ feeds into $m$-mode analysis.
 """
 function create_empty_visibilities(filename, Nbase, Ntime, frequencies)
     Nfreq = length(frequencies)
-    jldopen(filename,"w",compress=true) do file
+    jldopen(filename,"w") do file
         file["Nfreq"] = Nfreq
         file["Nbase"] = Nbase
         file["Ntime"] = Ntime
@@ -66,7 +66,7 @@ function grid_visibilities(filename, ms::MeasurementSet)
         idx += 1
     end
 
-    grid_visibilities(filename, reduced_data, reduced_flags, frequencies, time)
+    grid_visibilities(filename, reduced_data, reduced_flags, ms.ν, time)
 end
 
 doc"""
@@ -97,7 +97,7 @@ respect to sidereal time as we begin to average more days together.
 By gridding onto a sidereal time grid, we avoid this problem.
 """
 function grid_visibilities(filename, data, flags, frequencies, time)
-    jldopen(filename,"r+",compress=true) do file
+    jldopen(filename,"r+") do file
         Nfreq = file["Nfreq"] |> read
         Nbase = file["Nbase"] |> read
         Ntime = file["Ntime"] |> read

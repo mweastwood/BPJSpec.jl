@@ -17,12 +17,12 @@
 # however we will need some additional definitions to make things
 # consistent with the language of m-mode analysis.
 
-"""
-    block(alm::Alm,m)
+doc"""
+    getblock(alm::Alm, m)
 
-Get all the coefficients corresponding to a single value of m.
+Get all the coefficients corresponding to a single value of $m$.
 """
-function block(alm::Alm,m)
+function getblock(alm::Alm, m)
     a = zeros(Complex128,lmax(alm)-m+1)
     idx = 1
     for l = m:lmax(alm)
@@ -32,25 +32,58 @@ function block(alm::Alm,m)
     a
 end
 
+doc"""
+    setblock!(alm::Alm, x, m)
+
+Set all the coefficients corresponding to a single value of $m$
+to a value given by `x`.
 """
-    tikhonov(B::TransferMatrix,v::MModes;tolerance=0.0) -> Alm
+function setblock!(alm::Alm, x, m)
+    idx = 1
+    for l = m:lmax(alm)
+        alm[l,m] = x[idx]
+        idx += 1
+    end
+    alm
+end
+
+function *(B::TransferMatrix{one_ν},alm::Alm)
+    lmax(B) == lmax(alm) || error("The values of lmax must be the same.")
+    mmax(B) == mmax(alm) || error("The values of mmax must be the same.")
+    ν = frequency(B)
+    blocks = MModeBlock[]
+    for m = 0:mmax(B)
+        Bm = B[m].block
+        am = getblock(alm,m)
+        vm = Bm*am
+        push!(blocks,MModeBlock(vm,m,ν))
+    end
+    MModes(blocks)
+end
+
+"""
+    tikhonov(B::TransferMatrix{one_ν}, v::MModes{one_ν}; tolerance=0.0) -> Alm
 
 Solve for the spherical harmonic coefficients with the given
 transfer matrix and m-modes. `tolerance` acts as Tikhonov
 regularization parameter that alleviates some of the numerical
 problems with this process.
+
+Note that the interferometer cannot see the entire sky. A northern hemisphere
+telescope will never see the southern hemisphere. This means that there
+must be some information about the sky that is lost during the act of
+observing the sky. In linear algebra this means that the transfer matrix
+must be singular, and we will therefore need some amount of numerical
+regularization to invert it.
 """
-function tikhonov(B::TransferMatrix,v::MModes;tolerance::Float64=0.0)
+function tikhonov(B::TransferMatrix{one_ν}, v::MModes{one_ν};
+                  tolerance::Float64 = 0.0)
     alm = Alm(Complex128,lmax(B),mmax(B))
     for m = 0:mmax(B)
         Bm = B[m].block
         vm = v[m].block
         am = (Bm'*Bm + tolerance*I)\Bm'*vm
-        idx = 1
-        for l = m:lmax(B)
-            alm[l,m] = am[idx]
-            idx += 1
-        end
+        setblock!(alm,am,m)
     end
     alm
 end

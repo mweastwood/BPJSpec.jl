@@ -2,7 +2,7 @@ let
     frame = ReferenceFrame()
     set!(frame,Position(pos"ITRF",q"0.0m",q"0.0deg",q"90.0deg"))
     set!(frame,Epoch(epoch"UTC",Quantity(50237.29,"d")))
-    beam = geocentric_beam(frame,SineBeam(1.0),45e6)
+    beam = itrf_beam(frame,SineBeam(1.0),45e6)
     for i = 1:length(beam)
         θ,ϕ = LibHealpix.pix2ang_ring(512,i)
         if θ < π/2
@@ -57,6 +57,35 @@ let Nbase = 1, lmax = 3, mmax = 3
     end
 end
 
+# if we've defined the transfer matrix correctly, we should be able to compute
+# visibilities that match those computed directly from TTCal
+let Nant = 5, Nfreq = 2, lmax = 100, mmax = 100
+    name,ms = createms(Nant,Nfreq)
+    beam = HealpixMap(ones(12*512*512))
+    u,v,w = itrf_baselines(ms)
+    phasecenter = itrf_phasecenter(ms)
+
+    # let's begin with a single source on the north pole
+    alm = Alm(Complex128,lmax,mmax)
+    for m = 0:mmax, l = m:lmax
+        alm[l,m] = BPJSpec.Y(l,m,0.0,0.0) |> conj
+    end
+    B = gentransfer(beam,u,v,w,ms.ν[1],phasecenter,lmax=lmax,mmax=mmax)
+    v = B*alm
+    vis = visibilities(v)
+    expected = ones(Complex128,size(vis)) # visibilities should always be unity
+    @test isapprox(vis,expected,atol=1e-1)
+
+    # note that there are two things likely contributing to the rough
+    # tolerance:
+    # 1. point sources carry power to large l, which means that by
+    #    truncating the spherical harmonic expansion at some lmax,
+    #    we are missing some of the flux
+    # 2. alm2map and map2alm have some error that we must live with
+    #    until I wrap their iterative counterparts
+end
+
+#=
 # test transfermatrix i/o
 let Nbase = 100, lmax = 20, mmax = 20
     filename = tempname()*".jld"
@@ -83,4 +112,5 @@ let Nbase = 100, lmax = 20, mmax = 20
     @test B1 == B4
     @test B3 == B5
 end
+=#
 
