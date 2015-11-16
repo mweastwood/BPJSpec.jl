@@ -75,7 +75,7 @@ let Nbase = 100, lmax = 20, mmax = 20
     filename = tempname()*".jld"
     ν = 45e6
 
-    B1 = [BPJSpec.TransferMatrixBlock(Nbase,lmax,m,ν) for m = 0:mmax] |> TransferMatrix
+    B1 = TransferMatrix(Nbase,lmax,mmax,ν)
     for m = 0:mmax
         rand!(B1[m].block)
     end
@@ -85,15 +85,34 @@ let Nbase = 100, lmax = 20, mmax = 20
     @test B1 == B2
 
     # and make sure we can write multiple frequencies to the same file
-    B3 = [BPJSpec.TransferMatrixBlock(Nbase,lmax,m,ν+1e6) for m = 0:mmax] |> TransferMatrix
-    for m = 0:mmax
-        rand!(B3[m].block)
-    end
+    B3 = TransferMatrix(Nbase,lmax,mmax,ν+1e6)
     save_transfermatrix(filename,B3)
 
     B4 = load_transfermatrix(filename,ν)
     B5 = load_transfermatrix(filename,ν+1e6)
     @test B1 == B4
     @test B3 == B5
+end
+
+# test that we can make the transfer matrix square while leaving the
+# singular values untouched
+let Nbase = 100, lmax = 20, mmax = 20
+    B1 = TransferMatrix(Nbase,lmax,mmax,45e6)
+    for m = 0:mmax
+        rand!(B1[m].block)
+    end
+
+    P  = preserve_singular_values(B1)
+    B2 = P*B1
+    @test typeof(B2) == TransferMatrix{BPJSpec.one_ν}
+
+    for m = 0:mmax
+        x,y = size(B2[m])
+        @test x == y
+
+        U1,S1,V1 = svd(B1[m])
+        U2,S2,V2 = svd(B2[m])
+        @test S1 ≈ S2
+    end
 end
 

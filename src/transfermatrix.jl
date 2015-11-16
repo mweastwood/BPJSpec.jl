@@ -14,7 +14,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 doc"""
-    immutable TransferMatrixBlock <: MatrixBlock
+    immutable TransferMatrixBlock <: AbstractMatrixBlock
 
 This type stores a single block of the transfer matrix.
 
@@ -25,7 +25,7 @@ This type stores a single block of the transfer matrix.
 * `m` stores the value of $m$ corresponding to this block of the matrix
 * `ν` stores the frequency (in Hz)
 """
-immutable TransferMatrixBlock <: MatrixBlock
+immutable TransferMatrixBlock <: AbstractMatrixBlock
     block::Matrix{Complex128}
     lmax::Int
     m::Int
@@ -33,6 +33,7 @@ immutable TransferMatrixBlock <: MatrixBlock
 end
 
 default_size(::Type{TransferMatrixBlock},Nbase,lmax,m) = (two(m)*Nbase, lmax-m+1)
+metadata(B::TransferMatrixBlock) = (B.lmax,B.m,B.ν)
 
 """
     TransferMatrixBlock(Nbase,lmax,m,ν)
@@ -48,7 +49,7 @@ end
 @enum Representation one_ν one_m
 
 doc"""
-    immutable TransferMatrix{rep}
+    immutable TransferMatrix{rep} <: AbstractBlockDiagonalMatrix
 
 The transfer matrix represents the instrumental response of the
 interferometer to the spherical harmonic coefficients of the sky.
@@ -75,7 +76,7 @@ representation or the second.
 
 * `blocks` is a list of `TransferMatrixBlock`s
 """
-immutable TransferMatrix{rep}
+immutable TransferMatrix{rep} <: AbstractBlockDiagonalMatrix
     blocks::Vector{TransferMatrixBlock}
 end
 
@@ -310,6 +311,25 @@ function load_transfermatrix(filename, frequency)
         end
     end
     TransferMatrix(blocks)
+end
+
+doc"""
+    preserve_singular_values(B::TransferMatrix) -> BlockDiagonalMatrix
+
+Construct a matrix that projects the $m$-modes onto a lower dimensional
+space while preserving all the singular values of the transfer matrix.
+
+Multiplying by this matrix will compress the data, make the transfer
+matrix square, and leave the information about the sky untouched.
+"""
+function preserve_singular_values(B::TransferMatrix)
+    N = Nblocks(B)
+    blocks = Array{MatrixBlock}(N)
+    for i = 1:N
+        U,σ,V = svd(B.blocks[i])
+        blocks[i] = MatrixBlock(U')
+    end
+    BlockDiagonalMatrix(blocks)
 end
 
 #=

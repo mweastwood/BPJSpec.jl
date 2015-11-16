@@ -19,6 +19,7 @@ module BPJSpec
 
 export TransferMatrix, save_transfermatrix, load_transfermatrix, gentransfer
 export MModes, save_mmodes, load_mmodes, tikhonov
+export preserve_singular_values
 
 export itrf_baselines, itrf_phasecenter, itrf_beam
 export visibilities, create_empty_visibilities, grid_visibilities, load_visibilities
@@ -53,7 +54,6 @@ include("transfermatrix.jl")
 include("mmodes.jl")
 include("alm.jl")
 
-#include("projection.jl")
 #include("covariancematrix.jl")
 
 end

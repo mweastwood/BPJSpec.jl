@@ -13,14 +13,37 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-abstract VectorBlock # block that composes a vector
-abstract MatrixBlock
-typealias Block Union{VectorBlock,MatrixBlock}
+abstract AbstractVectorBlock # block that composes a vector
+abstract AbstractMatrixBlock # block that composes a matrix
+typealias AbstractBlock Union{AbstractVectorBlock,AbstractMatrixBlock}
 
-Base.size(A::Block) = size(A.block)
-Base.length(A::Block) = length(A.block)
-Base.svd(A::Block) = svd(A.block)
+Base.size(A::AbstractBlock) = size(A.block)
+Base.length(A::AbstractBlock) = length(A.block)
+Base.svd(A::AbstractBlock) = svd(A.block,thin=true)
 
-abstract BlockVector # a vector composed of blocks
-abstract BlockDiagonalMatrix
+abstract AbstractBlockVector # a vector composed of blocks
+abstract AbstractBlockDiagonalMatrix
+abstract AbstractBlockMatrix # a matrix composed of blocks
+typealias VectorOfBlocks Union{AbstractBlockVector,AbstractBlockDiagonalMatrix}
+
+Nblocks(A::VectorOfBlocks) = length(A.blocks)
+
+immutable MatrixBlock <: AbstractMatrixBlock
+    block::Matrix{Complex128}
+end
+
+immutable BlockDiagonalMatrix <: AbstractBlockDiagonalMatrix
+    blocks::Vector{MatrixBlock}
+end
+
+function *{T<:AbstractBlock}(lhs::AbstractMatrixBlock, rhs::T)
+    meta   = metadata(rhs)
+    result = lhs.block*rhs.block
+    T(result,meta...)
+end
+
+function *{T<:VectorOfBlocks}(lhs::AbstractBlockDiagonalMatrix, rhs::T)
+    Nblocks(lhs) == Nblocks(rhs) || error("Number of blocks must match.")
+    T([lhs.blocks[i]*rhs.blocks[i] for i = 1:Nblocks(rhs)])
+end
 

@@ -14,7 +14,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 doc"""
-    immutable MModeBlock
+    immutable MModeBlock <: AbstractVectorBlock
 
 This type stores the $m$-modes corresponding to a single block of
 the transfer matrix.
@@ -25,13 +25,14 @@ the transfer matrix.
 * `m` stores the value of $m$ (the azimuthal spherical harmonic quantum number)
 * `ν` stores the frequency (in Hz)
 """
-immutable MModeBlock <: VectorBlock
+immutable MModeBlock <: AbstractVectorBlock
     block::Vector{Complex128}
     m::Int
     ν::Float64
 end
 
 default_size(::Type{MModeBlock},Nbase,m) = (two(m)*Nbase,)
+metadata(v::MModeBlock) = (B.m,B.ν)
 
 doc"""
     MModeBlock(Nbase,m,ν)
@@ -45,7 +46,7 @@ function MModeBlock(Nbase,m,ν)
 end
 
 doc"""
-    immutable MModes{rep}
+    immutable MModes{rep} <: AbstractBlockVector
 
 This type represents a collection of $m$-modes.
 
@@ -67,7 +68,7 @@ of the type parameter.
 
 * `blocks` is a list of `MModeBlock`s
 """
-immutable MModes{rep}
+immutable MModes{rep} <: AbstractBlockVector
     blocks::Vector{MModeBlock}
 end
 
