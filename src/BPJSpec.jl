@@ -43,6 +43,7 @@ import LibHealpix: Alm, lmax, mmax
 include("special.jl") # special functions
 include("physics.jl") # physical constants and cosmology
 include("blocks.jl")  # block vectors and matrices
+include("itrf.jl")
 
 # This function is useful to handle some of the
 # special casing required for m == 0
