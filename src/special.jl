@@ -13,8 +13,6 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-import GSL: sf_legendre_sphPlm
-
 """
     Y(l,m,θ,ϕ)
 
@@ -22,7 +20,7 @@ The spherical harmonic function (using the Condon-Shortley phase
 convention).
 """
 function Y(l,m,θ,ϕ)
-    out = sf_legendre_sphPlm(l,abs(m),cos(θ))*exp(1im*m*ϕ)
+    out = GSL.sf_legendre_sphPlm(l,abs(m),cos(θ))*exp(1im*m*ϕ)
     # GSL already applies the Condon-Shortley phase convention
     # to this result, so if we want m < 0 we need to undo the
     # factor of (-1)^m.

@@ -17,37 +17,45 @@ __precompile__()
 
 module BPJSpec
 
-using HDF5
+export TransferMatrix, save_transfermatrix, load_transfermatrix, gentransfer
+export MModes, save_mmodes, load_mmodes, tikhonov
 
-export ObsParam
-export lmax, mmax, Nfreq
-export TransferMatrix, SpectralTransferMatrix
-export MModes, SpectralMModes, visibilities, tikhonov
-export ProjectionMatrix, compression
-export CovarianceMatrix, ForegroundModel, SphericalSignalModel, congruence
+export itrf_baselines, itrf_phasecenter, itrf_beam
+export visibilities, create_empty_visibilities, grid_visibilities, load_visibilities
 
-importall Base.Operators
-using LibHealpix
-import LibHealpix: Alm, lmax, mmax
+#export ObsParam
+#export lmax, mmax, Nfreq
+#export ProjectionMatrix, compression
+#export CovarianceMatrix, ForegroundModel, SphericalSignalModel, congruence
+
 using CasaCore.Measures
 using CasaCore.Tables
+using HDF5, JLD
+using LibHealpix
+using ProgressMeter
 using TTCal
 
-include("special.jl")   # special functions
-include("physics.jl")   # physical constants and cosmology
+importall Base.Operators
+import Cosmology
+import GSL
+import LibHealpix: Alm, lmax, mmax
 
-# This function is useful to hand some of the
+include("special.jl") # special functions
+include("physics.jl") # physical constants and cosmology
+include("blocks.jl")  # block vectors and matrices
+
+# This function is useful to handle some of the
 # special casing required for m == 0
 two(m) = ifelse(m != 0, 2, 1)
 
-include("obs.jl")
+include("visibilities.jl")
 include("transfermatrix.jl")
 include("mmodes.jl")
-include("projection.jl")
 include("alm.jl")
-include("covariancematrix.jl")
 
-include("cornerturn.jl")
+#include("obs.jl")
+#include("projection.jl")
+#include("covariancematrix.jl")
 
 end
 
