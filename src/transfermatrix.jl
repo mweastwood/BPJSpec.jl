@@ -139,42 +139,6 @@ frequency(B::TransferMatrix{one_ν}) = B[0].ν
 lmax(B::TransferMatrix{one_ν}) = B[0].lmax
 mmax(B::TransferMatrix{one_ν}) = length(B.blocks)-1
 
-function ==(lhs::TransferMatrixBlock, rhs::TransferMatrixBlock)
-    lhs.lmax == rhs.lmax && lhs.m == rhs.m && lhs.ν == rhs.ν && lhs.block == rhs.block
-end
-
-function =={rep}(lhs::TransferMatrix{rep}, rhs::TransferMatrix{rep})
-    lhs.blocks == rhs.blocks
-end
-
-#=
-function SpectralTransferMatrix(Nbase,Nfreq,lmax,mmax,m)
-    blocks = [TransferMatrixBlock(Nbase,lmax,mmax,m) for β = 1:Nfreq]
-    SpectralTransferMatrix{lmax,mmax}(m,blocks)
-end
-
-Nfreq(B::SpectralTransferMatrix) = length(B.blocks)
-
-function Base.size(B::TransferMatrix)
-    x = 0; y = 0
-    for m = 0:mmax(B)
-        sz = size(B[m])
-        x += sz[1]
-        y += sz[2]
-    end
-    x,y
-end
-function Base.size(B::SpectralTransferMatrix)
-    x = 0; y = 0
-    for β = 1:Nfreq(B)
-        sz = size(B[β])
-        x += sz[1]
-        y += sz[2]
-    end
-    x,y
-end
-=#
-
 """
     gentransfer(ms::MeasurementSet, beam::TTCal.BeamModel, channel; lmax = 100, mmax = 100)
 
@@ -331,38 +295,4 @@ function preserve_singular_values(B::TransferMatrix)
     end
     BlockDiagonalMatrix(blocks)
 end
-
-#=
-"""
-    SpectralTransferMatrix(m,matrices::Vector{TransferMatrix})
-
-Construct a SpectralTransferMatrix from the given list of transfer matrices.
-Each transfer matrix should correspond to a different frequency channel.
-"""
-function SpectralTransferMatrix(m,matrices::Vector{TransferMatrix})
-    lmax′ = lmax(matrices[1])
-    mmax′ = mmax(matrices[1])
-    blocks = TransferMatrixBlock[]
-    for matrix in matrices
-        if lmax(matrix) != lmax′ || mmax(matrix) != mmax′
-            error("The transfer matrices must all have the same lmax and mmax.")
-        end
-        push!(blocks,matrix[m])
-    end
-    SpectralTransferMatrix{lmax′,mmax′}(m,blocks)
-end
-
-function Base.full(B::SpectralTransferMatrix)
-    out = zeros(Complex128,size(B))
-    idx1 = 1; idx2 = 1
-    for β = 1:Nfreq(B)
-        block = B[β].block
-        out[idx1:idx1+size(block,1)-1,
-            idx2:idx2+size(block,2)-1] = block
-        idx1 += size(block,1)
-        idx2 += size(block,2)
-    end
-    out
-end
-=#
 

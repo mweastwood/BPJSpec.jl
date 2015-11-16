@@ -127,26 +127,6 @@ setindex!(v::MModes{one_m},x,α,β) = v[β][α] = x
 frequency(v::MModes{one_ν}) = v[0].ν
 mmax(v::MModes{one_ν}) = length(v.blocks)-1
 
-#=
-for T in (:MModeBlock,:MModes,:SpectralMModes)
-    @eval mmax{m}(v::$T{m}) = m
-end
-
-Nfreq(v::SpectralMModes) = length(v.blocks)
-
-function ==(lhs::MModeBlock,rhs::MModeBlock)
-    lhs.block == rhs.block && lhs.m == rhs.m && mmax(lhs) == mmax(rhs)
-end
-
-function ==(lhs::MModes,rhs::MModes)
-    lhs.blocks == rhs.blocks && mmax(lhs) == mmax(rhs)
-end
-
-Base.length(v::MModes) = sum([length(v[m]) for m = 0:mmax(v)])
-Base.length(v::SpectralMModes) = sum([length(v[β]) for β = 1:Nfreq(v)])
-
-=#
-
 """
     MModes(visibilities, ν; mmax=100)
 
@@ -196,63 +176,4 @@ function visibilities(v::MModes{one_ν})
     end
     ifft(M,2)*Ntime
 end
-
-#=
-"""
-    MModes(β,vectors::Vector{SpectralMModes})
-
-Construct an `MModes` vector by picking a single frequency channel `β`.
-The `SpectralMModes` vectors must be sorted in order of increasing `m`.
-"""
-function MModes(β,vectors::Vector{SpectralMModes})
-    mmax′ = mmax(vectors[1])
-    length(vectors) == mmax′+1 || error("Missing a complete set of m-modes.")
-    blocks = MModeBlock[]
-    for (i,vector) in enumerate(vectors)
-        mmax(vector) == mmax′ || error("The m-modes must all have the same mmax.")
-        vector.m+1 == i || error("The m-modes must be sorted in order of increasing `m`.")
-        push!(blocks,vector[β])
-    end
-    MModes{mmax′}(blocks)
-end
-
-"""
-    SpectralMModes(m,vectors::Vector{MModes})
-
-Construct a `SpectralMModes` vector from the given list of m-modes.
-Each m-mode vector should correspond to a different frequency channel.
-"""
-function SpectralMModes(m,vectors::Vector{MModes})
-    mmax′ = mmax(vectors[1])
-    blocks = MModeBlock[]
-    for vector in vectors
-        mmax(vector) == mmax′ || error("The m-modes must all have the same mmax.")
-        push!(blocks,vector[m])
-    end
-    SpectralMModes{mmax′}(m,blocks)
-end
-
-"""
-    SpectralMModes(Nfreq,mmax,m,vector::Vector{Complex128})
-
-This is the inverse to `Base.full(v::SpectralMModes)`. That is,
-construct a `SpectralMModes` vector from a `Vector{Complex128}`.
-"""
-function SpectralMModes(Nfreq,mmax,m,vector::Vector{Complex128})
-    N = div(length(vector),Nfreq)
-    blocks = [MModeBlock{mmax}(m,vector[(β-1)*N+1:β*N]) for β = 1:Nfreq]
-    SpectralMModes{mmax}(m,blocks)
-end
-
-function Base.full(v::SpectralMModes)
-    out = zeros(Complex128,length(v))
-    idx = 1
-    for β = 1:Nfreq(v)
-        block = v[β].block
-        out[idx:idx+length(block)-1] = block
-        idx += length(block)
-    end
-    out
-end
-=#
 
