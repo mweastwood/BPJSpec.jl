@@ -85,7 +85,6 @@ let Nant = 5, Nfreq = 2, lmax = 100, mmax = 100
     #    until I wrap their iterative counterparts
 end
 
-#=
 # test transfermatrix i/o
 let Nbase = 100, lmax = 20, mmax = 20
     filename = tempname()*".jld"
@@ -112,5 +111,4 @@ let Nbase = 100, lmax = 20, mmax = 20
     @test B1 == B4
     @test B3 == B5
 end
-=#
 
