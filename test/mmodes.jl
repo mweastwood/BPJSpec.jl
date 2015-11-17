@@ -29,3 +29,27 @@ let Nbase = 100, mmax = 100
     @test data ≈ data′
 end
 
+# test m-mode i/o
+let Nbase = 100, mmax = 20
+    filename = tempname()*".jld"
+    ν = 45e6
+
+    v1 = MModes(Nbase,mmax,ν)
+    for m = 0:mmax
+        rand!(v1[m].block)
+    end
+    save_mmodes(filename,v1)
+
+    v2 = load_mmodes(filename,ν)
+    @test v1 == v2
+
+    # and make sure we can write multiple frequencies to the same file
+    v3 = MModes(Nbase,mmax,ν+1e6)
+    save_mmodes(filename,v3)
+
+    v4 = load_mmodes(filename,ν)
+    v5 = load_mmodes(filename,ν+1e6)
+    @test v1 == v4
+    @test v3 == v5
+end
+

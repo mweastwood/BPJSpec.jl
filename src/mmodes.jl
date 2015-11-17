@@ -32,7 +32,7 @@ immutable MModeBlock <: AbstractVectorBlock
 end
 
 default_size(::Type{MModeBlock},Nbase,m) = (two(m)*Nbase,)
-metadata(v::MModeBlock) = (B.m,B.ν)
+metadata(v::MModeBlock) = (v.m,v.ν)
 
 doc"""
     MModeBlock(Nbase,m,ν)
@@ -175,5 +175,43 @@ function visibilities(v::MModes{one_ν})
         M[α,Ntime+1-m] = conj(v[α2,m])
     end
     ifft(M,2)*Ntime
+end
+
+function save_mmodes(filename, v::MModes{one_ν})
+    if !isfile(filename)
+        jldopen(filename,"w",compress=true) do file
+            file["mmax"] = mmax(v)
+        end
+    end
+
+    jldopen(filename,"r+",compress=true) do file
+        read(file["mmax"]) == mmax(v) || error("mmax is inconsistent")
+
+        name_ν  = @sprintf("%.3fMHz",frequency(v)/1e6)
+        name_ν in names(file) && error("group $(name_ν) already exists in file")
+        group_ν = g_create(file,name_ν)
+
+        for m = 0:mmax(v)
+            group_m = g_create(group_ν,string(m))
+            group_m["block"] = v[m].block
+        end
+    end
+end
+
+function load_mmodes(filename, frequency)
+    blocks = MModeBlock[]
+    jldopen(filename,"r") do file
+        mmax = file["mmax"] |> read
+
+        name_ν  = @sprintf("%.3fMHz",frequency/1e6)
+        group_ν = file[name_ν]
+
+        for m = 0:mmax
+            group_m = group_ν[string(m)]
+            block = group_m["block"] |> read
+            push!(blocks,MModeBlock(block,m,frequency))
+        end
+    end
+    MModes(blocks)
 end
 
