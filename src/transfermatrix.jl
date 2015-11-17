@@ -14,75 +14,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 doc"""
-    itrf_baselines(ms::MeasurementSet)
-
-Calculate the $(u,v,w)$ coordinates in the ITRF coordinate system with the phase
-center at true north.
-"""
-function itrf_baselines(ms::MeasurementSet)
-    antenna_table = Table(ms.table[kw"ANTENNA"])
-    positions = antenna_table["POSITION"]
-    unlock(antenna_table)
-
-    # calculate the baselines while skipping the autocorrelations
-    Nbase = ms.Nbase - ms.Nant
-    u = zeros(Nbase)
-    v = zeros(Nbase)
-    w = zeros(Nbase)
-    idx = 1
-    for α = 1:ms.Nbase
-        ms.ant1[α] == ms.ant2[α] && continue
-        u[idx] = positions[1,ms.ant1[α]] - positions[1,ms.ant2[α]]
-        v[idx] = positions[2,ms.ant1[α]] - positions[2,ms.ant2[α]]
-        w[idx] = positions[3,ms.ant1[α]] - positions[3,ms.ant2[α]]
-        idx += 1
-    end
-    u,v,w
-end
-
-doc"""
-    itrf_phasecenter(ms::MeasurementSet)
-
-Calculate the $(l,m,n)$ coordinates corresponding to the actual phase
-center of the array with respsect to true north.
-"""
-function itrf_phasecenter(ms::MeasurementSet)
-    itrf = measure(ms.frame,ms.phase_direction,dir"ITRF")
-    vector(itrf)
-end
-
-doc"""
-    itrf_beam(frame::ReferenceFrame, beam::BeamModel, frequency)
-
-Create a Healpix map of a TTCal beam model.
-At the moment only the $I \rightarrow I$ element of the Mueller
-matrix is used.
-"""
-function itrf_beam(frame::ReferenceFrame, beam::TTCal.BeamModel, frequency)
-    zenith = Direction(dir"AZEL",Quantity(0.0,"deg"),Quantity(90.0,"deg"))
-    zenith_itrf = measure(frame,zenith,dir"ITRF")
-    zenith_vec  = [vector(zenith_itrf)...]
-    global_north = [0.0,0.0,1.0]
-    local_north  = gramschmidt(global_north,zenith_vec)
-    map = HealpixMap(zeros(nside2npix(512)))
-    @showprogress 1 "Creating map of the beam..." for i = 1:length(map)
-        vec = LibHealpix.pix2vec_ring(512,i)
-        el  = π/2 - angle_between(vec,zenith_vec)
-        vec = gramschmidt(vec,zenith_vec)
-        az  = angle_between(vec,local_north)
-        if el < 0
-            map[i] = 0
-        else
-            J = beam(frequency,az,el)
-            M = MuellerMatrix(J)
-            map[i] = M.mat[1,1]
-        end
-    end
-    map
-end
-
-doc"""
-    immutable TransferMatrixBlock <: MatrixBlock
+    immutable TransferMatrixBlock <: AbstractMatrixBlock
 
 This type stores a single block of the transfer matrix.
 
@@ -93,7 +25,7 @@ This type stores a single block of the transfer matrix.
 * `m` stores the value of $m$ corresponding to this block of the matrix
 * `ν` stores the frequency (in Hz)
 """
-immutable TransferMatrixBlock <: MatrixBlock
+immutable TransferMatrixBlock <: AbstractMatrixBlock
     block::Matrix{Complex128}
     lmax::Int
     m::Int
@@ -101,6 +33,7 @@ immutable TransferMatrixBlock <: MatrixBlock
 end
 
 default_size(::Type{TransferMatrixBlock},Nbase,lmax,m) = (two(m)*Nbase, lmax-m+1)
+metadata(B::TransferMatrixBlock) = (B.lmax,B.m,B.ν)
 
 """
     TransferMatrixBlock(Nbase,lmax,m,ν)
@@ -116,7 +49,7 @@ end
 @enum Representation one_ν one_m
 
 doc"""
-    immutable TransferMatrix{rep}
+    immutable TransferMatrix{rep} <: AbstractBlockDiagonalMatrix
 
 The transfer matrix represents the instrumental response of the
 interferometer to the spherical harmonic coefficients of the sky.
@@ -143,7 +76,7 @@ representation or the second.
 
 * `blocks` is a list of `TransferMatrixBlock`s
 """
-immutable TransferMatrix{rep}
+immutable TransferMatrix{rep} <: AbstractBlockDiagonalMatrix
     blocks::Vector{TransferMatrixBlock}
 end
 
@@ -205,42 +138,6 @@ setindex!(B::TransferMatrix{one_m},x,α,β,l) = B[β][α,l] = x
 frequency(B::TransferMatrix{one_ν}) = B[0].ν
 lmax(B::TransferMatrix{one_ν}) = B[0].lmax
 mmax(B::TransferMatrix{one_ν}) = length(B.blocks)-1
-
-function ==(lhs::TransferMatrixBlock, rhs::TransferMatrixBlock)
-    lhs.lmax == rhs.lmax && lhs.m == rhs.m && lhs.ν == rhs.ν && lhs.block == rhs.block
-end
-
-function =={rep}(lhs::TransferMatrix{rep}, rhs::TransferMatrix{rep})
-    lhs.blocks == rhs.blocks
-end
-
-#=
-function SpectralTransferMatrix(Nbase,Nfreq,lmax,mmax,m)
-    blocks = [TransferMatrixBlock(Nbase,lmax,mmax,m) for β = 1:Nfreq]
-    SpectralTransferMatrix{lmax,mmax}(m,blocks)
-end
-
-Nfreq(B::SpectralTransferMatrix) = length(B.blocks)
-
-function Base.size(B::TransferMatrix)
-    x = 0; y = 0
-    for m = 0:mmax(B)
-        sz = size(B[m])
-        x += sz[1]
-        y += sz[2]
-    end
-    x,y
-end
-function Base.size(B::SpectralTransferMatrix)
-    x = 0; y = 0
-    for β = 1:Nfreq(B)
-        sz = size(B[β])
-        x += sz[1]
-        y += sz[2]
-    end
-    x,y
-end
-=#
 
 """
     gentransfer(ms::MeasurementSet, beam::TTCal.BeamModel, channel; lmax = 100, mmax = 100)
@@ -380,37 +277,22 @@ function load_transfermatrix(filename, frequency)
     TransferMatrix(blocks)
 end
 
-#=
-"""
-    SpectralTransferMatrix(m,matrices::Vector{TransferMatrix})
+doc"""
+    preserve_singular_values(B::TransferMatrix) -> BlockDiagonalMatrix
 
-Construct a SpectralTransferMatrix from the given list of transfer matrices.
-Each transfer matrix should correspond to a different frequency channel.
-"""
-function SpectralTransferMatrix(m,matrices::Vector{TransferMatrix})
-    lmax′ = lmax(matrices[1])
-    mmax′ = mmax(matrices[1])
-    blocks = TransferMatrixBlock[]
-    for matrix in matrices
-        if lmax(matrix) != lmax′ || mmax(matrix) != mmax′
-            error("The transfer matrices must all have the same lmax and mmax.")
-        end
-        push!(blocks,matrix[m])
-    end
-    SpectralTransferMatrix{lmax′,mmax′}(m,blocks)
-end
+Construct a matrix that projects the $m$-modes onto a lower dimensional
+space while preserving all the singular values of the transfer matrix.
 
-function Base.full(B::SpectralTransferMatrix)
-    out = zeros(Complex128,size(B))
-    idx1 = 1; idx2 = 1
-    for β = 1:Nfreq(B)
-        block = B[β].block
-        out[idx1:idx1+size(block,1)-1,
-            idx2:idx2+size(block,2)-1] = block
-        idx1 += size(block,1)
-        idx2 += size(block,2)
+Multiplying by this matrix will compress the data, make the transfer
+matrix square, and leave the information about the sky untouched.
+"""
+function preserve_singular_values(B::TransferMatrix)
+    N = Nblocks(B)
+    blocks = Array{MatrixBlock}(N)
+    for i = 1:N
+        U,σ,V = svd(B.blocks[i])
+        blocks[i] = MatrixBlock(U')
     end
-    out
+    BlockDiagonalMatrix(blocks)
 end
-=#
 

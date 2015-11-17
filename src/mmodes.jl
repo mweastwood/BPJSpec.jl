@@ -14,7 +14,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 doc"""
-    immutable MModeBlock
+    immutable MModeBlock <: AbstractVectorBlock
 
 This type stores the $m$-modes corresponding to a single block of
 the transfer matrix.
@@ -25,13 +25,14 @@ the transfer matrix.
 * `m` stores the value of $m$ (the azimuthal spherical harmonic quantum number)
 * `ν` stores the frequency (in Hz)
 """
-immutable MModeBlock <: VectorBlock
+immutable MModeBlock <: AbstractVectorBlock
     block::Vector{Complex128}
     m::Int
     ν::Float64
 end
 
 default_size(::Type{MModeBlock},Nbase,m) = (two(m)*Nbase,)
+metadata(v::MModeBlock) = (v.m,v.ν)
 
 doc"""
     MModeBlock(Nbase,m,ν)
@@ -45,7 +46,7 @@ function MModeBlock(Nbase,m,ν)
 end
 
 doc"""
-    immutable MModes{rep}
+    immutable MModes{rep} <: AbstractBlockVector
 
 This type represents a collection of $m$-modes.
 
@@ -67,7 +68,7 @@ of the type parameter.
 
 * `blocks` is a list of `MModeBlock`s
 """
-immutable MModes{rep}
+immutable MModes{rep} <: AbstractBlockVector
     blocks::Vector{MModeBlock}
 end
 
@@ -126,26 +127,6 @@ setindex!(v::MModes{one_m},x,α,β) = v[β][α] = x
 frequency(v::MModes{one_ν}) = v[0].ν
 mmax(v::MModes{one_ν}) = length(v.blocks)-1
 
-#=
-for T in (:MModeBlock,:MModes,:SpectralMModes)
-    @eval mmax{m}(v::$T{m}) = m
-end
-
-Nfreq(v::SpectralMModes) = length(v.blocks)
-
-function ==(lhs::MModeBlock,rhs::MModeBlock)
-    lhs.block == rhs.block && lhs.m == rhs.m && mmax(lhs) == mmax(rhs)
-end
-
-function ==(lhs::MModes,rhs::MModes)
-    lhs.blocks == rhs.blocks && mmax(lhs) == mmax(rhs)
-end
-
-Base.length(v::MModes) = sum([length(v[m]) for m = 0:mmax(v)])
-Base.length(v::SpectralMModes) = sum([length(v[β]) for β = 1:Nfreq(v)])
-
-=#
-
 """
     MModes(visibilities, ν; mmax=100)
 
@@ -196,62 +177,41 @@ function visibilities(v::MModes{one_ν})
     ifft(M,2)*Ntime
 end
 
-#=
-"""
-    MModes(β,vectors::Vector{SpectralMModes})
+function save_mmodes(filename, v::MModes{one_ν})
+    if !isfile(filename)
+        jldopen(filename,"w",compress=true) do file
+            file["mmax"] = mmax(v)
+        end
+    end
 
-Construct an `MModes` vector by picking a single frequency channel `β`.
-The `SpectralMModes` vectors must be sorted in order of increasing `m`.
-"""
-function MModes(β,vectors::Vector{SpectralMModes})
-    mmax′ = mmax(vectors[1])
-    length(vectors) == mmax′+1 || error("Missing a complete set of m-modes.")
+    jldopen(filename,"r+",compress=true) do file
+        read(file["mmax"]) == mmax(v) || error("mmax is inconsistent")
+
+        name_ν  = @sprintf("%.3fMHz",frequency(v)/1e6)
+        name_ν in names(file) && error("group $(name_ν) already exists in file")
+        group_ν = g_create(file,name_ν)
+
+        for m = 0:mmax(v)
+            group_m = g_create(group_ν,string(m))
+            group_m["block"] = v[m].block
+        end
+    end
+end
+
+function load_mmodes(filename, frequency)
     blocks = MModeBlock[]
-    for (i,vector) in enumerate(vectors)
-        mmax(vector) == mmax′ || error("The m-modes must all have the same mmax.")
-        vector.m+1 == i || error("The m-modes must be sorted in order of increasing `m`.")
-        push!(blocks,vector[β])
+    jldopen(filename,"r") do file
+        mmax = file["mmax"] |> read
+
+        name_ν  = @sprintf("%.3fMHz",frequency/1e6)
+        group_ν = file[name_ν]
+
+        for m = 0:mmax
+            group_m = group_ν[string(m)]
+            block = group_m["block"] |> read
+            push!(blocks,MModeBlock(block,m,frequency))
+        end
     end
-    MModes{mmax′}(blocks)
+    MModes(blocks)
 end
-
-"""
-    SpectralMModes(m,vectors::Vector{MModes})
-
-Construct a `SpectralMModes` vector from the given list of m-modes.
-Each m-mode vector should correspond to a different frequency channel.
-"""
-function SpectralMModes(m,vectors::Vector{MModes})
-    mmax′ = mmax(vectors[1])
-    blocks = MModeBlock[]
-    for vector in vectors
-        mmax(vector) == mmax′ || error("The m-modes must all have the same mmax.")
-        push!(blocks,vector[m])
-    end
-    SpectralMModes{mmax′}(m,blocks)
-end
-
-"""
-    SpectralMModes(Nfreq,mmax,m,vector::Vector{Complex128})
-
-This is the inverse to `Base.full(v::SpectralMModes)`. That is,
-construct a `SpectralMModes` vector from a `Vector{Complex128}`.
-"""
-function SpectralMModes(Nfreq,mmax,m,vector::Vector{Complex128})
-    N = div(length(vector),Nfreq)
-    blocks = [MModeBlock{mmax}(m,vector[(β-1)*N+1:β*N]) for β = 1:Nfreq]
-    SpectralMModes{mmax}(m,blocks)
-end
-
-function Base.full(v::SpectralMModes)
-    out = zeros(Complex128,length(v))
-    idx = 1
-    for β = 1:Nfreq(v)
-        block = v[β].block
-        out[idx:idx+length(block)-1] = block
-        idx += length(block)
-    end
-    out
-end
-=#
 

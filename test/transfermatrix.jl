@@ -1,18 +1,3 @@
-let
-    frame = ReferenceFrame()
-    set!(frame,Position(pos"ITRF",q"0.0m",q"0.0deg",q"90.0deg"))
-    set!(frame,Epoch(epoch"UTC",Quantity(50237.29,"d")))
-    beam = itrf_beam(frame,SineBeam(1.0),45e6)
-    for i = 1:length(beam)
-        θ,ϕ = LibHealpix.pix2ang_ring(512,i)
-        if θ < π/2
-            @test abs(beam[i] - cos(θ)) < 1e-5
-        else
-            @test abs(beam[i]) < 1e-5
-        end
-    end
-end
-
 let Nbase = 10, lmax = 10
     @test BPJSpec.default_size(BPJSpec.TransferMatrixBlock,Nbase,lmax,0) == (10,11)
     @test BPJSpec.default_size(BPJSpec.TransferMatrixBlock,Nbase,lmax,1) == (20,10)
@@ -85,13 +70,12 @@ let Nant = 5, Nfreq = 2, lmax = 100, mmax = 100
     #    until I wrap their iterative counterparts
 end
 
-#=
 # test transfermatrix i/o
 let Nbase = 100, lmax = 20, mmax = 20
     filename = tempname()*".jld"
     ν = 45e6
 
-    B1 = [BPJSpec.TransferMatrixBlock(Nbase,lmax,m,ν) for m = 0:mmax] |> TransferMatrix
+    B1 = TransferMatrix(Nbase,lmax,mmax,ν)
     for m = 0:mmax
         rand!(B1[m].block)
     end
@@ -101,10 +85,7 @@ let Nbase = 100, lmax = 20, mmax = 20
     @test B1 == B2
 
     # and make sure we can write multiple frequencies to the same file
-    B3 = [BPJSpec.TransferMatrixBlock(Nbase,lmax,m,ν+1e6) for m = 0:mmax] |> TransferMatrix
-    for m = 0:mmax
-        rand!(B3[m].block)
-    end
+    B3 = TransferMatrix(Nbase,lmax,mmax,ν+1e6)
     save_transfermatrix(filename,B3)
 
     B4 = load_transfermatrix(filename,ν)
@@ -112,5 +93,26 @@ let Nbase = 100, lmax = 20, mmax = 20
     @test B1 == B4
     @test B3 == B5
 end
-=#
+
+# test that we can make the transfer matrix square while leaving the
+# singular values untouched
+let Nbase = 100, lmax = 20, mmax = 20
+    B1 = TransferMatrix(Nbase,lmax,mmax,45e6)
+    for m = 0:mmax
+        rand!(B1[m].block)
+    end
+
+    P  = preserve_singular_values(B1)
+    B2 = P*B1
+    @test typeof(B2) == TransferMatrix{BPJSpec.one_ν}
+
+    for m = 0:mmax
+        x,y = size(B2[m])
+        @test x == y
+
+        U1,S1,V1 = svd(B1[m])
+        U2,S2,V2 = svd(B2[m])
+        @test S1 ≈ S2
+    end
+end
 
