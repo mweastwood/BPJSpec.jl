@@ -16,7 +16,7 @@
 # constants
 const c = 2.99792e8 # m/s
 const k = 1.38065e-23 # J/K
-const HI = 1420.40575177 # MHz
+const HI = 1420.40575177e6 # Hz
 const Jy = 1e-26 # one Jansky in mks unints
 
 # cosmology
@@ -39,7 +39,7 @@ age(z) = Cosmology.age_gyr(cosmology,z)
 """
     frequency(z)
 
-Calculate the frequency (in MHz) of the 21 cm line of Hydrogen at the redshift `z`.
+Calculate the frequency (in Hz) of the 21 cm line of Hydrogen at the redshift `z`.
 """
 frequency(z) = HI/(1+z)
 
@@ -47,7 +47,7 @@ frequency(z) = HI/(1+z)
     redshift(ν)
 
 Calculate the redshift from which the emission originates if the 21 cm line
-is observed at the frequency `ν` (in MHz).
+is observed at the frequency `ν` (in Hz).
 """
 redshift(ν)  = HI/ν-1
 
