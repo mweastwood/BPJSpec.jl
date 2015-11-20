@@ -15,22 +15,6 @@
 
 #=
 """
-    congruence(B::SpectralTransferMatrix,C::CovarianceMatrix) -> B*C*B'
-
-Compute the congruence transform of the covariance matrix with respect to
-the transfer matrix. That is, change the basis of the covariance matrix
-from spherical harmonic coefficients to m-modes.
-"""
-function congruence(B::SpectralTransferMatrix,C::CovarianceMatrix)
-    Nfreq(B) == Nfreq(C) || error("The values of Nfreq must be the same.")
-    out = CovarianceMatrix(Nfreq(C))
-    for β2 = 1:Nfreq(C), β1 = 1:Nfreq(C)
-        out[β1,β2] = CovarianceMatrixBlock(B[β1].block*C[β1,β2].block*B[β2].block')
-    end
-    out
-end
-
-"""
     CovarianceMatrix(component::AbstractComponent,ν,lmax,m)
 
 Construct a covariance matrix for the given component of the sky.
@@ -47,19 +31,6 @@ function CovarianceMatrix(component::AbstractComponent,ν,lmax,m)
         blocks[β1,β2] = CovarianceMatrixBlock(block)
     end
     CovarianceMatrix(blocks)
-end
-
-function Base.full(C::CovarianceMatrix)
-    N = blocksize(C)*Nfreq(C)
-    fullC = zeros(Complex128,N,N)
-    for β2 = 1:Nfreq(C), β1 = 1:Nfreq(C)
-        idx1 = (β1-1)*blocksize(C)+1:β1*blocksize(C)
-        idx2 = (β2-1)*blocksize(C)+1:β2*blocksize(C)
-        subC = sub(fullC,idx1,idx2)
-        block = C[β1,β2].block
-        subC[:] = block
-    end
-    fullC
 end
 =#
 

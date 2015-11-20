@@ -19,8 +19,7 @@ typealias AbstractBlock Union{AbstractVectorBlock,AbstractMatrixBlock}
 
 abstract AbstractBlockVector # a vector composed of blocks
 abstract AbstractBlockDiagonalMatrix
-abstract AbstractBlockMatrix # a matrix composed of blocks
-typealias VectorOfBlocks Union{AbstractBlockVector,AbstractBlockDiagonalMatrix}
+typealias ListOfBlocks Union{AbstractBlockVector,AbstractBlockDiagonalMatrix}
 
 metadata(::AbstractBlock) = ()
 
@@ -31,10 +30,52 @@ setindex!(A::AbstractMatrixBlock,x,i,j) = A.block[i,j] = x
 
 Base.size(A::AbstractBlock) = size(A.block)
 Base.length(A::AbstractBlock) = length(A.block)
-Nblocks(A::VectorOfBlocks) = length(A.blocks)
+
+function Base.length(A::AbstractBlockVector)
+    sz = 0
+    for block in A.blocks
+        sz += length(block)
+    end
+    sz
+end
+
+function Base.size(A::AbstractBlockDiagonalMatrix)
+    sz1 = sz2 = 0
+    for block in A.blocks
+        sz = size(block)
+        sz1 += sz[1]
+        sz2 += sz[2]
+    end
+    sz1,sz2
+end
+
+Nblocks(A::ListOfBlocks) = length(A.blocks)
 
 ==(lhs::AbstractBlock, rhs::AbstractBlock) = metadata(lhs) == metadata(rhs) && lhs.block == rhs.block
-==(lhs::VectorOfBlocks, rhs::VectorOfBlocks) = lhs.blocks == rhs.blocks
+==(lhs::ListOfBlocks, rhs::ListOfBlocks) = lhs.blocks == rhs.blocks
+
+function Base.full(A::AbstractBlockVector)
+    B = zeros(Complex128,length(A))
+    idx = 1
+    for block in A.blocks
+        l = length(block)
+        B[idx:idx+l-1] = block.block
+        idx += l
+    end
+    B
+end
+
+function Base.full(A::AbstractBlockDiagonalMatrix)
+    B = zeros(Complex128,size(A))
+    idx1 = idx2 = 1
+    for block in A.blocks
+        sz = size(block)
+        B[idx1:idx1+sz[1]-1,idx2:idx2+sz[2]-1] = block.block
+        idx1 += sz[1]
+        idx2 += sz[2]
+    end
+    B
+end
 
 function *{T<:AbstractBlock}(lhs::AbstractMatrixBlock, rhs::T)
     meta   = metadata(rhs)
@@ -42,7 +83,7 @@ function *{T<:AbstractBlock}(lhs::AbstractMatrixBlock, rhs::T)
     T(result,meta...)
 end
 
-function *{T<:VectorOfBlocks}(lhs::AbstractBlockDiagonalMatrix, rhs::T)
+function *{T<:ListOfBlocks}(lhs::AbstractBlockDiagonalMatrix, rhs::T)
     Nblocks(lhs) == Nblocks(rhs) || error("Number of blocks must match.")
     T([lhs.blocks[i]*rhs.blocks[i] for i = 1:Nblocks(rhs)])
 end
@@ -51,15 +92,19 @@ Base.svd(A::AbstractBlock) = svd(A.block,thin=true)
 
 # Default implementation
 
+immutable VectorBlock <: AbstractVectorBlock
+    block::Vector{Complex128}
+end
+
 immutable MatrixBlock <: AbstractMatrixBlock
     block::Matrix{Complex128}
 end
 
-immutable BlockDiagonalMatrix <: AbstractBlockDiagonalMatrix
-    blocks::Vector{MatrixBlock}
+immutable BlockVector <: AbstractBlockVector
+    blocks::Vector{VectorBlock}
 end
 
-immutable BlockMatrix <: AbstractBlockMatrix
-    blocks::Matrix{MatrixBlock}
+immutable BlockDiagonalMatrix <: AbstractBlockDiagonalMatrix
+    blocks::Vector{MatrixBlock}
 end
 
