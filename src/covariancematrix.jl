@@ -13,53 +13,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-"""
-    CovarianceMatrixBlock
-
-A single block of a `CovarianceMatrix` corresponding to a pair
-of frequency channels.
-"""
-immutable CovarianceMatrixBlock
-    block::Matrix{Complex128}
-end
-
-"""
-    CovarianceMatrix
-
-A covariance matrix where frequency channels are arranged in arranged
-in blocks.
-"""
-immutable CovarianceMatrix
-    blocks::Matrix{CovarianceMatrixBlock}
-end
-
-function CovarianceMatrix(Nfreq)
-    CovarianceMatrix(Array{CovarianceMatrixBlock}(Nfreq,Nfreq))
-end
-
-Nfreq(C::CovarianceMatrix) = size(C.blocks,1)
-blocksize(C::CovarianceMatrix) = size(C[1,1].block,1)
-getindex(C::CovarianceMatrix,β1,β2) = C.blocks[β1,β2]
-setindex!(C::CovarianceMatrix,x,β1,β2) = C.blocks[β1,β2] = x
-
-"""
-    congruence(B::SpectralTransferMatrix,C::CovarianceMatrix) -> B*C*B'
-
-Compute the congruence transform of the covariance matrix with respect to
-the transfer matrix. That is, change the basis of the covariance matrix
-from spherical harmonic coefficients to m-modes.
-"""
-function congruence(B::SpectralTransferMatrix,C::CovarianceMatrix)
-    Nfreq(B) == Nfreq(C) || error("The values of Nfreq must be the same.")
-    out = CovarianceMatrix(Nfreq(C))
-    for β2 = 1:Nfreq(C), β1 = 1:Nfreq(C)
-        out[β1,β2] = CovarianceMatrixBlock(B[β1].block*C[β1,β2].block*B[β2].block')
-    end
-    out
-end
-
-abstract AbstractComponent
-
+#=
 """
     CovarianceMatrix(component::AbstractComponent,ν,lmax,m)
 
@@ -78,22 +32,44 @@ function CovarianceMatrix(component::AbstractComponent,ν,lmax,m)
     end
     CovarianceMatrix(blocks)
 end
+=#
 
-function Base.full(C::CovarianceMatrix)
-    N = blocksize(C)*Nfreq(C)
-    fullC = zeros(Complex128,N,N)
-    for β2 = 1:Nfreq(C), β1 = 1:Nfreq(C)
-        idx1 = (β1-1)*blocksize(C)+1:β1*blocksize(C)
-        idx2 = (β2-1)*blocksize(C)+1:β2*blocksize(C)
-        subC = sub(fullC,idx1,idx2)
-        block = C[β1,β2].block
-        subC[:] = block
-    end
-    fullC
+doc"""
+    Cnoise(Tsys0,α,ν,ν0,Δν,τ_total,τ_int,m) -> Float64
+
+Compute the expected variance of the $m$-modes due to thermal noise.
+
+The system temperature is modeled as
+\\[
+    T_{sys} = T_{sys,0} \left(\frac{\nu}{\nu_0}\right)^{-\alpha},
+\\]
+$\Delta\nu$ gives the bandwidth, $\tau_{total}$ gives the total integration
+time (in seconds), and $\tau_{int}$ gives the integration time corresponding
+to a single integration (also in seconds).
+"""
+function Cnoise(Tsys0,α,ν,ν0,Δν,τ_total,τ_int,m)
+    Tsys = Tsys0 * (ν/ν0)^(-α)
+    tsid = 86164.09054 # sidereal day in seconds
+    Tsys*Tsys / (τ_total*Δν) * sinc(m*τ_int/tsid)^2
 end
 
+immutable NoiseModel
+    Tsys0::Float64
+    α::Float64
+    ν0::Float64
+    Δν::Float64
+    τ_total::Float64
+    τ_int::Float64
+end
+
+function call(model::NoiseModel,m,ν)
+    Cnoise(model.Tsys0,model.α,ν,model.ν0,model.Δν,model.τ_total,model.τ_int,m)
+end
+
+abstract SkyComponent
+
 """
-    Cforeground(l,ν1,ν2,ν0,A,α,β,ζ) -> Cl::Float64
+    Cforeground(l,ν1,ν2,ν0,A,α,β,ζ) -> Float64
 
 Evaluate a model for the multifrequency angular power spectrum of
 a foreground component. Note that `ν0`, `A`, `α`, `β`, and `ζ` are
@@ -105,7 +81,7 @@ function Cforeground(l,ν1,ν2,ν0,A,α,β,ζ)
         * exp(-log(ν1/ν2)^2/(2*ζ^2)))
 end
 
-immutable ForegroundModel <: AbstractComponent
+immutable ForegroundModel <: SkyComponent
     ν0::Float64
     A::Float64
     α::Float64
@@ -117,68 +93,75 @@ function call(model::ForegroundModel,l,ν1,ν2)
     Cforeground(l,ν1,ν2,model.ν0,model.A,model.α,model.β,model.ζ)
 end
 
-"""
-    Csignal_spherical(l,ν1,ν2,kedges,P) -> Cl::Float64
-
-Project a model of a spherically averaged spatial power spectrum
-to calculate the corresponding multifrequency angular power spectrum.
-There are two branches because a limit must be taken as `ν1-ν2` tends
-to zero.
-
-This projection assumes that the power spectrum is constant within
-the bins defined by `kedges`. The integral is then analytically
-evaluated within each bin.
-
-    1/(π*r1*r2) * ∫dk*P(k)*cos(sqrt(k^2-k⟂^2)*Δr)*k/sqrt(k^2-k⟂^2)
-
-Note that because `kedges` defines the edges of each of the bins,
-the length of `kedges` should be one greater than the length of `P`.
-"""
-function Csignal_spherical(l,ν1,ν2,kedges,P)
+function Csignal(l,ν1,ν2,kpara,kperp,power)
     if ν1 == ν2
         z = redshift(ν1)
-        r = comoving_distance(z)
-        kperp = l/r
+        χ = comoving_distance(z)
+
+        # calculate weights for interpolating the value of the
+        # power spectrum at k_perp = l/χ
+        j = searchsortedlast(kperp,l/χ)
+        weight_left  = 1 - (l/χ  -  kperp[j]) / (kperp[j+1] - kperp[j])
+        weight_right = 1 - (kperp[j+1] - l/χ) / (kperp[j+1] - kperp[j])
+
+        # integrate over k_para assuming that the power spectrum
+        # is linear between the grid points
         out = 0.0
-        for i = 1:length(P)
-            kperp ≥ kedges[i+1] && continue
-            kmax = kedges[i+1]
-            kmin = max(kedges[i],kperp)
-            out += (sqrt(kmax^2-kperp^2)
-                   -sqrt(kmin^2-kperp^2))*P[i]/(π*r^2)
+        for i = 1:length(kpara)-1
+            k_start = kpara[i]
+            k_stop  = kpara[i+1]
+            P_start = weight_left*power[i,  j] + weight_right*power[i,  j+1]
+            P_stop  = weight_left*power[i+1,j] + weight_right*power[i+1,j+1]
+            out += 0.5*(P_start+P_stop)*(k_stop-k_start)
         end
+        out /= π*χ^2
         return out
     else
         z1 = redshift(ν1)
         z2 = redshift(ν2)
-        r1 = comoving_distance(z1)
-        r2 = comoving_distance(z2)
-        Δr = r2-r1
-        rmean = (r1+r2)/2
-        kperp = l/rmean
+        χ1 = comoving_distance(z1)
+        χ2 = comoving_distance(z2)
+        Δχ = χ2-χ1
+        χ  = 0.5*(χ1+χ2)
+
+        # calculate weights for interpolating the value of the
+        # power spectrum at k_perp = l/χ
+        j = searchsortedlast(kperp,l/χ)
+        weight_left  = 1 - (l/χ  -  kperp[j]) / (kperp[j+1] - kperp[j])
+        weight_right = 1 - (kperp[j+1] - l/χ) / (kperp[j+1] - kperp[j])
+
+        # integrate over k_para assuming that the power spectrum
+        # is linear between the grid points
         out = 0.0
-        for i = 1:length(P)
-            kperp ≥ kedges[i+1] && continue
-            kmax = kedges[i+1]
-            kmin = max(kedges[i],kperp)
-            out += (sin(sqrt(kmax^2-kperp^2)*Δr)
-                   -sin(sqrt(kmin^2-kperp^2)*Δr))*P[i]/(π*Δr*r1*r2)
+        for i = 1:length(kpara)-1
+            k_start = kpara[i]
+            k_stop  = kpara[i+1]
+            P_start = weight_left*power[i,  j] + weight_right*power[i,  j+1]
+            P_stop  = weight_left*power[i+1,j] + weight_right*power[i+1,j+1]
+            out += (P_stop*sin(k_stop*Δχ) - P_start*sin(k_start*Δχ)) / Δχ
+            out += (P_stop-P_start) * (cos(k_stop*Δχ)-cos(k_start*Δχ)) / (k_stop-k_start) / Δχ^2
         end
+        out /= π*χ1*χ2
         return out
     end
 end
 
-immutable SphericalSignalModel <: AbstractComponent
-    kedges::Vector{Float64} # These define the edges of power spectrum bins
-    power::Vector{Float64}
+immutable SignalModel <: SkyComponent
+    kpara::Vector{Float64} # Mpc⁻¹
+    kperp::Vector{Float64} # Mpc⁻¹
+    power::Matrix{Float64} # K² Mpc³
 end
 
-function call(model::SphericalSignalModel,l,ν1,ν2)
-    Csignal_spherical(l,ν1,ν2,model.kedges,model.power)
+function dimensionful_powerspectrum(kpara,kperp,Δ²)
+    out = similar(Δ²)
+    for j = 1:length(kperp), i = 1:length(kpara)
+        k = hypot(kpara[i],kperp[j])
+        out[i,j] = 2π^2 * Δ²[i,j] / k^3
+    end
+    out
 end
 
-# TODO: implement CylindricalSignalModel
-# This will have cylindrical binning of the power spectrum.
-# That is, allow the power spectrum to be specified as a
-# function of kperp and kpara.
+function call(model::SignalModel,l,ν1,ν2)
+    Csignal(l,ν1,ν2,model.kpara,model.kperp,model.power)
+end
 
