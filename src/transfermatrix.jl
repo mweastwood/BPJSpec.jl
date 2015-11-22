@@ -259,19 +259,37 @@ function save_transfermatrix(filename, B::TransferMatrix{one_ν})
     end
 end
 
-function load_transfermatrix(filename, frequency)
+function load_transfermatrix(filename, ν)
     blocks = TransferMatrixBlock[]
     jldopen(filename,"r") do file
         lmax = file["lmax"] |> read
         mmax = file["mmax"] |> read
 
-        name_ν  = @sprintf("%.3fMHz",frequency/1e6)
+        name_ν  = @sprintf("%.3fMHz",ν/1e6)
         group_ν = file[name_ν]
 
         for m = 0:mmax
             group_m = group_ν[string(m)]
             block = group_m["block"] |> read
-            push!(blocks,TransferMatrixBlock(block,lmax,m,frequency))
+            push!(blocks,TransferMatrixBlock(block,lmax,m,ν))
+        end
+    end
+    TransferMatrix(blocks)
+end
+
+function load_transfermatrix(filename, ν, m::Int)
+    blocks = TransferMatrixBlock[]
+    jldopen(filename,"r") do file
+        lmax = file["lmax"] |> read
+        mmax = file["mmax"] |> read
+
+        for β = 1:length(ν)
+            name_ν  = @sprintf("%.3fMHz",ν[β]/1e6)
+            group_ν = file[name_ν]
+
+            group_m = group_ν[string(m)]
+            block = group_m["block"] |> read
+            push!(blocks,TransferMatrixBlock(block,lmax,m,ν[β]))
         end
     end
     TransferMatrix(blocks)
