@@ -19,6 +19,18 @@ let Nbase = 10, lmax = 10, mmax = 10
     blocks = [BPJSpec.TransferMatrixBlock(Nbase,lmax,3,ν) for ν in linspace(45e6,50e6,5)]
     B = TransferMatrix(blocks)
     @test typeof(B) == TransferMatrix{BPJSpec.one_m}
+
+    blocks = [BPJSpec.TransferMatrixBlock(Nbase,lmax,0,45e6),
+              BPJSpec.TransferMatrixBlock(Nbase,lmax,1,46e6)]
+    @test_throws ErrorException TransferMatrix(blocks)
+
+    blocks = [BPJSpec.TransferMatrixBlock(Nbase,lmax,1,45e6),
+              BPJSpec.TransferMatrixBlock(Nbase,lmax,2,45e6)]
+    @test_throws ErrorException TransferMatrix(blocks)
+
+    blocks = [BPJSpec.TransferMatrixBlock(Nbase,lmax,3,45e6),
+              BPJSpec.TransferMatrixBlock(Nbase,lmax,2,45e6)]
+    @test_throws ErrorException TransferMatrix(blocks)
 end
 
 # infinitesimally short baselines should only have nonzero elements when l=m=0
