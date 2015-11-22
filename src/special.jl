@@ -85,13 +85,26 @@ to the numerical precision required by `ishermitian`.
 force_hermitian(A) = 0.5*(A+A')
 
 """
-    force_posdef(A,ϵ=1e-10) -> A+ϵ*I
+    force_posdef(A)
 
-If the matrix `A`, is nearly positive definite, but has small
-negative eigenvalues, this function can be used to make the matrix
-positive definite.
+Force the matrix `A` to be Hermitian positive definite.
+This is intended to be used on matrices that are nearly Hermitian
+positive definite, but not to the numerical precision required
+by `isposdef`.
 """
-force_posdef(A,ϵ=1e-10) = A+ϵ*I
+function force_posdef(A)
+    B = force_hermitian(A)
+    U,Σ,V = svd(B)
+    H = V*diagm(Σ)*V'
+    C = force_hermitian(0.5*(B+H))
+
+    count = 0
+    while !isposdef(C)
+        C += 2^count*eps(Float64)*I
+        count += 1
+    end
+    C
+end
 
 doc"""
     gramschmidt(u,v)
