@@ -25,6 +25,7 @@ export itrf_baselines, itrf_phasecenter, itrf_beam
 export visibilities, create_empty_visibilities, grid_visibilities, load_visibilities
 
 export NoiseModel, ForegroundModel, SignalModel
+export covariance_matrix, dimensionful_powerspectrum
 
 using CasaCore.Measures
 using CasaCore.Tables
