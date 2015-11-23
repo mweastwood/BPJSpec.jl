@@ -15,3 +15,7 @@ for i = 1:10
     @test z ≈ z′
 end
 
+let
+    @test BPJSpec.beam_solid_angle(SineBeam(0)) ≈ 2π
+end
+

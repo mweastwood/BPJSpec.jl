@@ -52,7 +52,7 @@ function itrf_phasecenter(ms::MeasurementSet)
 end
 
 doc"""
-    itrf_beam(frame::ReferenceFrame, beam::BeamModel, frequency)
+    itrf_beam(frame::ReferenceFrame, beam::TTCal.BeamModel, frequency)
 
 Create a Healpix map of a TTCal beam model.
 At the moment only the $I \rightarrow I$ element of the Mueller
