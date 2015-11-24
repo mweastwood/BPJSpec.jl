@@ -61,6 +61,6 @@ function beam_solid_angle(beam::SineBeam)
 end
 
 function jansky_to_kelvin(x, ν, Ω)
-    out * (c^2/(2*ν^2*k*Ω) * Jy)
+    x * (c^2/(2*ν^2*k*Ω) * Jy)
 end
 
