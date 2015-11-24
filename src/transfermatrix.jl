@@ -180,7 +180,8 @@ function gentransfer!(B::TransferMatrix{one_ν},
     idx = 1
     nextidx() = (myidx = idx; idx += 1; myidx)
     p = Progress(Nbase, 1, "Dreaming...", 50)
-    increment_progress() = next!(p)
+    l = ReentrantLock()
+    increment_progress() = (lock(l); next!(p); unlock(l))
     @sync for worker in workers()
         @async while true
             α = nextidx()
