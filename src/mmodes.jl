@@ -105,8 +105,15 @@ function MModes(blocks)
     """)
 end
 
-function MModes(Nbase,mmax,ν::Float64)
+function MModes(Nbase::Int,mmax::Int,ν::Float64)
     [MModeBlock(Nbase,m,ν) for m = 0:mmax] |> MModes
+end
+
+function MModes(vector::Vector{Complex128},m::Int,ν::AbstractVector)
+    Nfreq = length(ν)
+    N = div(length(vector),Nfreq)
+    blocks = [MModeBlock(vector[(β-1)*N+1:β*N],m,ν[β]) for β = 1:Nfreq]
+    MModes(blocks)
 end
 
 # α labels the baseline
@@ -126,6 +133,9 @@ setindex!(v::MModes{one_m},x,α,β) = v[β][α] = x
 
 frequency(v::MModes{one_ν}) = v[0].ν
 mmax(v::MModes{one_ν}) = length(v.blocks)-1
+
+getm(v::MModes{one_m}) = v[1].m
+frequencies(v::MModes{one_m}) = [v[β].ν for β = 1:length(v.blocks)]
 
 """
     MModes(visibilities, ν; mmax=100)
@@ -198,18 +208,67 @@ function save_mmodes(filename, v::MModes{one_ν})
     end
 end
 
-function load_mmodes(filename, frequency)
+function save_mmodes(filename, v::MModes{one_m})
+    if !isfile(filename)
+        jldopen(filename,"w",compress=true) do file
+            file["mmax"] = getm(v)
+        end
+    end
+
+    jldopen(filename,"r+",compress=true) do file
+        m = getm(v)
+        mmax = read(file["mmax"])
+        if m > mmax
+            if "mmax" in names(file)
+                o_delete(file,"mmax")
+            end
+            file["mmax"] = m
+        end
+
+        ν = frequencies(v)
+        for β = 1:length(ν)
+            name_ν  = @sprintf("%.3fMHz",ν[β]/1e6)
+            if !(name_ν in names(file))
+                group_ν = g_create(file,name_ν)
+            else
+                group_ν = file[name_ν]
+            end
+
+            group_m = g_create(group_ν,string(m))
+            group_m["block"] = v[β].block
+        end
+    end
+end
+
+function load_mmodes(filename, ν)
     blocks = MModeBlock[]
     jldopen(filename,"r") do file
         mmax = file["mmax"] |> read
 
-        name_ν  = @sprintf("%.3fMHz",frequency/1e6)
+        name_ν  = @sprintf("%.3fMHz",ν/1e6)
         group_ν = file[name_ν]
 
         for m = 0:mmax
             group_m = group_ν[string(m)]
             block = group_m["block"] |> read
-            push!(blocks,MModeBlock(block,m,frequency))
+            push!(blocks,MModeBlock(block,m,ν))
+        end
+    end
+    MModes(blocks)
+end
+
+function load_mmodes(filename, ν, m::Int)
+    blocks = MModeBlock[]
+    jldopen(filename,"r") do file
+        mmax = file["mmax"] |> read
+
+        for β = 1:length(ν)
+            name_ν  = @sprintf("%.3fMHz",ν[β]/1e6)
+            group_ν = file[name_ν]
+
+            group_m = group_ν[string(m)]
+            block = group_m["block"] |> read
+            push!(blocks,MModeBlock(block,m,ν[β]))
         end
     end
     MModes(blocks)
