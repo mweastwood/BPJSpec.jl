@@ -94,16 +94,12 @@ by `isposdef`.
 """
 function force_posdef(A)
     B = force_hermitian(A)
-    U,Σ,V = svd(B)
-    H = V*diagm(Σ)*V'
-    C = force_hermitian(0.5*(B+H))
-
     count = 0
-    while !isposdef(C)
-        C += 2^count*eps(Float64)*I
+    while !isposdef(B)
+        B += 2^count*eps(Float64)*I
         count += 1
     end
-    C
+    B
 end
 
 doc"""
