@@ -11,9 +11,9 @@ let lmax = 20, mmax = 10
 end
 
 let lmax = 20, mmax = 10, Nbase = 100, ν = 45e6
-    B = TransferMatrix(Nbase,lmax,mmax,ν)
+    B = BPJSpec.TransferMatrix(Nbase,lmax,mmax,ν)
     for m = 0:mmax
-        rand!(B[m].block)
+        rand!(B[m+1].block)
     end
 
     alm = Alm(Complex128,lmax,mmax)

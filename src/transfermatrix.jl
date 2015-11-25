@@ -13,163 +13,93 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-doc"""
-    immutable TransferMatrixBlock <: AbstractMatrixBlock
-
-This type stores a single block of the transfer matrix.
-
-**Fields:**
-
-* `block` stores the actual matrix block
-* `lmax` stores the maximum value of $l$
-* `m` stores the value of $m$ corresponding to this block of the matrix
-* `ν` stores the frequency (in Hz)
-"""
-immutable TransferMatrixBlock <: AbstractMatrixBlock
-    block::Matrix{Complex128}
+immutable TransferMeta <: Metadata
     lmax::Int
-    m::Int
-    ν::Float64
+    m::UnitRange{Int}
+    ν::Vector{Float64}
+
+    function TransferMeta(lmax,m,ν)
+        if length(m) > 1 && length(ν) > 1
+            error("Cannot simultaneously have multiple values of m and multiple frequency channels.")
+        end
+        new(lmax,m,ν)
+    end
 end
 
-default_size(::Type{TransferMatrixBlock},Nbase,lmax,m) = (two(m)*Nbase, lmax-m+1)
-metadata(B::TransferMatrixBlock) = (B.lmax,B.m,B.ν)
+TransferMeta(lmax::Int,m::Int,ν::AbstractVector) = TransferMeta(lmax,m,collect(ν))
+TransferMeta(lmax::Int,mmax::Int,ν::Float64) = TransferMeta(lmax,0:mmax,[ν])
 
-"""
-    TransferMatrixBlock(Nbase,lmax,m,ν)
-
-Create an empty transfer matrix block of the default size.
-"""
-function TransferMatrixBlock(Nbase,lmax,m,ν)
-    sz = default_size(TransferMatrixBlock,Nbase,lmax,m)
-    block = zeros(Complex128,sz)
-    TransferMatrixBlock(block,lmax,m,ν)
-end
-
-@enum Representation one_ν one_m
+==(lhs::TransferMeta,rhs::TransferMeta) = lhs.lmax == rhs.lmax && lhs.m == rhs.m && lhs.ν == rhs.ν
 
 doc"""
-    immutable TransferMatrix{rep} <: AbstractBlockDiagonalMatrix
+    typealias TransferMatrix Blocks{MatrixBlock, TransferMeta}
+
+This type stores the transfer matrix organized into blocks.
 
 The transfer matrix represents the instrumental response of the
 interferometer to the spherical harmonic coefficients of the sky.
-
-The transfer matrix is usually very large, but we can use its block
+This matrix is usually very large, but we can use its block
 diagonal structure to work with parts of the matrix separately.
-We can choose between:
-
-1. Working with one frequency channel at a time, but all values of $m$,
-   where $m$ is the azimuthal quantum number of the spherical harmonics, or
-2. Working with several frequency channels, but only one value of $m$.
-
-The former representation is more useful while calculating elements of
-the transfer matrix, but the latter representation is more useful for
-foreground filtering and cosmological power spectrum estimation (where
-frequency structure is important). The type parameter `sym` is therefore
-the switch that indicates whether we are working with the first
-representation or the second.
-
-    TransferMatrix{one_ν} # one frequency channel, many m
-    TransferMatrix{one_m} # many frequency channels, one m
-
-**Fields:**
-
-* `blocks` is a list of `TransferMatrixBlock`s
 """
-immutable TransferMatrix{rep} <: AbstractBlockDiagonalMatrix
-    blocks::Vector{TransferMatrixBlock}
-end
+typealias TransferMatrix Blocks{MatrixBlock, TransferMeta}
 
-"""
-    TransferMatrix(blocks)
+initial_block_size(::Type{TransferMatrix}, Nbase, lmax, m) = (two(m)*Nbase, lmax-m+1)
 
-Construct a transfer matrix from the list of blocks.
-
-The representation (`one_ν` or `one_m`) is inferred from the provided
-list of blocks.
-"""
-function TransferMatrix(blocks)
-    lmax = [block.lmax for block in blocks]
-    length(unique(lmax)) == 1 || error("All blocks in a TransferMatrix must have a consistent lmax.")
-
-    m = [block.m for block in blocks]
-    ν = [block.ν for block in blocks]
-    mmax = length(m) - 1
-
-    # if all the blocks are the same frequency and are sorted in order
-    # of increasing m, we have the one_ν representation
-    if length(unique(ν)) == 1 && m == collect(0:mmax)
-        return TransferMatrix{one_ν}(blocks)
+function call(::Type{TransferMatrix}, Nbase::Int, lmax::Int, mmax::Int, ν::Float64)
+    meta = TransferMeta(lmax,mmax,ν)
+    blocks = MatrixBlock[]
+    for m = 0:mmax
+        sz = initial_block_size(TransferMatrix,Nbase,lmax,m)
+        push!(blocks,MatrixBlock(sz))
     end
-
-    # if all the blocks have different frequencies (not necessarily sorted)
-    # but only have one value of m, we have the one_m
-    if length(unique(ν)) == length(ν) && length(unique(m)) == 1
-        return TransferMatrix{one_m}(blocks)
-    end
-
-    error("""
-    The list of blocks must either:
-
-    * have a consistent frequency channel representing all values of m from 0 to some mmax, or
-    * have different frequency channels, but a consistent value of m
-    """)
+    TransferMatrix(blocks,meta)
 end
 
-function TransferMatrix(Nbase,lmax,mmax,ν::Float64)
-    [TransferMatrixBlock(Nbase,lmax,m,ν) for m = 0:mmax] |> TransferMatrix
-end
+is_single_frequency(meta::TransferMeta) = length(meta.ν) == 1
+is_single_m(meta::TransferMeta) = length(meta.m) == 1
+is_single_frequency(B::TransferMatrix) = is_single_frequency(B.meta)
+is_single_m(B::TransferMatrix) = is_single_m(B.meta)
 
-# α labels the baseline
-# β labels the frequency channel
-# l and m label the spherical harmonic
+lmax(meta::TransferMeta) = meta.lmax
+lmax(B::TransferMatrix) = lmax(B.meta)
 
-getindex(B::TransferMatrixBlock,α,l) = B.block[α,l-B.m+1]
-setindex!(B::TransferMatrixBlock,x,α,l) = B.block[α,l-B.m+1] = x
+mmax(meta::TransferMeta) = maximum(meta.m)
+mmax(B::TransferMatrix) = mmax(B.meta)
 
-getindex(B::TransferMatrix{one_ν},m) = B.blocks[m+1]
-getindex(B::TransferMatrix{one_ν},α,l,m) = B[m][α,l]
-setindex!(B::TransferMatrix{one_ν},x,α,l,m) = B[m][α,l] = x
-
-getindex(B::TransferMatrix{one_m},β) = B.blocks[β]
-getindex(B::TransferMatrix{one_m},α,β,l) = B[β][α,l]
-setindex!(B::TransferMatrix{one_m},x,α,β,l) = B[β][α,l] = x
-
-frequency(B::TransferMatrix{one_ν}) = B[0].ν
-lmax(B::TransferMatrix{one_ν}) = B[0].lmax
-mmax(B::TransferMatrix{one_ν}) = length(B.blocks)-1
+Nfreq(meta::TransferMeta) = length(meta.ν)
+Nfreq(B::TransferMatrix) = length(B.meta)
 
 """
-    gentransfer(ms::MeasurementSet, beam::TTCal.BeamModel, channel; lmax = 100, mmax = 100)
+    transfer(ms::MeasurementSet, beam::TTCal.BeamModel, channel; lmax = 100, mmax = 100)
 
 Generate a transfer matrix where the instrumental parameters are read from a
 measurement set.
 """
-function gentransfer(ms::MeasurementSet, beam::TTCal.BeamModel, channel;
-                     lmax::Int = 100, mmax::Int = 100)
+function transfer(ms::MeasurementSet, beam::TTCal.BeamModel, channel;
+                  lmax::Int = 100, mmax::Int = 100)
     healpix_beam = itrf_beam(ms.frame,beam,ms.ν[channel])
     u,v,w = itrf_baselines(ms)
     phasecenter = itrf_phasecenter(ms)
-    gentransfer(healpix_beam, u, v, w, ms.ν[channel],
-                phasecenter, lmax=lmax, mmax=mmax)
+    transfer(healpix_beam, u, v, w, ms.ν[channel],
+             phasecenter, lmax=lmax, mmax=mmax)
 end
 
 """
-    gentransfer(beam::HealpixMap, u, v, w, ν, phasecenter; lmax = 100, mmax = 100)
+    transfer(beam::HealpixMap, u, v, w, ν, phasecenter; lmax = 100, mmax = 100)
 
 Construct a transfer matrix for the given beam model and observational parameters.
 """
-function gentransfer(beam::HealpixMap, u, v, w, ν, phasecenter;
-                     lmax::Int = 100, mmax::Int = 100)
+function transfer(beam::HealpixMap, u, v, w, ν, phasecenter;
+                  lmax::Int = 100, mmax::Int = 100)
     Nbase = length(u)
     B = TransferMatrix(Nbase,lmax,mmax,ν)
-    gentransfer!(B,beam,u,v,w,ν,phasecenter,lmax=lmax,mmax=mmax)
+    transfer!(B,beam,u,v,w,ν,phasecenter,lmax=lmax,mmax=mmax)
     B
 end
 
-function gentransfer!(B::TransferMatrix{one_ν},
-                      beam::HealpixMap, u, v, w, ν, phasecenter;
-                      lmax::Int = 100, mmax::Int = 100)
+function transfer!(B::TransferMatrix,
+                   beam::HealpixMap, u, v, w, ν, phasecenter;
+                   lmax::Int = 100, mmax::Int = 100)
     Nbase = length(u)
     λ = c / ν
     u = u / λ
@@ -227,77 +157,82 @@ function pack!(B,realfringe,imagfringe,α,Nbase,lmax,mmax)
     # spherical harmonic conjugates while we've expanded the fringe pattern
     # in terms of the spherical harmonics.
     for l = 0:lmax
-        B[α,l,0] = conj(realfringe[l,0]) + 1im*conj(imagfringe[l,0])
+        B[1][α,l+1] = conj(realfringe[l,0]) + 1im*conj(imagfringe[l,0])
     end
     for m = 1:mmax, l = m:lmax
         α1 = α         # positive m
         α2 = α + Nbase # negative m
-        B[α1,l,m] = conj(realfringe[l,m]) + 1im*conj(imagfringe[l,m])
-        B[α2,l,m] = conj(realfringe[l,m]) - 1im*conj(imagfringe[l,m])
+        B[m+1][α1,l-m+1] = conj(realfringe[l,m]) + 1im*conj(imagfringe[l,m])
+        B[m+1][α2,l-m+1] = conj(realfringe[l,m]) - 1im*conj(imagfringe[l,m])
     end
 end
 
-function save_transfermatrix(filename, B::TransferMatrix{one_ν})
+function save(filename, B::TransferMatrix)
     if !isfile(filename)
         jldopen(filename,"w",compress=true) do file
-            file["lmax"] = lmax(B)
-            file["mmax"] = mmax(B)
+            file["description"] = "transfer matrix"
         end
     end
 
     jldopen(filename,"r+",compress=true) do file
-        read(file["lmax"]) == lmax(B) || error("lmax is inconsistent")
-        read(file["mmax"]) == mmax(B) || error("mmax is inconsistent")
+        if read(file["description"]) != "transfer matrix"
+            error("Attempting to write to a file that does not contain a transfer matrix.")
+        end
 
-        name_ν  = @sprintf("%.3fMHz",frequency(B)/1e6)
-        name_ν in names(file) && error("group $(name_ν) already exists in file")
-        group_ν = g_create(file,name_ν)
-
-        for m = 0:mmax(B)
-            group_m = g_create(group_ν,string(m))
-            group_m["block"] = B[m].block
+        if is_single_frequency(B)
+            ν = B.meta.ν[1]
+            name = @sprintf("%.3fMHz",ν/1e6)
+            name in names(file) || g_create(file,name)
+            group = file[name]
+            for m = 0:mmax(B)
+                block = B[m+1]
+                group[string(m)] = block.block
+            end
+        elseif is_single_m(B)
+            m = B.meta.m[1]
+            for β = 1:Nfreq(B)
+                ν = B.meta.ν[β]
+                name = @sprintf("%.3fMHz",ν/1e6)
+                name in names(file) || g_create(file,name)
+                group = file[name]
+                block = B[β]
+                group[string(m)] = block.block
+            end
         end
     end
 end
 
-function load_transfermatrix(filename, ν)
-    blocks = TransferMatrixBlock[]
+function load(filename, meta::TransferMeta)
+    blocks = MatrixBlock[]
     jldopen(filename,"r") do file
-        lmax = file["lmax"] |> read
-        mmax = file["mmax"] |> read
+        if read(file["description"]) != "transfer matrix"
+            error("Attempting to read from a file that does not contain a transfer matrix.")
+        end
 
-        name_ν  = @sprintf("%.3fMHz",ν/1e6)
-        group_ν = file[name_ν]
-
-        for m = 0:mmax
-            group_m = group_ν[string(m)]
-            block = group_m["block"] |> read
-            push!(blocks,TransferMatrixBlock(block,lmax,m,ν))
+        if is_single_frequency(meta)
+            ν = meta.ν[1]
+            name = @sprintf("%.3fMHz",ν/1e6)
+            group = file[name]
+            for m = 0:mmax(meta)
+                block = group[string(m)] |> read
+                push!(blocks,MatrixBlock(block))
+            end
+        elseif is_single_m(meta)
+            m = meta.m[1]
+            for β = 1:Nfreq(meta)
+                ν = meta.ν[β]
+                name = @sprintf("%.3fMHz",ν/1e6)
+                group = file[name]
+                block = group[string(m)] |> read
+                push!(blocks,MatrixBlock(block))
+            end
         end
     end
-    TransferMatrix(blocks)
-end
-
-function load_transfermatrix(filename, ν, m::Int)
-    blocks = TransferMatrixBlock[]
-    jldopen(filename,"r") do file
-        lmax = file["lmax"] |> read
-        mmax = file["mmax"] |> read
-
-        for β = 1:length(ν)
-            name_ν  = @sprintf("%.3fMHz",ν[β]/1e6)
-            group_ν = file[name_ν]
-
-            group_m = group_ν[string(m)]
-            block = group_m["block"] |> read
-            push!(blocks,TransferMatrixBlock(block,lmax,m,ν[β]))
-        end
-    end
-    TransferMatrix(blocks)
+    TransferMatrix(blocks,meta)
 end
 
 doc"""
-    preserve_singular_values(B::TransferMatrix) -> BlockDiagonalMatrix
+    preserve_singular_values(B::TransferMatrix)
 
 Construct a matrix that projects the $m$-modes onto a lower dimensional
 space while preserving all the singular values of the transfer matrix.
@@ -306,12 +241,12 @@ Multiplying by this matrix will compress the data, make the transfer
 matrix square, and leave the information about the sky untouched.
 """
 function preserve_singular_values(B::TransferMatrix)
-    N = Nblocks(B)
+    N = length(B.blocks)
     blocks = Array{MatrixBlock}(N)
     for i = 1:N
         U,σ,V = svd(B.blocks[i])
         blocks[i] = MatrixBlock(U')
     end
-    BlockDiagonalMatrix(blocks)
+    Blocks(blocks)
 end
 

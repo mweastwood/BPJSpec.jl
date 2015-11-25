@@ -17,12 +17,11 @@ __precompile__()
 
 module BPJSpec
 
-export TransferMatrix, save_transfermatrix, load_transfermatrix, gentransfer
-export MModes, save_mmodes, load_mmodes, tikhonov
-export preserve_singular_values
-
 export itrf_baselines, itrf_phasecenter, itrf_beam
-export visibilities, create_empty_visibilities, grid_visibilities, load_visibilities
+export create_empty_visibilities, grid_visibilities, load_visibilities
+
+export visibilities, mmodes, transfer, tikhonov
+export preserve_singular_values
 
 export NoiseModel, ForegroundModel, SignalModel
 export covariance_matrix, dimensionful_powerspectrum
@@ -52,8 +51,25 @@ include("visibilities.jl")
 include("transfermatrix.jl")
 include("mmodes.jl")
 include("alm.jl")
+include("noise.jl")
 
 include("covariancematrix.jl")
+
+function load(filename, args...)
+    local description
+    jldopen(filename,"r") do file
+        description = read(file["description"])
+    end
+    if description == "transfer matrix"
+        return load(filename, TransferMeta(args...))
+    elseif description == "m-modes"
+        return load(filename, MModesMeta(args...))
+    elseif description == "noise covariance matrix"
+        return load(filename, NoiseMeta(args...))
+    else
+        error("Unrecognized format.")
+    end
+end
 
 end
 
