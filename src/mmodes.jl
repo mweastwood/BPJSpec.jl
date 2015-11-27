@@ -25,7 +25,7 @@ immutable MModesMeta <: Metadata
     end
 end
 
-MModesMeta(m::Int,ν::AbstractVector) = MModesMeta(m,collect(ν))
+MModesMeta(m::Int,ν::AbstractVector) = MModesMeta(m:m,collect(ν))
 MModesMeta(mmax::Int,ν::Float64) = MModesMeta(0:mmax,[ν])
 
 ==(lhs::MModesMeta,rhs::MModesMeta) = lhs.m == rhs.m && lhs.ν == rhs.ν

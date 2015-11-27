@@ -25,7 +25,7 @@ immutable NoiseMeta <: Metadata
     end
 end
 
-NoiseMeta(m::Int,ν::AbstractVector) = NoiseMeta(m,collect(ν))
+NoiseMeta(m::Int,ν::AbstractVector) = NoiseMeta(m:m,collect(ν))
 NoiseMeta(mmax::Int,ν::Float64) = NoiseMeta(0:mmax,[ν])
 
 ==(lhs::NoiseMeta,rhs::NoiseMeta) = lhs.m == rhs.m && lhs.ν == rhs.ν

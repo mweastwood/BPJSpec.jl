@@ -26,7 +26,7 @@ immutable TransferMeta <: Metadata
     end
 end
 
-TransferMeta(lmax::Int,m::Int,ν::AbstractVector) = TransferMeta(lmax,m,collect(ν))
+TransferMeta(lmax::Int,m::Int,ν::AbstractVector) = TransferMeta(lmax,m:m,collect(ν))
 TransferMeta(lmax::Int,mmax::Int,ν::Float64) = TransferMeta(lmax,0:mmax,[ν])
 
 ==(lhs::TransferMeta,rhs::TransferMeta) = lhs.lmax == rhs.lmax && lhs.m == rhs.m && lhs.ν == rhs.ν
