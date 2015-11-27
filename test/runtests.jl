@@ -18,5 +18,5 @@ include("transfermatrix.jl")
 include("mmodes.jl")
 include("alm.jl")
 include("noise.jl")
-include("covariancematrix.jl")
+include("sky.jl")
 
