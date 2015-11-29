@@ -60,6 +60,17 @@ function call(::Type{MModes}, Nbase::Int, mmax::Int, ν::Float64)
     MModes(blocks,meta)
 end
 
+function call(::Type{MModes}, vector::Vector{Complex128}, m::Int, ν::AbstractVector)
+    # When foreground-filtering the m-modes, it is often convenient to call
+    # `full(::MModes)` to turn the m-modes into a standard vector. This function
+    # is the inverse of `full`.
+    Nfreq = length(ν)
+    N = div(length(vector),Nfreq)
+    blocks = [VectorBlock(vector[(β-1)*N+1:β*N]) for β = 1:Nfreq]
+    meta = MModesMeta(m:m,collect(ν))
+    MModes(blocks,meta)
+end
+
 is_single_frequency(meta::MModesMeta) = length(meta.ν) == 1
 is_single_m(meta::MModesMeta) = length(meta.m) == 1
 is_single_frequency(v::MModes) = is_single_frequency(v.meta)
@@ -69,7 +80,7 @@ mmax(meta::MModesMeta) = maximum(meta.m)
 mmax(v::MModes) = mmax(v.meta)
 
 Nfreq(meta::MModesMeta) = length(meta.ν)
-Nfreq(v::MModes) = length(v.meta)
+Nfreq(v::MModes) = Nfreq(v.meta)
 
 """
     mmodes(visibilities; frequency=0.0, mmax=100)
@@ -122,13 +133,6 @@ function visibilities(v::MModes)
     end
     ifft(M,2)*Ntime
 end
-
-#function MModes(vector::Vector{Complex128},m::Int,ν::AbstractVector)
-#    Nfreq = length(ν)
-#    N = div(length(vector),Nfreq)
-#    blocks = [MModesBlock(vector[(β-1)*N+1:β*N],m,ν[β]) for β = 1:Nfreq]
-#    MModes(blocks)
-#end
 
 function save(filename, v::MModes)
     if !isfile(filename)
