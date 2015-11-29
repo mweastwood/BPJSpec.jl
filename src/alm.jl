@@ -85,9 +85,11 @@ function tikhonov(B::TransferMatrix, v::MModes;
     for m = 0:mmax(B)
         Bm = B[m+1].block
         vm = v[m+1].block
-        am = (Bm'*Bm + tolerance*I)\Bm'*vm
+        am = tikhonov(Bm,vm,tolerance)
         setblock!(alm,am,m)
     end
     alm
 end
+
+tikhonov(A::Matrix, b::Vector, tol) = (A'*A + tol*I)\A'*b
 
