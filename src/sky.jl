@@ -13,26 +13,6 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-"""
-    covariance_matrix(noise::NoiseModel, Nbase::Int, m::Int, ν::Float64)
-
-Construct a covariance matrix for the thermal noise.
-"""
-function covariance_matrix(noise::NoiseModel, Nbase::Int, m::Int, ν::Float64)
-
-    #Nfreq = length(ν)
-    #Ncoef = lmax-m+1 # number of spherical harmonic coefficients
-    #C = zeros(Complex128,Nfreq*Ncoef,Nfreq*Ncoef)
-    #for β2 = 1:Nfreq, β1 = 1:Nfreq
-    #    block = zeros(Complex128,Ncoef,Ncoef)
-    #    for l = m:lmax
-    #        block[l-m+1,l-m+1] = component(l,ν[β1],ν[β2])
-    #    end
-    #    C[(β1-1)*Ncoef+1:β1*Ncoef,(β2-1)*Ncoef+1:β2*Ncoef] = block
-    #end
-    #C
-end
-
 abstract SkyComponent
 
 """
