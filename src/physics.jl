@@ -51,3 +51,16 @@ is observed at the frequency `ν` (in Hz).
 """
 redshift(ν)  = HI/ν-1
 
+"""
+    beam_solid_angle(beam::SineBeam)
+
+Calculate the solid angle (in steradians) of the given beam model.
+"""
+function beam_solid_angle(beam::SineBeam)
+    2π*quadgk(x->sin(x)^beam.α*cos(x),0,π/2)[1]
+end
+
+function jansky_to_kelvin(x, ν, Ω)
+    x * (c^2/(2*ν^2*k*Ω) * Jy)
+end
+

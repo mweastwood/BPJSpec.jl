@@ -47,22 +47,23 @@ function setblock!(alm::Alm, x, m)
     alm
 end
 
-function *(B::TransferMatrix{one_ν},alm::Alm)
+function *(B::TransferMatrix,alm::Alm)
+    is_single_frequency(B) || error("Expected single-frequency transfer matrix.")
     lmax(B) == lmax(alm) || error("The values of lmax must be the same.")
     mmax(B) == mmax(alm) || error("The values of mmax must be the same.")
-    ν = frequency(B)
-    blocks = MModeBlock[]
+    blocks = VectorBlock[]
     for m = 0:mmax(B)
-        Bm = B[m].block
+        Bm = B[m+1].block
         am = getblock(alm,m)
         vm = Bm*am
-        push!(blocks,MModeBlock(vm,m,ν))
+        push!(blocks,VectorBlock(vm))
     end
-    MModes(blocks)
+    meta = MModesMeta(B.meta.m,B.meta.ν)
+    MModes(blocks,meta)
 end
 
 """
-    tikhonov(B::TransferMatrix{one_ν}, v::MModes{one_ν}; tolerance=0.0) -> Alm
+    tikhonov(B::TransferMatrix, v::MModes; tolerance=0.0) -> Alm
 
 Solve for the spherical harmonic coefficients with the given
 transfer matrix and m-modes. `tolerance` acts as Tikhonov
@@ -76,15 +77,19 @@ observing the sky. In linear algebra this means that the transfer matrix
 must be singular, and we will therefore need some amount of numerical
 regularization to invert it.
 """
-function tikhonov(B::TransferMatrix{one_ν}, v::MModes{one_ν};
+function tikhonov(B::TransferMatrix, v::MModes;
                   tolerance::Float64 = 0.0)
+    is_single_frequency(B) || error("Expected single-frequency transfer matrix.")
+    is_single_frequency(v) || error("Expected single-frequency m-modes.")
     alm = Alm(Complex128,lmax(B),mmax(B))
     for m = 0:mmax(B)
-        Bm = B[m].block
-        vm = v[m].block
-        am = (Bm'*Bm + tolerance*I)\Bm'*vm
+        Bm = B[m+1].block
+        vm = v[m+1].block
+        am = tikhonov(Bm,vm,tolerance)
         setblock!(alm,am,m)
     end
     alm
 end
+
+tikhonov(A::Matrix, b::Vector, tol) = (A'*A + tol*I)\A'*b
 

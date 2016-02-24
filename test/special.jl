@@ -8,6 +8,14 @@ for i = 1:10
     @test BPJSpec.Y(1,-1,θ,ϕ) ≈ +1/2 * sqrt(3/(2π)) * sin(θ) * exp(-1im*ϕ)
 end
 
+# Test the spherical Bessel function
+for i = 1:10
+    x = 100*randn() |> abs
+    @test BPJSpec.j(0,x) ≈ sin(x)/x
+    @test BPJSpec.j(1,x) ≈ sin(x)/x^2 - cos(x)/x
+    @test BPJSpec.j(2,x) ≈ (3/x^2 - 1)*sin(x)/x - 3cos(x)/x^2
+end
+
 # Test the plane wave expansion
 let u = 2.0, v = -3.0, w = 2.0
     alm_real, alm_imag = BPJSpec.planewave(u,v,w)

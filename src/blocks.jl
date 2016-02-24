@@ -13,25 +13,78 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-abstract AbstractVectorBlock # block that composes a vector
-abstract AbstractMatrixBlock # block that composes a matrix
-typealias AbstractBlock Union{AbstractVectorBlock,AbstractMatrixBlock}
+abstract Block
+abstract Metadata
 
-abstract AbstractBlockVector # a vector composed of blocks
-abstract AbstractBlockDiagonalMatrix
-typealias ListOfBlocks Union{AbstractBlockVector,AbstractBlockDiagonalMatrix}
+immutable NoMetadata <: Metadata end
 
-metadata(::AbstractBlock) = ()
+"""
+    immutable VectorBlock <: Block
 
-getindex(A::AbstractVectorBlock,i) = A.block[i]
-setindex!(A::AbstractVectorBlock,x,i) = A.block[i] = x
-getindex(A::AbstractMatrixBlock,i,j) = A.block[i,j]
-setindex!(A::AbstractMatrixBlock,x,i,j) = A.block[i,j] = x
+A block that composes a vector.
+"""
+immutable VectorBlock <: Block
+    block::Vector{Complex128}
+end
 
-Base.size(A::AbstractBlock) = size(A.block)
-Base.length(A::AbstractBlock) = length(A.block)
+VectorBlock(sz) = VectorBlock(zeros(Complex128,sz))
 
-function Base.length(A::AbstractBlockVector)
+"""
+    immutable MatrixBlock <: Block
+
+A dense block that composes a matrix.
+"""
+immutable MatrixBlock <: Block
+    block::Matrix{Complex128}
+end
+
+MatrixBlock(sz) = MatrixBlock(zeros(Complex128,sz))
+
+"""
+    immutable DiagonalMatrixBlock <: Block
+
+A diagonal block that composes a matrix.
+"""
+immutable DiagonalMatrixBlock <: Block
+    block::Diagonal{Complex128}
+end
+
+DiagonalMatrixBlock(sz) = DiagonalMatrixBlock(Diagonal(zeros(Complex128,sz)))
+
+"""
+    immutable Blocks{T<:Block, S<:Metadata}
+
+A list of blocks. This can represent a block diagonal matrix,
+or a vector that is organized into blocks.
+"""
+immutable Blocks{T<:Block, S<:Metadata}
+    blocks::Vector{T}
+    meta::S
+end
+
+Blocks{T}(blocks::Vector{T}) = Blocks{T,NoMetadata}(blocks,NoMetadata())
+
+typealias BlockVector{S} Blocks{VectorBlock, S}
+typealias BlockMatrix{S} Union{Blocks{MatrixBlock, S}, Blocks{DiagonalMatrixBlock, S}}
+
+getindex(A::VectorBlock,i) = A.block[i]
+setindex!(A::VectorBlock,x,i) = A.block[i] = x
+
+getindex(A::MatrixBlock,i,j) = A.block[i,j]
+setindex!(A::MatrixBlock,x,i,j) = A.block[i,j] = x
+
+getindex(A::DiagonalMatrixBlock,i,j) = A.block[i,j]
+setindex!(A::DiagonalMatrixBlock,x,i,j) = A.block[i,j] = x
+
+getindex(A::Blocks,i) = A.blocks[i]
+
+==(A::Block,B::Block) = A.block == B.block
+==(A::Blocks,B::Blocks) = A.blocks == B.blocks && A.meta == B.meta
+
+Base.length(A::Block) = length(A.block)
+Base.size(A::Block) = size(A.block)
+
+function Base.length(A::BlockVector)
     sz = 0
     for block in A.blocks
         sz += length(block)
@@ -39,7 +92,7 @@ function Base.length(A::AbstractBlockVector)
     sz
 end
 
-function Base.size(A::AbstractBlockDiagonalMatrix)
+function Base.size(A::BlockMatrix)
     sz1 = sz2 = 0
     for block in A.blocks
         sz = size(block)
@@ -49,23 +102,18 @@ function Base.size(A::AbstractBlockDiagonalMatrix)
     sz1,sz2
 end
 
-Nblocks(A::ListOfBlocks) = length(A.blocks)
-
-==(lhs::AbstractBlock, rhs::AbstractBlock) = metadata(lhs) == metadata(rhs) && lhs.block == rhs.block
-==(lhs::ListOfBlocks, rhs::ListOfBlocks) = lhs.blocks == rhs.blocks
-
-function Base.full(A::AbstractBlockVector)
+function Base.full(A::BlockVector)
     B = zeros(Complex128,length(A))
     idx = 1
     for block in A.blocks
-        l = length(block)
-        B[idx:idx+l-1] = block.block
-        idx += l
+        sz = length(block)
+        B[idx:idx+sz-1] = block.block
+        idx += sz
     end
     B
 end
 
-function Base.full(A::AbstractBlockDiagonalMatrix)
+function Base.full(A::BlockMatrix)
     B = zeros(Complex128,size(A))
     idx1 = idx2 = 1
     for block in A.blocks
@@ -77,34 +125,22 @@ function Base.full(A::AbstractBlockDiagonalMatrix)
     B
 end
 
-function *{T<:AbstractBlock}(lhs::AbstractMatrixBlock, rhs::T)
-    meta   = metadata(rhs)
-    result = lhs.block*rhs.block
-    T(result,meta...)
+ctranspose{T<:Block}(A::T) = T(A.block')
+ctranspose(A::Blocks) = Blocks([A.blocks[i]' for i = 1:length(A.blocks)],A.meta)
+
+*(A::MatrixBlock, B::DiagonalMatrixBlock) = MatrixBlock(A.block * B.block)
+*(A::DiagonalMatrixBlock, B::MatrixBlock) = MatrixBlock(A.block * B.block)
+*(A::MatrixBlock, B::DiagonalMatrixBlock, C::MatrixBlock) = MatrixBlock(A.block * B.block * C.block)
+*(A::MatrixBlock, B::MatrixBlock) = MatrixBlock(A.block * B.block)
+*(A::MatrixBlock, B::VectorBlock) = VectorBlock(A.block * B.block)
+
+function *(A::Blocks, B::Blocks)
+    Blocks([A.blocks[i]*B.blocks[i] for i = 1:length(B.blocks)],B.meta)
 end
 
-function *{T<:ListOfBlocks}(lhs::AbstractBlockDiagonalMatrix, rhs::T)
-    Nblocks(lhs) == Nblocks(rhs) || error("Number of blocks must match.")
-    T([lhs.blocks[i]*rhs.blocks[i] for i = 1:Nblocks(rhs)])
+function *(A::Blocks, B::Blocks, C::Blocks)
+    Blocks([A.blocks[i]*B.blocks[i]*C.blocks[i] for i = 1:length(B.blocks)],B.meta)
 end
 
-Base.svd(A::AbstractBlock) = svd(A.block,thin=true)
-
-# Default implementation
-
-immutable VectorBlock <: AbstractVectorBlock
-    block::Vector{Complex128}
-end
-
-immutable MatrixBlock <: AbstractMatrixBlock
-    block::Matrix{Complex128}
-end
-
-immutable BlockVector <: AbstractBlockVector
-    blocks::Vector{VectorBlock}
-end
-
-immutable BlockDiagonalMatrix <: AbstractBlockDiagonalMatrix
-    blocks::Vector{MatrixBlock}
-end
+Base.svd(A::Block) = svd(A.block,thin=true)
 

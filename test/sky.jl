@@ -1,16 +1,3 @@
-# Test NoiseModel
-let
-    Tsys0 = 6420
-    α = 2.56
-    ν0 = 45e6
-    Δν = 24e3
-    τ_total = 24*3600.0
-    τ_int   = 30.0
-    noise = NoiseModel(Tsys0,α,ν0,Δν,τ_total,τ_int)
-    @test noise(0,ν0) ≈ Tsys0^2/(τ_total*Δν)
-    @test noise(0,2ν0) ≈ Tsys0^2/(τ_total*Δν) * 2^(-2α)
-end
-
 # Test ForegroundModel
 let
     ν0 = 45e6

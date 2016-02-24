@@ -13,59 +13,6 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-#=
-"""
-    CovarianceMatrix(component::AbstractComponent,ν,lmax,m)
-
-Construct a covariance matrix for the given component of the sky.
-"""
-function CovarianceMatrix(component::AbstractComponent,ν,lmax,m)
-    Nfreq = length(ν)
-    blocksize = lmax-m+1
-    blocks = Array{CovarianceMatrixBlock}(Nfreq,Nfreq)
-    for β2 = 1:Nfreq, β1 = 1:Nfreq
-        block = zeros(Complex128,blocksize,blocksize)
-        for l = m:lmax
-            block[l-m+1,l-m+1] = component(l,ν[β1],ν[β2])
-        end
-        blocks[β1,β2] = CovarianceMatrixBlock(block)
-    end
-    CovarianceMatrix(blocks)
-end
-=#
-
-doc"""
-    Cnoise(Tsys0,α,ν,ν0,Δν,τ_total,τ_int,m) -> Float64
-
-Compute the expected variance of the $m$-modes due to thermal noise.
-
-The system temperature is modeled as
-\\[
-    T_{sys} = T_{sys,0} \left(\frac{\nu}{\nu_0}\right)^{-\alpha},
-\\]
-$\Delta\nu$ gives the bandwidth, $\tau_{total}$ gives the total integration
-time (in seconds), and $\tau_{int}$ gives the integration time corresponding
-to a single integration (also in seconds).
-"""
-function Cnoise(Tsys0,α,ν,ν0,Δν,τ_total,τ_int,m)
-    Tsys = Tsys0 * (ν/ν0)^(-α)
-    tsid = 86164.09054 # sidereal day in seconds
-    Tsys*Tsys / (τ_total*Δν) * sinc(m*τ_int/tsid)^2
-end
-
-immutable NoiseModel
-    Tsys0::Float64
-    α::Float64
-    ν0::Float64
-    Δν::Float64
-    τ_total::Float64
-    τ_int::Float64
-end
-
-function call(model::NoiseModel,m,ν)
-    Cnoise(model.Tsys0,model.α,ν,model.ν0,model.Δν,model.τ_total,model.τ_int,m)
-end
-
 abstract SkyComponent
 
 """
@@ -156,12 +103,36 @@ function dimensionful_powerspectrum(kpara,kperp,Δ²)
     out = similar(Δ²)
     for j = 1:length(kperp), i = 1:length(kpara)
         k = hypot(kpara[i],kperp[j])
-        out[i,j] = 2π^2 * Δ²[i,j] / k^3
+        if k < eps(Float64)
+            out[i,j] = 0
+        else
+            out[i,j] = 2π^2 * Δ²[i,j] / k^3
+        end
     end
     out
 end
 
 function call(model::SignalModel,l,ν1,ν2)
     Csignal(l,ν1,ν2,model.kpara,model.kperp,model.power)
+end
+
+"""
+    covariance_matrix(component::SkyComponent, ν, lmax, m)
+
+Construct a covariance matrix for the given component of the sky.
+"""
+function covariance_matrix(component::SkyComponent, ν, lmax, m)
+    Nfreq = length(ν)
+    Ncoef = lmax-m+1 # number of spherical harmonic coefficients
+
+    C = zeros(Complex128,Nfreq*Ncoef,Nfreq*Ncoef)
+    for β2 = 1:Nfreq, β1 = 1:Nfreq
+        block = zeros(Complex128,Ncoef,Ncoef)
+        for l = m:lmax
+            block[l-m+1,l-m+1] = component(l,ν[β1],ν[β2])
+        end
+        C[(β1-1)*Ncoef+1:β1*Ncoef,(β2-1)*Ncoef+1:β2*Ncoef] = block
+    end
+    C
 end
 
