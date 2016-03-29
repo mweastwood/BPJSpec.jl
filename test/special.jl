@@ -35,6 +35,9 @@ end
 
 # Test the matrix trace
 for i = 1:10
+    A = rand(Float64,50,50)
+    B = rand(Float64,50,50)
+    @test trace(A*B) ≈ BPJSpec.tr(A,B)
     A = rand(Complex128,50,50)
     B = rand(Complex128,50,50)
     @test trace(A*B) ≈ BPJSpec.tr(A,B)
