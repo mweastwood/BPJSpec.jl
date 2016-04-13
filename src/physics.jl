@@ -27,14 +27,14 @@ const cosmology = Cosmology.cosmology()
 
 Calculate the comoving distance (in units of Mpc) to the redshift `z`.
 """
-comoving_distance(z) = Cosmology.comoving_radial_dist_mpc(cosmology,z)
+comoving_distance(z) = Cosmology.comoving_radial_dist_mpc(cosmology, z)
 
 """
     age(z)
 
 Calculate the age of the universe (in units of Gyr) to the redshift `z`.
 """
-age(z) = Cosmology.age_gyr(cosmology,z)
+age(z) = Cosmology.age_gyr(cosmology, z)
 
 """
     frequency(z)
@@ -51,6 +51,7 @@ is observed at the frequency `ν` (in Hz).
 """
 redshift(ν)  = HI/ν-1
 
+#=
 """
     beam_solid_angle(beam::SineBeam)
 
@@ -63,4 +64,5 @@ end
 function jansky_to_kelvin(x, ν, Ω)
     x * (c^2/(2*ν^2*k*Ω) * Jy)
 end
+=#
 

@@ -13,102 +13,128 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-immutable MModesMeta <: Metadata
-    m::UnitRange{Int}
-    ν::Vector{Float64}
-
-    function MModesMeta(m,ν)
-        if length(m) > 1 && length(ν) > 1
-            error("Cannot simultaneously have multiple values of m and multiple frequency channels.")
-        end
-        new(m,ν)
-    end
-end
-
-MModesMeta(m::Int,ν::AbstractVector) = MModesMeta(m:m,collect(ν))
-MModesMeta(mmax::Int,ν::Float64) = MModesMeta(0:mmax,[ν])
-
-==(lhs::MModesMeta,rhs::MModesMeta) = lhs.m == rhs.m && lhs.ν == rhs.ν
-
 doc"""
-    typealias MModes Blocks{VectorBlock, MModesMeta}
+    MModes
 
-This type stores the $m$-modes organized into blocks.
+This type represents the $m$-modes measured by an interferometer.
 
 $m$-modes are the Fourier transform of a visibility with
-respect to time. These are relate to the spherical harmonic
-coefficients of the sky brightness through a matrix equation.
+respect to sidereal time. These are related to the spherical
+harmonic coefficients of the sky brightness through a matrix equation.
 
-\\[
+\[
     v = Ba,
-\\]
+\]
 
 where $v$ is the vector of $m$-modes, $B$ is the transfer
 matrix, and $a$ is the vector of spherical harmonic coefficients.
+
+# Fields
+
+* `path` points to the directory that contains the blocks of $m$-modes
+* `mmax` is the maximum value of the azimuthal quantum number $m$
+* `frequencies` is the list of frequencies in units of Hz
+* `blocks` is a list of mmapped vectors where the actual $m$-modes are stored
+
+Note that there is one mmapped vector for each frequency and each value of $m$.
 """
-typealias MModes Blocks{VectorBlock, MModesMeta}
+immutable MModes
+    path :: ASCIIString
+    mmax :: Int
+    frequencies :: Vector{Float64}
+    blocks :: Vector{Vector{Complex128}}
+end
 
-initial_block_size(::Type{MModes}, Nbase, m) = (two(m)*Nbase,)
-
-function call(::Type{MModes}, Nbase::Int, mmax::Int, ν::Float64)
-    meta = MModesMeta(mmax,ν)
-    blocks = VectorBlock[]
-    for m = 0:mmax
-        sz = initial_block_size(MModes,Nbase,m)
-        push!(blocks,VectorBlock(sz))
+function MModes(path)
+    local mmax, frequencies
+    # first read the METADATA file
+    open(joinpath(path, "METADATA"), "r") do file
+        mmax = read(file, Int)
+        len  = read(file, Int)
+        frequencies = read(file, Float64, len)
     end
-    MModes(blocks,meta)
+    # now mmap each block
+    blocks = Vector{Complex128}[]
+    for frequency in frequencies, m = 0:mmax
+        filename = block_filename(m, frequency)
+        open(joinpath(path, filename), "r+") do file
+            len = read(file, Int)
+            push!(blocks, Mmap.mmap(file, Vector{Complex128}, len))
+        end
+    end
+    MModes(path, mmax, frequencies, blocks)
 end
 
-function call(::Type{MModes}, vector::Vector{Complex128}, m::Int, ν::AbstractVector)
-    # When foreground-filtering the m-modes, it is often convenient to call
-    # `full(::MModes)` to turn the m-modes into a standard vector. This function
-    # is the inverse of `full`.
-    Nfreq = length(ν)
-    N = div(length(vector),Nfreq)
-    blocks = [VectorBlock(vector[(β-1)*N+1:β*N]) for β = 1:Nfreq]
-    meta = MModesMeta(m:m,collect(ν))
-    MModes(blocks,meta)
-end
+doc"""
+    MModes(path, visibilities, mmax)
 
-is_single_frequency(meta::MModesMeta) = length(meta.ν) == 1
-is_single_m(meta::MModesMeta) = length(meta.m) == 1
-is_single_frequency(v::MModes) = is_single_frequency(v.meta)
-is_single_m(v::MModes) = is_single_m(v.meta)
-
-mmax(meta::MModesMeta) = maximum(meta.m)
-mmax(v::MModes) = mmax(v.meta)
-
-Nfreq(meta::MModesMeta) = length(meta.ν)
-Nfreq(v::MModes) = Nfreq(v.meta)
-
-"""
-    mmodes(visibilities; frequency=0.0, mmax=100)
-
-Calculate the m-modes from the given visibilities. The visibilities
+Calculate the $m$-modes from the given visibilities. The visibilities
 should be provided as a matrix where the first dimension indicates
 the baseline and the second dimension indicates the sidereal time.
 The FFT will be performed over the second dimension. The
 visibilities should span a full sidereal day.
 """
-function mmodes{T<:Complex}(visibilities::Matrix{T};
-                            mmax::Int = 100,
-                            frequency::Float64 = 0.0)
-    Nbase,Ntime = size(visibilities)
-    M = fft(visibilities,2)/Ntime
-    v = MModes(Nbase,mmax,frequency)
-    for α = 1:Nbase
-        v[1][α] = M[α,1]
+function MModes(path, visibilities, mmax)
+    frequencies = visibilities.frequencies
+    # create the directory if it doesn't already exist
+    isdir(path) || mkdir(path)
+    # create the METADATA file to store mmax and the list of frequency channels
+    open(joinpath(path, "METADATA"), "w") do file
+        write(file, mmax, length(frequencies), frequencies)
     end
-    for m = 1:mmax, α = 1:Nbase
-        α1 = α         # positive m
-        α2 = α + Nbase # negative m
-        v[m+1][α1] =      M[α,m+1]
-        v[m+1][α2] = conj(M[α,Ntime+1-m])
+    # create the files for storing each block
+    blocks = Vector{Complex128}[]
+    for channel = 1:length(frequencies), m = 0:mmax
+        ν = frequencies[channel]
+        filename = block_filename(m, ν)
+        open(joinpath(path, filename), "w+") do file
+            len = two(m)*visibilities.Nbase
+            write(file, len)
+            push!(blocks, Mmap.mmap(file, Vector{Complex128}, len))
+        end
     end
-    v
+    # Fourier transform the visibilities with respect to sidereal time and pack
+    # them into a vector
+    for channel = 1:length(frequencies)
+        transformed_visibilities = do_fourier_transform(visibilities[channel])
+        pack_mmodes!(blocks, transformed_visibilities, mmax, channel)
+    end
+    MModes(path, mmax, frequencies, blocks)
 end
 
+function do_fourier_transform(matrix)
+    Nbase, Ntime = size(matrix)
+    fft(matrix, 2) / Ntime
+end
+
+function pack_mmodes!(blocks, transformed_visibilities, mmax, channel)
+    Nbase, Ntime = size(transformed_visibilities)
+    for m = 0:mmax
+        idx = block_index(mmax, m, channel)
+        block = blocks[idx]
+        if m == 0
+            for α = 1:Nbase
+                block[α] = transformed_visibilities[α,m+1]
+            end
+        else
+            for α = 1:Nbase
+                α1 = α         # positive m
+                α2 = α + Nbase # negative m
+                block[α1] =      transformed_visibilities[α,m+1]
+                block[α2] = conj(transformed_visibilities[α,Ntime+1-m])
+            end
+        end
+    end
+end
+
+Nfreq(mmodes::MModes) = length(mmodes.ν)
+
+function getindex(mmodes::MModes, m, channel)
+    idx = block_index(mmodes.mmax, m, channel)
+    copy(mmodes.blocks[idx])
+end
+
+#=
 """
     visibilities(v::MModes)
 
@@ -133,68 +159,18 @@ function visibilities(v::MModes)
     end
     ifft(M,2)*Ntime
 end
+=#
 
-function save(filename, v::MModes)
-    if !isfile(filename)
-        jldopen(filename,"w",compress=true) do file
-            file["description"] = "m-modes"
-        end
-    end
-
-    jldopen(filename,"r+",compress=true) do file
-        if read(file["description"]) != "m-modes"
-            error("Attempting to write to a file that does not contain m-modes.")
-        end
-
-        if is_single_frequency(v)
-            ν = v.meta.ν[1]
-            name = @sprintf("%.3fMHz",ν/1e6)
-            name in names(file) || g_create(file,name)
-            group = file[name]
-            for m = 0:mmax(v)
-                block = v[m+1]
-                group[string(m)] = block.block
-            end
-        elseif is_single_m(v)
-            m = v.meta.m[1]
-            for β = 1:Nfreq(v)
-                ν = v.meta.ν[β]
-                name = @sprintf("%.3fMHz",ν/1e6)
-                name in names(file) || g_create(file,name)
-                group = file[name]
-                block = v[β]
-                group[string(m)] = block.block
-            end
-        end
-    end
-end
-
-function load(filename, meta::MModesMeta)
-    blocks = VectorBlock[]
-    jldopen(filename,"r") do file
-        if read(file["description"]) != "m-modes"
-            error("Attempting to read from a file that does not contain m-modes.")
-        end
-
-        if is_single_frequency(meta)
-            ν = meta.ν[1]
-            name = @sprintf("%.3fMHz",ν/1e6)
-            group = file[name]
-            for m = 0:mmax(meta)
-                block = group[string(m)] |> read
-                push!(blocks,VectorBlock(block))
-            end
-        elseif is_single_m(meta)
-            m = meta.m[1]
-            for β = 1:Nfreq(meta)
-                ν = meta.ν[β]
-                name = @sprintf("%.3fMHz",ν/1e6)
-                group = file[name]
-                block = group[string(m)] |> read
-                push!(blocks,VectorBlock(block))
-            end
-        end
-    end
+#=
+function call(::Type{MModes}, vector::Vector{Complex128}, m::Int, ν::AbstractVector)
+    # When foreground-filtering the m-modes, it is often convenient to call
+    # `full(::MModes)` to turn the m-modes into a standard vector. This function
+    # is the inverse of `full`.
+    Nfreq = length(ν)
+    N = div(length(vector),Nfreq)
+    blocks = [VectorBlock(vector[(β-1)*N+1:β*N]) for β = 1:Nfreq]
+    meta = MModesMeta(m:m,collect(ν))
     MModes(blocks,meta)
 end
+=#
 

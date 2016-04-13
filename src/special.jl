@@ -14,13 +14,13 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 """
-    Y(l,m,θ,ϕ)
+    Y(l, m, θ, ϕ)
 
 The spherical harmonic function (using the Condon-Shortley phase
 convention).
 """
-function Y(l,m,θ,ϕ)
-    out = GSL.sf_legendre_sphPlm(l,abs(m),cos(θ))*exp(1im*m*ϕ)
+function Y(l, m, θ, ϕ)
+    out = GSL.sf_legendre_sphPlm(l, abs(m), cos(θ)) * exp(1im*m*ϕ)
     # GSL already applies the Condon-Shortley phase convention
     # to this result, so if we want m < 0 we need to undo the
     # factor of (-1)^m.
@@ -29,50 +29,27 @@ function Y(l,m,θ,ϕ)
 end
 
 """
-    j(l,x)
+    j(l, x)
 
 The spherical Bessel function (of the first kind).
 """
-function j(l,x)
+function j(l, x)
     sqrt(π/(2x))*besselj(l+1/2,x)
 end
 
 """
-    tr(A,B) -> tr(AB)
+    tr(A, B) -> tr(AB)
 
 The trace of the product of two matrices, computed
 without first computing the product itself.
 """
-function tr{T}(A::Matrix{T},B::Matrix{T})
+function tr{T}(A::Matrix{T}, B::Matrix{T})
     trace = zero(T)
     Bt = transpose(B)
-    for i in eachindex(A)
+    for i in eachindex(A, Bt)
         trace += A[i]*Bt[i]
     end
     trace
-end
-
-"""
-    planewave(u,v,w,Δphase=0.0;lmax=100,mmax=100)
-
-Compute the spherical harmonic coefficients corresponding to the
-plane wave:
-
-    exp(2im*π*(u*x+v*y+w*z)) * exp(1im*Δphase)
-"""
-function planewave(u,v,w,Δphase=0.0;lmax::Int=100,mmax::Int=100)
-    b = sqrt(u*u+v*v+w*w)
-    θ = acos(w/b)
-    ϕ = atan2(v,u)
-    realpart = Alm(Complex128,lmax,mmax)
-    imagpart = Alm(Complex128,lmax,mmax)
-    for m = 0:mmax, l = m:lmax
-        alm1 = 4π*(1im)^l*j(l,2π*b)*conj(       Y(l,+m,θ,ϕ))*exp(1im*Δphase)
-        alm2 = 4π*(1im)^l*j(l,2π*b)*conj((-1)^m*Y(l,-m,θ,ϕ))*exp(1im*Δphase)
-        realpart[l,m] = (alm1 + conj(alm2))/2
-        imagpart[l,m] = (alm1 - conj(alm2))/2im
-    end
-    realpart,imagpart
 end
 
 """
@@ -103,27 +80,27 @@ function force_posdef(A)
 end
 
 doc"""
-    gramschmidt(u,v)
+    gramschmidt(u, v)
 
 Remove the projection of $u$ onto $v$ from $u$ for unit vectors $u$ and $v$.
 That is, compute $u - u\cdot u$ but the output is normalized.
 """
-function gramschmidt(u,v)
-    u = u - dot(u,v)*v
+function gramschmidt(u, v)
+    u = u - dot(u, v) * v
     normalize!(u)
 end
 
 doc"""
-    angle_between(u,v)
+    angle_between(u, v)
 
 Compute the angle between the vectors $u$ and $v$.
 """
-function angle_between(u,v)
+function angle_between(u, v)
     normalize!(u)
     normalize!(v)
     # if u and v are unit vectors, only numerical errors
     # will push the dot product out of the range [-1,+1]
-    dot_product = clamp(dot(u,v),-1.0,1.0)
+    dot_product = clamp(dot(u, v), -1.0, 1.0)
     acos(dot_product)
 end
 

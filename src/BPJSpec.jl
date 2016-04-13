@@ -17,18 +17,12 @@ __precompile__()
 
 module BPJSpec
 
-export itrf_baselines, itrf_phasecenter, itrf_beam
-export create_empty_visibilities, grid_visibilities, load_visibilities
-
-export visibilities, mmodes, transfer, tikhonov
-export preserve_singular_values
-
-export NoiseModel, ForegroundModel, SignalModel
-export covariance_matrix, dimensionful_powerspectrum
+export GriddedVisibilities, grid!
+export MModes, TransferMatrix
+export tikhonov
 
 using CasaCore.Measures
 using CasaCore.Tables
-using HDF5, JLD
 using LibHealpix
 using ProgressMeter
 using TTCal
@@ -37,38 +31,32 @@ importall Base.Operators
 import Cosmology
 import GSL
 import LibHealpix: Alm, lmax, mmax
+import TTCal: Nfreq
 
-include("special.jl") # special functions
-include("physics.jl") # physical constants and cosmology
-include("blocks.jl")  # block vectors and matrices
-include("itrf.jl")
+include("special.jl")  # special functions
+include("physics.jl")  # physical constants and cosmology
+include("parallel.jl") # tools for parallel processing
+#include("blocks.jl")  # block vectors and matrices
+#include("itrf.jl")
 
-# This function is useful to handle some of the
-# special casing required for m == 0
+# This function is useful to handle some of the special casing required for m == 0
 two(m) = ifelse(m != 0, 2, 1)
 
-include("visibilities.jl")
-include("transfermatrix.jl")
-include("mmodes.jl")
-include("alm.jl")
-include("noise.jl")
-include("sky.jl")
+# These functions define the filenames used when blocks are written to disk
+block_filename(ν) = @sprintf("%.6fMHz.block", ν/1e6)
+block_filename(m, ν) = @sprintf("%.6fMHz-%04d.block", ν/1e6, m)
 
-function load(filename, args...)
-    local description
-    jldopen(filename,"r") do file
-        description = read(file["description"])
-    end
-    if description == "transfer matrix"
-        return load(filename, TransferMeta(args...))
-    elseif description == "m-modes"
-        return load(filename, MModesMeta(args...))
-    elseif description == "noise covariance matrix"
-        return load(filename, NoiseMeta(args...))
-    else
-        error("Unrecognized format.")
-    end
-end
+# This function defines the ordering for blocks of a given m and frequency channel
+# This ordering is assumed at various points so a careful check is needed before changing
+block_index(mmax, m, channel) = (mmax+1)*(channel-1) + m + 1
+
+include("visibilities.jl")
+include("mmodes.jl")
+include("transfermatrix.jl")
+include("alm.jl")
+
+#include("noise.jl")
+#include("sky.jl")
 
 end
 
