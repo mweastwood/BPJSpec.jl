@@ -33,11 +33,25 @@ frequency channel, and each array has dimensions of `Nbase` by `Ntime`.
 
 # Implementation
 
+Note that generally an interferometer integrates for some time $t$
+that does not evenly divide a sidereal day. We must therefore pick
+some gridding kernel that determines what we do with an integration
+that falls between grid points. The gridding kernel currently used
+is the triangular function (or hat function), which divides the
+visibility amongst the two nearest grid points proportional to its
+distance from each grid point.
+
+At the OVRO LWA, we picked a 13 second integration time which comes
+within one tenth of one second to evenly dividing a sidereal day.
+However we cannot guarantee that the correlator starts at a given
+sidereal time. Therefore we need to adjust the grid to align with
+the integrations. The `origin` parameter is used to accomplish this.
+
 When gridding the visibilities we are going to be making a lot of small writes
 to several arrays that may not fit into the system memory. This is why we mmap
 the arrays onto the disk.
 
-Also note that it seems like two arrays cannot be mmapped to the same file.
+Experiements suggest that two arrays cannot be mmapped to the same file.
 That is instead of being written one after another the two arrays are written
 on top of each other. This is why `data` and `weights` are mmapped to two
 separate files.
@@ -177,25 +191,4 @@ function sidereal_time(meta)
     time = longitude(zenith_app)
     mod2pi(time) / 2π
 end
-
-"""
-    grid_visibilities(filename, ms::MeasurementSet)
-
-Grid the data from the measurement set.
-"""
-
-doc"""
-    grid_visibilities(filename, data, flags, frequencies, time)
-
-For a sidereal time on the interval $0 \le t < 1$, grid and
-add the data to the given file.
-
-Here "grid" means to put the data onto a set of points that are
-evenly space in sidereal time. If the correlator is continuously
-running, it will spit out an integration every 30 seconds (for
-example). However 30 seconds does not divide evenly into a sidereal
-day so that these integrations will slowly start slipping with
-respect to sidereal time as we begin to average more days together.
-By gridding onto a sidereal time grid, we avoid this problem.
-"""
 

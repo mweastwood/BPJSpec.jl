@@ -36,8 +36,6 @@ import TTCal: Nfreq
 include("special.jl")  # special functions
 include("physics.jl")  # physical constants and cosmology
 include("parallel.jl") # tools for parallel processing
-#include("blocks.jl")  # block vectors and matrices
-#include("itrf.jl")
 
 # This function is useful to handle some of the special casing required for m == 0
 two(m) = ifelse(m != 0, 2, 1)
