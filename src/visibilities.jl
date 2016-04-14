@@ -186,7 +186,7 @@ Get the local sidereal time on the interval $0 \le t < 1$.
 """
 function sidereal_time(meta)
     frame = TTCal.reference_frame(meta)
-    zenith = Direction(dir"AZEL",0degrees,90degrees)
+    zenith = Direction(dir"AZEL", 0degrees, 90degrees)
     zenith_app = measure(frame, zenith, dir"APP")
     time = longitude(zenith_app)
     mod2pi(time) / 2π

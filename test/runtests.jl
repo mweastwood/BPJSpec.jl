@@ -19,7 +19,7 @@ srand(123)
     include("physics.jl")
     include("visibilities.jl")
     include("mmodes.jl")
-    #include("transfermatrix.jl")
+    include("transfermatrix.jl")
     #include("alm.jl")
 
     #include("noise.jl")

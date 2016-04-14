@@ -1,27 +1,28 @@
 @testset "transfermatrix.jl" begin
-    let Nbase = 10, lmax = 10
-        @test BPJSpec.initial_block_size(TransferMatrix, Nbase, lmax, 0) == (10, 11)
-        @test BPJSpec.initial_block_size(TransferMatrix, Nbase, lmax, 1) == (20, 10)
-        @test BPJSpec.initial_block_size(TransferMatrix, Nbase, lmax, 2) == (20,  9)
-    end
-
-    let Nbase = 3, lmax = 7, mmax = 5, ν = 45e6
-        transfermatrix = TransferMatrix(tempname(), lmax, mmax, [ν])
-        BPJSpec.initialize!(transfermatrix, Nbase)
-        for m = 0:mmax
-            block = BPJSpec.read_block(transfermatrix, m, ν)
-            @test all(block .== 0)
-            @test size(block) == BPJSpec.initial_block_size(TransferMatrix, Nbase, lmax, m)
-
-            oldblock = copy(block)
-            rand!(oldblock)
-            BPJSpec.write_block(transfermatrix, oldblock, m, ν)
-            newblock = BPJSpec.read_block(transfermatrix, m, ν)
-            @test oldblock == newblock
+    # test the beam map
+    let
+        obs = Position(pos"ITRF", 10meters, 0degrees, 90degrees) # observatory is on the north pole
+        time = Epoch(epoch"UTC", (2015-1858)*365*24*3600*seconds)
+        antennas = [TTCal.Antenna(obs)]
+        baselines = [TTCal.Baseline(1, 1)]
+        channels = [45e6]
+        phase_center = Direction(dir"ITRF", 0degrees, 90degrees)
+        beam = SineBeam(1.0)
+        meta = Metadata(antennas, baselines, channels, phase_center, time, beam)
+        map = BPJSpec.beam_map(meta, channels[1])
+        expected_map = HealpixMap(Float64, 512)
+        for idx = 1:length(expected_map)
+            θ,ϕ = LibHealpix.pix2ang_ring(512, idx)
+            if θ < π/2
+                expected_map[idx] = cos(θ)
+            end
         end
+        @test isring(map)
+        @test nside(map) == 512
+        @test norm(pixels(map)-pixels(expected_map)) / norm(pixels(expected_map)) < eps(Float64)
     end
 
-    # Test the plane wave expansion
+    # test the plane wave expansion
     let u = 2.0, v = -3.0, w = 2.0
         alm_real, alm_imag = BPJSpec.planewave(u,v,w,0,100,100)
         map_real = alm2map(alm_real,512)
@@ -36,6 +37,43 @@
         end
         @test pixels(map_real) ≈ pixels(map_test_real)
         @test pixels(map_imag) ≈ pixels(map_test_imag)
+    end
+
+    let Nfreq = 2, Nant = 3, mmax = 5
+        Nbase = (Nant*(Nant+1))÷2
+        Ntime = 2mmax
+        lmax = mmax
+        path = tempname()
+        meta = metadata(Nant, Nfreq)
+        transfermatrix = TransferMatrix(path, meta, lmax, mmax)
+        @test transfermatrix.path == path
+        @test transfermatrix.lmax == lmax
+        @test transfermatrix.mmax == mmax
+        @test transfermatrix.ν == meta.channels
+        # the baselines are randomly oriented, so we can't test the values in the
+        # transfer matrix blocks, but we can at least make sure they're all the
+        # correct size
+        for β = 1:Nfreq, m = 0:mmax
+            block = transfermatrix[m,β]
+            @test size(block) == (BPJSpec.two(m)*Nbase, lmax-m+1)
+        end
+        # note we will indirectly test that the matrix is calculated correctly
+        # by verifying calculations made with the transfer matrix
+
+        # opening the transfer matrix again should see all changes to the blocks
+        for β = 1:Nfreq, m = 0:mmax
+            block = transfermatrix[m,β]
+            rand!(block)
+            transfermatrix[m,β] = block
+        end
+        transfermatrix′ = TransferMatrix(path)
+        @test transfermatrix.path == transfermatrix′.path
+        @test transfermatrix.lmax == transfermatrix′.lmax
+        @test transfermatrix.mmax == transfermatrix′.mmax
+        @test transfermatrix.ν == transfermatrix′.ν
+        for β = 1:Nfreq, m = 0:mmax
+            @test transfermatrix[m,β] == transfermatrix′[m,β]
+        end
     end
 
     #=
@@ -87,30 +125,6 @@
         #    we are missing some of the flux
         # 2. alm2map and map2alm have some error that we must live with
         #    until I wrap their iterative counterparts
-    end
-
-    # test transfermatrix i/o
-    let Nbase = 100, lmax = 20, mmax = 20
-        filename = tempname()*".jld"
-        ν = 45e6
-
-        B1 = BPJSpec.TransferMatrix(Nbase,lmax,mmax,ν)
-        for m = 0:mmax
-            rand!(B1[m+1].block)
-        end
-        BPJSpec.save(filename,B1)
-
-        B2 = BPJSpec.load(filename,lmax,mmax,ν)
-        @test B1 == B2
-
-        # and make sure we can write multiple frequencies to the same file
-        B3 = BPJSpec.TransferMatrix(Nbase,lmax,mmax,ν+1e6)
-        BPJSpec.save(filename,B3)
-
-        B4 = BPJSpec.load(filename,lmax,mmax,ν)
-        B5 = BPJSpec.load(filename,lmax,mmax,ν+1e6)
-        @test B1 == B4
-        @test B3 == B5
     end
 
     # test that we can make the transfer matrix square while leaving the
