@@ -13,61 +13,26 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-doc"""
-    GriddedVisibilities
-
-This type represents visibilities on a sidereal time grid.
-
-# Fields
-
-* `path` points to the directory where all of the visibilities are stored
-* `Nbase` is the total number of baselines
-* `Ntime` is the number of sidereal time grid points
-* `frequencies` is the list of frequencies in units of Hz
-* `origin` is the sidereal time of the first grid point
-* `data` is a list of mmapped arrays where the visibilities are stored
-* `weights` is a list of mmapped arrays where the weights are stored
-
-Note that in each of `data` and `weights` there is one mmapped array for each
-frequency channel, and each array has dimensions of `Nbase` by `Ntime`.
-
-# Implementation
-
-Note that generally an interferometer integrates for some time $t$
-that does not evenly divide a sidereal day. We must therefore pick
-some gridding kernel that determines what we do with an integration
-that falls between grid points. The gridding kernel currently used
-is the triangular function (or hat function), which divides the
-visibility amongst the two nearest grid points proportional to its
-distance from each grid point.
-
-At the OVRO LWA, we picked a 13 second integration time which comes
-within one tenth of one second to evenly dividing a sidereal day.
-However we cannot guarantee that the correlator starts at a given
-sidereal time. Therefore we need to adjust the grid to align with
-the integrations. The `origin` parameter is used to accomplish this.
-
-When gridding the visibilities we are going to be making a lot of small writes
-to several arrays that may not fit into the system memory. This is why we mmap
-the arrays onto the disk.
-
-Experiements suggest that two arrays cannot be mmapped to the same file.
-That is instead of being written one after another the two arrays are written
-on top of each other. This is why `data` and `weights` are mmapped to two
-separate files.
-"""
-immutable GriddedVisibilities
-    path :: ASCIIString
-    Nbase :: Int
-    Ntime :: Int
-    frequencies :: Vector{Float64}
-    origin :: Float64
-    data :: Vector{Matrix{Complex128}}
-    weights :: Vector{Matrix{Float64}}
-    function GriddedVisibilities(path, Nbase, Ntime, frequencies, origin, data, weights)
-        0 ≤ origin < 1 || throw(ArgumentEttor("The sidereal time must be in the interval [0,1)"))
-        new(path, Nbase, Ntime, frequencies, origin, data, weights)
+function GriddedVisibilities(path, Nbase, Ntime, frequencies, origin)
+    # create the directory if it doesn't already exist
+    isdir(path) || mkdir(path)
+    # create the METADATA file to store Nbase, Ntime, and the list of frequency channels
+    open(joinpath(path, "METADATA"), "w") do file
+        write(file, Nbase, Ntime, length(frequencies), frequencies, origin)
     end
+    # create the files storying each frequency channel
+    data = Matrix{Complex128}[]
+    weights = Matrix{Float64}[]
+    for frequency in frequencies
+        filename = block_filename(frequency)
+        open(joinpath(path, filename), "w+") do file
+            push!(data, Mmap.mmap(file, Matrix{Complex128}, (Nbase, Ntime)))
+        end
+        open(joinpath(path, filename*".weights"), "w+") do file
+            push!(weights, Mmap.mmap(file, Matrix{Float64}, (Nbase, Ntime)))
+        end
+    end
+    GriddedVisibilities(path, Nbase, Ntime, frequencies, origin, data, weights)
 end
 
 function GriddedVisibilities(path)
@@ -95,29 +60,43 @@ function GriddedVisibilities(path)
     GriddedVisibilities(path, Nbase, Ntime, frequencies, origin, data, weights)
 end
 
-function GriddedVisibilities(path, meta, Ntime)
+function GriddedVisibilities(path, meta::Metadata, Ntime)
     frequencies = meta.channels
     origin = sidereal_time(meta)
-    # create the directory if it doesn't already exist
-    isdir(path) || mkdir(path)
-    # create the METADATA file to store Nbase, Ntime, and the list of frequency channels
-    open(joinpath(path, "METADATA"), "w") do file
-        write(file, Nbase(meta), Ntime, length(frequencies), frequencies, origin)
-    end
-    # create the files storying each frequency channel
-    data = Matrix{Complex128}[]
-    weights = Matrix{Float64}[]
-    for channel = 1:length(frequencies)
-        ν = frequencies[channel]
-        filename = block_filename(ν)
-        open(joinpath(path, filename), "w+") do file
-            push!(data, Mmap.mmap(file, Matrix{Complex128}, (Nbase(meta), Ntime)))
+    GriddedVisibilities(path, Nbase(meta), Ntime, frequencies, origin)
+end
+
+"""
+    GriddedVisibilities(path, meta::Metadata, mmodes::MModes)
+
+Calculate the visibilities from the given m-modes.
+"""
+function GriddedVisibilities(path, meta::Metadata, mmodes::MModes)
+    Ntime = 2*mmodes.mmax + 1
+    origin = sidereal_time(meta)
+    visibilities = GriddedVisibilities(path, Nbase(meta), Ntime, mmodes.frequencies, origin)
+    for idx = 1:Nfreq(visibilities)
+        block = zeros(Complex128, Nbase(meta), Ntime)
+        # m = 0
+        v = mmodes[0,idx]
+        for α = 1:Nbase(meta)
+            block[α,1] = v[α]
         end
-        open(joinpath(path, filename*".weights"), "w+") do file
-            push!(weights, Mmap.mmap(file, Matrix{Float64}, (Nbase(meta), Ntime)))
+        # m > 0
+        for m = 1:mmodes.mmax
+            v = mmodes[m,idx]
+            for α = 1:Nbase(meta)
+                α1 = α               # positive m
+                α2 = α + Nbase(meta) # negative m
+                block[α,m+1]       =      v[α1]
+                block[α,Ntime+1-m] = conj(v[α2])
+            end
         end
+        result = ifft(block,2)*Ntime
+        visibilities.data[idx][:] = result
+        visibilities.weights[idx][:] = 1
     end
-    GriddedVisibilities(path, Nbase(meta), Ntime, frequencies, origin, data, weights)
+    visibilities
 end
 
 Nfreq(visibilities::GriddedVisibilities) = length(visibilities.frequencies)

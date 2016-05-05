@@ -37,14 +37,6 @@
     end
 
     #=
-    # m-mode generation and visibility generation should be inverse operations
-    let Nbase = 100, mmax = 100
-        data = rand(Complex128,Nbase,2mmax+1)
-        v = mmodes(data;frequency=45e6,mmax=mmax)
-        data′ = visibilities(v)
-        @test data ≈ data′
-    end
-
     # test that we can compress the m-modes without affecting the spherical
     # harmonic coefficients
     let Nbase = 100, lmax = 20, mmax = 20

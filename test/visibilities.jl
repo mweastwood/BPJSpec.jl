@@ -35,13 +35,7 @@
             rand!(visibilities.weights[β])
         end
         visibilities′ = GriddedVisibilities(path)
-        @test visibilities.path == visibilities′.path
-        @test visibilities.Nbase == visibilities′.Nbase
-        @test visibilities.Ntime == visibilities′.Ntime
-        @test visibilities.frequencies == visibilities′.frequencies
-        @test visibilities.origin == visibilities′.origin
-        @test visibilities.data == visibilities′.data
-        @test visibilities.weights == visibilities′.weights
+        @test visibilities == visibilities′
     end
 
     let Nfreq = 2, Nant = 5, Ntime = 11
@@ -81,6 +75,41 @@
         for β = 1:Nfreq
             grid = visibilities[β]
             @test grid == fill(complex(1, 1), Nbase, Ntime)
+        end
+    end
+
+    let Nfreq = 2, Nant = 3, Ntime = 5
+        # test that we can generate visibilities from m-modes
+        Nbase = (Nant*(Nant+1))÷2
+        mmax = (Ntime-1)÷2
+        meta = metadata(Nant, Nfreq)
+        visibilities = GriddedVisibilities(tempname(), meta, Ntime)
+        for β = 1:Nfreq
+            visibilities.data[β][:] = 2
+            visibilities.weights[β][:] = 1
+        end
+        mmodes = MModes(tempname(), mmax, visibilities.frequencies)
+        for β = 1:Nfreq
+            mmodes[0,β] = fill(2, Nbase)
+            for m = 1:mmax
+                mmodes[m,β] = zeros(2Nbase)
+            end
+        end
+        visibilities′ = GriddedVisibilities(tempname(), meta, mmodes)
+        for β = 1:Nfreq
+            @test visibilities[β] == visibilities′[β]
+        end
+
+        # visibility generation should be the inverse of m-mode generation
+        visibilities = GriddedVisibilities(tempname(), meta, Ntime)
+        for β = 1:Nfreq
+            rand!(visibilities.data[β])
+            rand!(visibilities.weights[β])
+        end
+        mmodes = MModes(tempname(), visibilities, mmax)
+        visibilities′ = GriddedVisibilities(tempname(), meta, mmodes)
+        for β = 1:Nfreq
+            @test visibilities[β] ≈ visibilities′[β]
         end
     end
 end

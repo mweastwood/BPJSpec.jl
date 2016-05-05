@@ -11,7 +11,12 @@
         end
     end
 
-    let lmax = 20, mmax = 10, Nbase = 100, ν = 45e6
+    let Nfreq = 2, Nant = 3, lmax = 20, mmax = 10
+        Nbase = (Nant*(Nant+1))÷2
+        path = tempname()
+        meta = metadata(Nant, Nfreq)
+        transfermatrix = TransferMatrix(path, meta, lmax, mmax)
+
         B = BPJSpec.TransferMatrix(Nbase,lmax,mmax,ν)
         for m = 0:mmax
             rand!(B[m+1].block)

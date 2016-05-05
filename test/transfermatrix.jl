@@ -41,7 +41,6 @@
 
     let Nfreq = 2, Nant = 3, mmax = 5
         Nbase = (Nant*(Nant+1))÷2
-        Ntime = 2mmax
         lmax = mmax
         path = tempname()
         meta = metadata(Nant, Nfreq)
@@ -49,7 +48,7 @@
         @test transfermatrix.path == path
         @test transfermatrix.lmax == lmax
         @test transfermatrix.mmax == mmax
-        @test transfermatrix.ν == meta.channels
+        @test transfermatrix.frequencies == meta.channels
         # the baselines are randomly oriented, so we can't test the values in the
         # transfer matrix blocks, but we can at least make sure they're all the
         # correct size
@@ -67,13 +66,7 @@
             transfermatrix[m,β] = block
         end
         transfermatrix′ = TransferMatrix(path)
-        @test transfermatrix.path == transfermatrix′.path
-        @test transfermatrix.lmax == transfermatrix′.lmax
-        @test transfermatrix.mmax == transfermatrix′.mmax
-        @test transfermatrix.ν == transfermatrix′.ν
-        for β = 1:Nfreq, m = 0:mmax
-            @test transfermatrix[m,β] == transfermatrix′[m,β]
-        end
+        @test transfermatrix == transfermatrix′
     end
 
     #=

@@ -47,20 +47,18 @@ function setblock!(alm::Alm, x, m)
     alm
 end
 
-#function *(B::TransferMatrix,alm::Alm)
-#    is_single_frequency(B) || error("Expected single-frequency transfer matrix.")
-#    lmax(B) == lmax(alm) || error("The values of lmax must be the same.")
-#    mmax(B) == mmax(alm) || error("The values of mmax must be the same.")
-#    blocks = VectorBlock[]
-#    for m = 0:mmax(B)
-#        Bm = B[m+1].block
-#        am = getblock(alm,m)
-#        vm = Bm*am
-#        push!(blocks,VectorBlock(vm))
-#    end
-#    meta = MModesMeta(B.meta.m,B.meta.ν)
-#    MModes(blocks,meta)
-#end
+function *(B::TransferMatrix, alm::Alm)
+    # note for now we assume B has only one frequency channel
+    blocks = VectorBlock[]
+    for m = 0:mmax(B)
+        Bm = B[m+1].block
+        am = getblock(alm,m)
+        vm = Bm*am
+        push!(blocks,VectorBlock(vm))
+    end
+    meta = MModesMeta(B.meta.m,B.meta.ν)
+    MModes(blocks,meta)
+end
 
 """
     tikhonov(B::TransferMatrix, v::MModes, tolerance)
@@ -80,15 +78,23 @@ regularization to invert it.
 function tikhonov(B::TransferMatrix, v::MModes, tolerance)
     # note for now we assume that B and v each only have one frequency channel
     alm = Alm(Complex128, B.lmax, B.mmax)
+    p = Progress(B.mmax+1, "Solving: ")
     for m = 0:B.mmax
-        @show m
         Bm = B[m,1]
         vm = v[m,1]
         am = tikhonov(Bm, vm, tolerance)
         setblock!(alm, am, m)
+        next!(p)
     end
     alm
 end
 
-tikhonov(A::Matrix, b::Vector, tol) = (A'*A + tol*I)\A'*b
+function tikhonov(A::Matrix, b::Vector, tol)
+    At = A'
+    AA = At*A # rate limiting step
+    Ab = At*b
+    D = tol*I
+    out = (AA + D)\Ab
+    out
+end
 

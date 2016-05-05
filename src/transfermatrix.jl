@@ -13,53 +13,18 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-doc"""
-    TransferMatrix
-
-This type represents the transfer matrix of an interferometer.
-
-The transfer matrix represents the instrumental response of the
-interferometer to the spherical harmonic coefficients of the sky.
-This matrix is usually very large, but we can use its block
-diagonal structure to work with parts of the matrix separately.
-
-# Fields
-
-* `path` points to the directory that contains all of the transfer matrix blocks
-* `lmax` is the maximum value of the total angular momentum quantum number $l$
-* `mmax` is the maximum value of the azimuthal quantum number $m$
-* `ν` is the list of frequencies in units of Hz
-
-# Implementation
-
-Because the transfer matrix can be incredibly large it is almost
-certainly the case that it cannot fit into the system memory.
-However each individual block of the matrix should be able to fit.
-Therefore the matrix must be stored on disk.
-"""
-immutable TransferMatrix
-    path :: ASCIIString
-    lmax :: Int
-    mmax :: Int
-    ν :: Vector{Float64}
-    function TransferMatrix(path, lmax, mmax, ν)
-        mmax ≤ lmax || throw(ArgumentError("Transfer matrices require mmax ≤ lmax"))
-        new(path, lmax, mmax, ν)
-    end
-end
-
 function TransferMatrix(path)
-    local lmax, mmax, ν
+    local lmax, mmax, frequencies
     open(joinpath(path, "METADATA"), "r") do file
         lmax = read(file, Int)
         mmax = read(file, Int)
         len  = read(file, Int)
-        ν    = read(file, Float64, len)
+        frequencies = read(file, Float64, len)
     end
-    TransferMatrix(path, lmax, mmax, ν)
+    TransferMatrix(path, lmax, mmax, frequencies)
 end
 
-Nfreq(matrix::TransferMatrix) = length(matrix.ν)
+Nfreq(matrix::TransferMatrix) = length(matrix.frequencies)
 channels(matrix::TransferMatrix) = 1:Nfreq(matrix)
 
 """
@@ -84,17 +49,17 @@ function initialize!(transfermatrix::TransferMatrix, Nbase)
     path = transfermatrix.path
     lmax = transfermatrix.lmax
     mmax = transfermatrix.mmax
-    ν = transfermatrix.ν
+    frequencies = transfermatrix.frequencies
     # create the directory if it doesn't already exist
     isdir(path) || mkdir(path)
     # create the METADATA file to store lmax, mmax, and the list of frequency channels
     open(joinpath(transfermatrix.path, "METADATA"), "w") do file
-        write(file, lmax, mmax, length(ν), ν)
+        write(file, lmax, mmax, length(frequencies), frequencies)
     end
 end
 
 function generate_transfermatrix!(transfermatrix, meta)
-    for ν in transfermatrix.ν
+    for ν in transfermatrix.frequencies
         generate_transfermatrix_onechannel!(transfermatrix, meta, ν)
     end
 end
@@ -108,16 +73,20 @@ function generate_transfermatrix_onechannel!(transfermatrix, meta, ν)
     # Memory map all the blocks on the master process to avoid having to
     # open/close the files multiple times and to avoid having to read the
     # entire matrix at once.
+    info("Memory mapping files")
     blocks = Matrix{Complex128}[]
     for m = 0:transfermatrix.mmax
         filename = block_filename(m, ν)
         open(joinpath(transfermatrix.path, filename), "w+") do file
-            sz = (two(m)*Nbase(meta), lmax-m+1)
+            # note that we store the transpose of the transfer matrix blocks to make
+            # all the disk writes sequential
+            sz = (lmax-m+1, two(m)*Nbase(meta))
             write(file, sz[1], sz[2])
             block = Mmap.mmap(file, Matrix{Complex128}, sz)
             push!(blocks, block)
         end
     end
+    info("Beginning the computation")
     @distribute for α = 1:Nbase(meta)
         realfringe, imagfringe = @remote fringes(meta, beam, phase_center, lmax, mmax, ν, α)
         pack!(blocks, realfringe, imagfringe, lmax, mmax, Nbase(meta), α)
@@ -136,7 +105,6 @@ function beam_map(meta::Metadata, frequency)
     north  = gramschmidt([0.0, 0.0, 1.0], zenith)
     east   = cross(north, zenith)
     map = HealpixMap(zeros(nside2npix(512)))
-    progress = Progress(length(map), "Creating a Healpix map of the beam: ")
     for i = 1:length(map)
         vec = LibHealpix.pix2vec_ring(512, i)
         el = π/2 - angle_between(vec, zenith)
@@ -150,7 +118,6 @@ function beam_map(meta::Metadata, frequency)
             M = MuellerMatrix(J)
             map[i] = M.mat[1,1]
         end
-        next!(progress)
     end
     map
 end
@@ -178,6 +145,18 @@ function planewave(u, v, w, phase, lmax, mmax)
     realpart, imagpart
 end
 
+function newplanewave(u, v, w, phase, nside)
+    realmap = HealpixMap(Float64, nside)
+    imagmap = HealpixMap(Float64, nside)
+    for idx = 1:length(realmap)
+        vec = LibHealpix.pix2vec_ring(nside, idx)
+        ϕ = 2π*(u*vec[1] + v*vec[2] + w*vec[3]) + phase
+        realmap[idx] = cos(ϕ)
+        imagmap[idx] = sin(ϕ)
+    end
+    realmap, imagmap
+end
+
 """
     fringes(meta, beam, phase_center, lmax, mmax, ν, α)
 
@@ -195,20 +174,10 @@ function fringes(meta, beam, phase_center, lmax, mmax, ν, α)
     u = (antenna1.position.x - antenna2.position.x) / λ
     v = (antenna1.position.y - antenna2.position.y) / λ
     w = (antenna1.position.z - antenna2.position.z) / λ
-    if hypot(hypot(u, v), w) < eps(Float64)
-        # Special case for the autocorrelations to prevent NaNs from entering into
-        # the transfer matrix elements.
-        realfringe = map2alm(beam, lmax, mmax, iterations=0)
-        imagfringe = Alm(Complex128, lmax, mmax) # all zeros
-    else
-        # Account for the extra phase due to the fact that the phase center is
-        # not perfectly orthogonal to the baseline.
-        extraphase = -2π*(u*phase_center.x + v*phase_center.y + w*phase_center.z)
-        realfringe, imagfringe = planewave(u, v, w, extraphase, lmax, mmax)
-        # Use spherical harmonic transforms to incorporate the effects of the beam.
-        realfringe = map2alm(beam .* alm2map(realfringe, 512), lmax, mmax, iterations=0)
-        imagfringe = map2alm(beam .* alm2map(imagfringe, 512), lmax, mmax, iterations=0)
-    end
+    extraphase = -2π*(u*phase_center.x + v*phase_center.y + w*phase_center.z)
+    realmap, imagmap = newplanewave(u, v, w, extraphase, 512)
+    realfringe = map2alm(beam .* realmap, lmax, mmax, iterations=5)
+    imagfringe = map2alm(beam .* imagmap, lmax, mmax, iterations=5)
     realfringe, imagfringe
 end
 
@@ -224,34 +193,34 @@ function pack!(blocks, realfringe, imagfringe, lmax, mmax, Nbase, α)
     # spherical harmonic conjugates while we've expanded the fringe pattern
     # in terms of the spherical harmonics.
     for l = 0:lmax
-        blocks[1][α,l+1] = conj(realfringe[l,0]) + 1im*conj(imagfringe[l,0])
+        blocks[1][l+1,α] = conj(realfringe[l,0]) + 1im*conj(imagfringe[l,0])
     end
     for m = 1:mmax, l = m:lmax
         α1 = α         # positive m
         α2 = α + Nbase # negative m
-        blocks[m+1][α1,l-m+1] = conj(realfringe[l,m]) + 1im*conj(imagfringe[l,m])
-        blocks[m+1][α2,l-m+1] = conj(realfringe[l,m]) - 1im*conj(imagfringe[l,m])
+        blocks[m+1][l-m+1,α1] = conj(realfringe[l,m]) + 1im*conj(imagfringe[l,m])
+        blocks[m+1][l-m+1,α2] = conj(realfringe[l,m]) - 1im*conj(imagfringe[l,m])
     end
 end
 
-function setindex!(transfermatrix, block, m, channel)
-    ν = transfermatrix.ν[channel]
+function setindex!(transfermatrix::TransferMatrix, block, m, channel)
+    ν = transfermatrix.frequencies[channel]
     filename = block_filename(m, ν)
     open(joinpath(transfermatrix.path, filename), "w") do file
-        write(file, size(block, 1), size(block, 2), block)
+        write(file, size(block, 2), size(block, 1), block.')
     end
     block
 end
 
 function getindex(transfermatrix::TransferMatrix, m, channel)
     local block
-    ν = transfermatrix.ν[channel]
+    ν = transfermatrix.frequencies[channel]
     filename = block_filename(m, ν)
     open(joinpath(transfermatrix.path, filename), "r") do file
         sz = tuple(read(file, Int, 2)...)
         block = read(file, Complex128, sz)
     end
-    block
+    block.'
 end
 
 #=

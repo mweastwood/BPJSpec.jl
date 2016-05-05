@@ -33,21 +33,10 @@ import GSL
 import LibHealpix: Alm, lmax, mmax
 import TTCal: Nfreq
 
-include("special.jl")  # special functions
-include("physics.jl")  # physical constants and cosmology
-include("parallel.jl") # tools for parallel processing
-
-# This function is useful to handle some of the special casing required for m == 0
-two(m) = ifelse(m != 0, 2, 1)
-
-# These functions define the filenames used when blocks are written to disk
-block_filename(ν) = @sprintf("%.6fMHz.block", ν/1e6)
-block_filename(m, ν) = @sprintf("%.6fMHz-%04d.block", ν/1e6, m)
-
-# This function defines the ordering for blocks of a given m and frequency channel
-# This ordering is assumed at various points so a careful check is needed before changing
-block_index(mmax, m, channel) = (mmax+1)*(channel-1) + m + 1
-
+include("special.jl")     # special functions
+include("physics.jl")     # physical constants and cosmology
+include("parallel.jl")    # tools for parallel processing
+include("definitions.jl") # defines all the types
 include("visibilities.jl")
 include("mmodes.jl")
 include("transfermatrix.jl")
