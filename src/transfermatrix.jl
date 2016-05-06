@@ -25,51 +25,88 @@ function TransferMatrix(path)
 end
 
 Nfreq(matrix::TransferMatrix) = length(matrix.frequencies)
-channels(matrix::TransferMatrix) = 1:Nfreq(matrix)
 
 """
-    TransferMatrix(path, meta, lmax, mmax)
+    TransferMatrix(path, meta::Metadata, lmax, mmax, nside)
 
 Generate the transfer matrix. This will take some time.
 """
-function TransferMatrix(path, meta::Metadata, lmax, mmax)
+function TransferMatrix(path, meta::Metadata, lmax, mmax, nside)
     transfermatrix = TransferMatrix(path, lmax, mmax, meta.channels)
-    initialize!(transfermatrix, Nbase(meta))
-    generate_transfermatrix!(transfermatrix, meta)
+    variables = TransferMatrixVariables(nside)
+    generate_transfermatrix!(transfermatrix, meta, variables)
     transfermatrix
 end
 
 """
-    initialize!(transfermatrix, Nbase)
+    TransferMatrixVariables
 
-Initialize the transfer matrix blocks to be all zeros.
-The number of baselines must be specified so that all the blocks have the right size.
+This type just holds some variables we would like to precompute
+and use while generating the transfer matrix.
+
+# Fields
+
+* `lmax` and `mmax` specify the space of spherical harmonics to use
+* `x`, `y`, and `z` give the unit vector to each pixel in the Healpix map
+* `u`, `v`, and `w` give each baseline vector in ITRF coordinates (meters)
+* `phase_center` the ITRF direction to the phase center
 """
-function initialize!(transfermatrix::TransferMatrix, Nbase)
-    path = transfermatrix.path
-    lmax = transfermatrix.lmax
-    mmax = transfermatrix.mmax
-    frequencies = transfermatrix.frequencies
-    # create the directory if it doesn't already exist
-    isdir(path) || mkdir(path)
-    # create the METADATA file to store lmax, mmax, and the list of frequency channels
-    open(joinpath(transfermatrix.path, "METADATA"), "w") do file
-        write(file, lmax, mmax, length(frequencies), frequencies)
-    end
+immutable TransferMatrixVariables
+    lmax :: Int
+    mmax :: Int
+    x :: HealpixMap
+    y :: HealpixMap
+    z :: HealpixMap
+    u :: Vector{Float64}
+    v :: Vector{Float64}
+    w :: Vector{Float64}
+    phase_center :: Direction
 end
 
-function generate_transfermatrix!(transfermatrix, meta)
-    for ν in transfermatrix.frequencies
-        generate_transfermatrix_onechannel!(transfermatrix, meta, ν)
+function TransferMatrixVariables(meta, lmax, mmax, nside)
+    x = HealpixMap(Float64, nside)
+    y = HealpixMap(Float64, nside)
+    z = HealpixMap(Float64, nside)
+    for pix = 1:length(x)
+        vec = LibHealpix.pix2vec_ring(nside, pix)
+        x[pix] = vec[1]
+        y[pix] = vec[2]
+        z[pix] = vec[3]
     end
-end
 
-function generate_transfermatrix_onechannel!(transfermatrix, meta, ν)
-    lmax = transfermatrix.lmax
-    mmax = transfermatrix.mmax
-    beam = beam_map(meta, ν)
+    nbase = Nbase(meta)
+    u = zeros(nbase)
+    v = zeros(nbase)
+    w = zeros(nbase)
+    for α = 1:nbase
+        antenna1 = meta.antennas[meta.baselines[α].antenna1]
+        antenna2 = meta.antennas[meta.baselines[α].antenna2]
+        u[α] = antenna1.position.x - antenna2.position.x
+        v[α] = antenna1.position.y - antenna2.position.y
+        w[α] = antenna1.position.z - antenna2.position.z
+    end
+
     frame = TTCal.reference_frame(meta)
     phase_center = measure(frame, meta.phase_center, dir"ITRF")
+
+    TransferMatrixVariables(lmax, mmax, x, y, z, u, v, w, phase_center)
+end
+
+function generate_transfermatrix!(transfermatrix, meta, variables)
+    for ν in transfermatrix.frequencies
+        generate_transfermatrix_onechannel!(transfermatrix, meta, variables, ν)
+    end
+end
+
+function generate_transfermatrix_onechannel!(transfermatrix, meta, variables, ν)
+    λ = c / ν
+    u = variables.u / λ
+    v = variables.v / λ
+    w = variables.w / λ
+    lmax = transfermatrix.lmax
+    mmax = transfermatrix.mmax
+    nside = variables.nside
+    beam = beam_map(meta, ν)
     # Memory map all the blocks on the master process to avoid having to
     # open/close the files multiple times and to avoid having to read the
     # entire matrix at once.
@@ -88,8 +125,8 @@ function generate_transfermatrix_onechannel!(transfermatrix, meta, ν)
     end
     info("Beginning the computation")
     @distribute for α = 1:Nbase(meta)
-        realfringe, imagfringe = @remote fringes(meta, beam, phase_center, lmax, mmax, ν, α)
-        pack!(blocks, realfringe, imagfringe, lmax, mmax, Nbase(meta), α)
+        realfringe, imagfringe = @remote fringes(beam, variables)
+        pack!(blocks, realfringe, imagfringe, lmax, mmax, α)
     end
 end
 
@@ -123,34 +160,22 @@ function beam_map(meta::Metadata, frequency)
 end
 
 """
-    planewave(u, v, w, phase, lmax, mmax)
+    planewave(u, v, w, x, y, z, phase_center)
 
-Compute the spherical harmonic coefficients corresponding to the
-plane wave:
+Compute the fringe pattern over a Healpix image.
 
-    exp(2im*π*(u*x+v*y+w*z)) * exp(1im*phase)
+```math
+exp(2 \pi i (ux+vy+wz)
+```
 """
-function planewave(u, v, w, phase, lmax, mmax)
-    b = sqrt(u^2 + v^2 + w^2)
-    θ = acos(w / b)
-    ϕ = atan2(v, u)
-    realpart = Alm(Complex128, lmax, mmax)
-    imagpart = Alm(Complex128, lmax, mmax)
-    for m = 0:mmax, l = m:lmax
-        alm1 = 4π * (1im)^l * j(l,2π*b) * conj(       Y(l,+m,θ,ϕ)) * exp(1im*phase)
-        alm2 = 4π * (1im)^l * j(l,2π*b) * conj((-1)^m*Y(l,-m,θ,ϕ)) * exp(1im*phase)
-        realpart[l,m] = (alm1 + conj(alm2))/2
-        imagpart[l,m] = (alm1 - conj(alm2))/2im
-    end
-    realpart, imagpart
-end
-
-function newplanewave(u, v, w, phase, nside)
-    realmap = HealpixMap(Float64, nside)
-    imagmap = HealpixMap(Float64, nside)
+function planewave(u, v, w, x, y, z, phase_center)
+    realmap = HealpixMap(Float64, nside(x))
+    imagmap = HealpixMap(Float64, nside(x))
     for idx = 1:length(realmap)
-        vec = LibHealpix.pix2vec_ring(nside, idx)
-        ϕ = 2π*(u*vec[1] + v*vec[2] + w*vec[3]) + phase
+        δx = x[idx] - phase_center.x
+        δy = y[idx] - phase_center.y
+        δz = z[idx] - phase_center.z
+        ϕ = 2π*(u*δx + v*δy + w*δz)
         realmap[idx] = cos(ϕ)
         imagmap[idx] = sin(ϕ)
     end
@@ -158,7 +183,7 @@ function newplanewave(u, v, w, phase, nside)
 end
 
 """
-    fringes(meta, beam, phase_center, lmax, mmax, ν, α)
+    fringes(beam, variables)
 
 Generate the spherical harmonic expansion of the fringe pattern on the sky.
 
@@ -167,27 +192,24 @@ of a real field, there must be one set of coefficients for the real part of
 the fringe pattern and one set of coefficients for the imaginary part of the
 fringe pattern.
 """
-function fringes(meta, beam, phase_center, lmax, mmax, ν, α)
-    antenna1 = meta.antennas[meta.baselines[α].antenna1]
-    antenna2 = meta.antennas[meta.baselines[α].antenna2]
+function fringes(beam, variables, ν, α)
     λ = c / ν
-    u = (antenna1.position.x - antenna2.position.x) / λ
-    v = (antenna1.position.y - antenna2.position.y) / λ
-    w = (antenna1.position.z - antenna2.position.z) / λ
-    extraphase = -2π*(u*phase_center.x + v*phase_center.y + w*phase_center.z)
-    realmap, imagmap = newplanewave(u, v, w, extraphase, 512)
-    realfringe = map2alm(beam .* realmap, lmax, mmax, iterations=5)
-    imagfringe = map2alm(beam .* imagmap, lmax, mmax, iterations=5)
+    u = variables.u[α] / λ
+    v = variables.v[α] / λ
+    w = variables.w[α] / λ
+    realmap, imagmap = planewave(u, v, w, variables.x, variables.y, variables.z, phase_center)
+    realfringe = map2alm(beam .* realmap, variables.lmax, variables.mmax, iterations=5)
+    imagfringe = map2alm(beam .* imagmap, variables.lmax, variables.mmax, iterations=5)
     realfringe, imagfringe
 end
 
 """
-    pack!(blocks, realfringe, imagfringe, lmax, mmax, Nbase, α)
+    pack!(blocks, realfringe, imagfringe, lmax, mmax, α)
 
 Having calculated the spherical harmonic expansion of the fringe pattern,
 pack those numbers into the transfer matrix.
 """
-function pack!(blocks, realfringe, imagfringe, lmax, mmax, Nbase, α)
+function pack!(blocks, realfringe, imagfringe, lmax, mmax, α)
     # Note that all the conjugations in this function come about because
     # Shaw et al. 2014, 2015 expand the fringe pattern in terms of the
     # spherical harmonic conjugates while we've expanded the fringe pattern
@@ -195,11 +217,16 @@ function pack!(blocks, realfringe, imagfringe, lmax, mmax, Nbase, α)
     for l = 0:lmax
         blocks[1][l+1,α] = conj(realfringe[l,0]) + 1im*conj(imagfringe[l,0])
     end
-    for m = 1:mmax, l = m:lmax
-        α1 = α         # positive m
-        α2 = α + Nbase # negative m
-        blocks[m+1][l-m+1,α1] = conj(realfringe[l,m]) + 1im*conj(imagfringe[l,m])
-        blocks[m+1][l-m+1,α2] = conj(realfringe[l,m]) - 1im*conj(imagfringe[l,m])
+    for m = 1:mmax
+        block = blocks[m+1]
+        α1 = 2α-1 # positive m
+        for l = m:lmax
+            block[l-m+1,α1] = conj(realfringe[l,m]) + 1im*conj(imagfringe[l,m])
+        end
+        α2 = 2α-0 # negative m
+        for l = m:lmax
+            block[l-m+1,α2] = conj(realfringe[l,m]) - 1im*conj(imagfringe[l,m])
+        end
     end
 end
 

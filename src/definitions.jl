@@ -177,7 +177,11 @@ Therefore the matrix must be stored on disk.
     mmax :: Int
     frequencies :: Vector{Float64}
     function TransferMatrix(path, lmax, mmax, frequencies)
-        mmax ≤ lmax || throw(ArgumentError("Transfer matrices require mmax ≤ lmax"))
+        mmax ≤ lmax || throw(ArgumentError("spherical harmonics require mmax ≤ lmax"))
+        isdir(path) || mkdir(path)
+        open(joinpath(path, "METADATA"), "w") do file
+            write(file, lmax, mmax, length(frequencies), frequencies)
+        end
         new(path, lmax, mmax, frequencies)
     end
 end
