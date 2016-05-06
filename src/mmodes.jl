@@ -61,17 +61,13 @@ end
 function MModes(path, transfermatrix::TransferMatrix, alm::Alm)
     # assume the transfer matrix is single frequency for now
     mmodes = MModes(path, transfermatrix.mmax, transfermatrix.frequencies)
-    for m = 0:mmax
-        Bm = B[m,1]
-        am = getblock(alm, m)
-        vm = Bm*am
-        ν = frequencies[1]
-        filename = block_filename(m, ν)
-        open(joinpath(path, filename), "w+") do file
-            write(file, length(vm))
-            push!(mmodes.blocks, Mmap.mmap(file, Vector{Complex128}, len))
-        end
-        mmodes.blocks[m+1][:] = vm
+    for m = 0:transfermatrix.mmax
+        @show m
+        @time Bm = transfermatrix[m,1]
+        @time am = getblock(alm, m)
+        @time vm = Bm*am
+        @time ν = mmodes.frequencies[1]
+        @time mmodes[m,1] = vm
     end
 end
 
