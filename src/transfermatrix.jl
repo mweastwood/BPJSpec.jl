@@ -33,8 +33,15 @@ Generate the transfer matrix. This will take some time.
 """
 function TransferMatrix(path, meta::Metadata, lmax, mmax, nside)
     transfermatrix = TransferMatrix(path, lmax, mmax, meta.channels)
-    variables = TransferMatrixVariables(nside)
+    variables = TransferMatrixVariables(meta, lmax, mmax, nside)
     generate_transfermatrix!(transfermatrix, meta, variables)
+    transfermatrix
+end
+
+function TransferMatrix(path, meta::Metadata, beam::HealpixMap, lmax, mmax, nside)
+    transfermatrix = TransferMatrix(path, lmax, mmax, meta.channels)
+    variables = TransferMatrixVariables(meta, lmax, mmax, nside)
+    generate_transfermatrix!(transfermatrix, meta, beam, variables)
     transfermatrix
 end
 
@@ -94,19 +101,20 @@ end
 
 function generate_transfermatrix!(transfermatrix, meta, variables)
     for ν in transfermatrix.frequencies
-        generate_transfermatrix_onechannel!(transfermatrix, meta, variables, ν)
+        beam = beam_map(meta, ν)
+        generate_transfermatrix_onechannel!(transfermatrix, meta, beam, variables, ν)
     end
 end
 
-function generate_transfermatrix_onechannel!(transfermatrix, meta, variables, ν)
-    λ = c / ν
-    u = variables.u / λ
-    v = variables.v / λ
-    w = variables.w / λ
+function generate_transfermatrix!(transfermatrix, meta, beam, variables)
+    for ν in transfermatrix.frequencies
+        generate_transfermatrix_onechannel!(transfermatrix, meta, beam, variables, ν)
+    end
+end
+
+function generate_transfermatrix_onechannel!(transfermatrix, meta, beam, variables, ν)
     lmax = transfermatrix.lmax
     mmax = transfermatrix.mmax
-    nside = variables.nside
-    beam = beam_map(meta, ν)
     # Memory map all the blocks on the master process to avoid having to
     # open/close the files multiple times and to avoid having to read the
     # entire matrix at once.
@@ -125,7 +133,7 @@ function generate_transfermatrix_onechannel!(transfermatrix, meta, variables, ν
     end
     info("Beginning the computation")
     @distribute for α = 1:Nbase(meta)
-        realfringe, imagfringe = @remote fringes(beam, variables)
+        realfringe, imagfringe = @remote fringes(beam, variables, ν, α)
         pack!(blocks, realfringe, imagfringe, lmax, mmax, α)
     end
 end
@@ -183,7 +191,7 @@ function planewave(u, v, w, x, y, z, phase_center)
 end
 
 """
-    fringes(beam, variables)
+    fringes(beam, variables, ν, α)
 
 Generate the spherical harmonic expansion of the fringe pattern on the sky.
 
@@ -197,7 +205,7 @@ function fringes(beam, variables, ν, α)
     u = variables.u[α] / λ
     v = variables.v[α] / λ
     w = variables.w[α] / λ
-    realmap, imagmap = planewave(u, v, w, variables.x, variables.y, variables.z, phase_center)
+    realmap, imagmap = planewave(u, v, w, variables.x, variables.y, variables.z, variables.phase_center)
     realfringe = map2alm(beam .* realmap, variables.lmax, variables.mmax, iterations=5)
     imagfringe = map2alm(beam .* imagmap, variables.lmax, variables.mmax, iterations=5)
     realfringe, imagfringe
