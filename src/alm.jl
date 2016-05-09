@@ -47,19 +47,6 @@ function setblock!(alm::Alm, x, m)
     alm
 end
 
-function *(B::TransferMatrix, alm::Alm)
-    # note for now we assume B has only one frequency channel
-    blocks = VectorBlock[]
-    for m = 0:mmax(B)
-        Bm = B[m+1].block
-        am = getblock(alm,m)
-        vm = Bm*am
-        push!(blocks,VectorBlock(vm))
-    end
-    meta = MModesMeta(B.meta.m,B.meta.ν)
-    MModes(blocks,meta)
-end
-
 """
     tikhonov(B::TransferMatrix, v::MModes, tolerance)
 
