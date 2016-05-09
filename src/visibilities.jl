@@ -86,8 +86,8 @@ function GriddedVisibilities(path, meta::Metadata, mmodes::MModes)
         for m = 1:mmodes.mmax
             v = mmodes[m,idx]
             for α = 1:Nbase(meta)
-                α1 = α               # positive m
-                α2 = α + Nbase(meta) # negative m
+                α1 = 2α-1 # positive m
+                α2 = 2α-0 # negative m
                 block[α,m+1]       =      v[α1]
                 block[α,Ntime+1-m] = conj(v[α2])
             end

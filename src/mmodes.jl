@@ -116,8 +116,8 @@ function pack_mmodes!(blocks, transformed_visibilities, mmax, channel)
             end
         else
             for α = 1:Nbase
-                α1 = α         # positive m
-                α2 = α + Nbase # negative m
+                α1 = 2α-1 # positive m
+                α2 = 2α-0 # negative m
                 block[α1] =      transformed_visibilities[α,m+1]
                 block[α2] = conj(transformed_visibilities[α,Ntime+1-m])
             end
