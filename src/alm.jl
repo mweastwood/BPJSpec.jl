@@ -69,6 +69,7 @@ function tikhonov(B::TransferMatrix, v::MModes, tolerance)
     for m = 0:B.mmax
         Bm = B[m,1]
         vm = v[m,1]
+        account_for_flags!(Bm, vm)
         am = tikhonov(Bm, vm, tolerance)
         setblock!(alm, am, m)
         next!(p)
@@ -83,5 +84,19 @@ function tikhonov(A::Matrix, b::Vector, tol)
     D = tol*I
     out = (AA + D)\Ab
     out
+end
+
+"""
+    account_for_flags!(transfermatrix_block, mmodes_block)
+
+Flagged baselines will have their m-mode equal to zero. We therefore
+need to set the corresponding row in the transfer matrix to zero as well.
+"""
+function account_for_flags!(transfermatrix_block, mmodes_block)
+    for α = 1:length(mmodes_block)
+        if abs(mmodes_block[α]) < eps(Float64)
+            transfermatrix_block[α,:] = 0
+        end
+    end
 end
 
