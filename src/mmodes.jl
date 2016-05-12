@@ -69,6 +69,7 @@ function MModes(path, transfermatrix::TransferMatrix, alm::Alm)
         @time ν = mmodes.frequencies[1]
         @time mmodes[m,1] = vm
     end
+    mmodes
 end
 
 doc"""
