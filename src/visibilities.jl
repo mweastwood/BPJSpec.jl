@@ -67,12 +67,11 @@ function GriddedVisibilities(path, meta::Metadata, Ntime)
 end
 
 """
-    GriddedVisibilities(path, meta::Metadata, mmodes::MModes)
+    GriddedVisibilities(path, meta::Metadata, mmodes::MModes, Ntime)
 
 Calculate the visibilities from the given m-modes.
 """
-function GriddedVisibilities(path, meta::Metadata, mmodes::MModes)
-    Ntime = 2*mmodes.mmax + 1
+function GriddedVisibilities(path, meta::Metadata, mmodes::MModes, Ntime)
     origin = sidereal_time(meta)
     visibilities = GriddedVisibilities(path, Nbase(meta), Ntime, mmodes.frequencies, origin)
     for idx = 1:Nfreq(visibilities)
@@ -92,7 +91,11 @@ function GriddedVisibilities(path, meta::Metadata, mmodes::MModes)
                 block[α,Ntime+1-m] = conj(v[α2])
             end
         end
-        result = ifft(block,2)*Ntime
+        info("Starting FFT...")
+        @time result = ifft(block,2)
+        info("Doing the multiply...")
+        @time result = result*Ntime
+        info("Finished FFT...")
         visibilities.data[idx][:] = result
         visibilities.weights[idx][:] = 1
     end
@@ -105,8 +108,10 @@ function getindex(visibilities::GriddedVisibilities, channel)
     data    = visibilities.data[channel]
     weights = visibilities.weights[channel]
     output  = similar(data)
-    @inbounds for I in eachindex(data)
-        output[I] = ifelse(weights[I] < eps(Float64), complex(0.0), data[I] / weights[I])
+    @inbounds for j = 1:visibilities.Ntime, i = 1:visibilities.Nbase
+        d = data[i,j]
+        w = weights[i,j]
+        output[i,j] = ifelse(w < eps(Float64), complex(0.0), d/w)
     end
     output
 end
