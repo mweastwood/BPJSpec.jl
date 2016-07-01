@@ -16,6 +16,15 @@
 # This function is useful to handle some of the special casing required for m == 0
 two(m) = ifelse(m != 0, 2, 1)
 
+# In order to be nice to the lustre file system, we will want to avoid dumping
+# thousands of files into a single directory. Instead we will distribute
+# the files across sqrt(N) sub-directories.
+function directory_name(m, ν, N)
+    sqrtN = round(Int, sqrt(N))
+    h = mod1(hash(m, hash(ν)), sqrtN)
+    @sprintf("%.6fMHz-%02d", ν/1e6, h)
+end
+
 # These functions define the filenames used when blocks are written to disk
 block_filename(ν) = @sprintf("%.6fMHz.block", ν/1e6)
 block_filename(m, ν) = @sprintf("%.6fMHz-%04d.block", ν/1e6, m)

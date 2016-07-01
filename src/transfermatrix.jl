@@ -120,9 +120,12 @@ function generate_transfermatrix_onechannel!(transfermatrix, meta, beam, variabl
     # entire matrix at once.
     info("Memory mapping files")
     blocks = Matrix{Complex128}[]
-    for m = 0:transfermatrix.mmax
+    for m = 0:mmax
+        directory = directory_name(m, ν, mmax+1)
+        directory = joinpath(transfermatrix.path, directory)
+        isdir(directory) || mkdir(directory)
         filename = block_filename(m, ν)
-        open(joinpath(transfermatrix.path, filename), "w+") do file
+        open(joinpath(directory, filename), "w+") do file
             # note that we store the transpose of the transfer matrix blocks to make
             # all the disk writes sequential
             sz = (lmax-m+1, two(m)*Nbase(meta))
@@ -130,11 +133,47 @@ function generate_transfermatrix_onechannel!(transfermatrix, meta, beam, variabl
             block = Mmap.mmap(file, Matrix{Complex128}, sz)
             push!(blocks, block)
         end
+        #open(joinpath(directory, filename), "r+") do file
+        #    sz1 = read(file, Int)
+        #    sz2 = read(file, Int)
+        #    sz = (sz1, sz2)
+        #    block = Mmap.mmap(file, Matrix{Complex128}, sz)
+        #    push!(blocks, block)
+        #end
     end
     info("Beginning the computation")
-    @distribute for α = 1:Nbase(meta)
-        realfringe, imagfringe = @remote fringes(beam, variables, ν, α)
-        pack!(blocks, realfringe, imagfringe, lmax, mmax, α)
+    idx = 1
+    #idx = 1500
+    nextidx() = (myidx = idx; idx += 1; myidx)
+    p = Progress(Nbase(meta) - idx + 1, "Progress: ")
+    l = ReentrantLock()
+    increment_progress() = (lock(l); next!(p); unlock(l))
+    @sync for worker in workers()
+        @async begin
+            input = RemoteRef()
+            output_realfringe = RemoteRef()
+            output_imagfringe = RemoteRef()
+            remotecall(worker, transfermatrix_worker_loop,
+                       input, output_realfringe, output_imagfringe, beam, variables, ν)
+            while true
+                α = nextidx()
+                α ≤ Nbase(meta) || break
+                put!(input, α)
+                realfringe = take!(output_realfringe)
+                imagfringe = take!(output_imagfringe)
+                pack!(blocks, realfringe, imagfringe, lmax, mmax, α)
+                increment_progress()
+            end
+        end
+    end
+end
+
+function transfermatrix_worker_loop(input, output_realfringe, output_imagfringe, beam, variables, ν)
+    while true
+        α = take!(input)
+        realfringe, imagfringe = fringes(beam, variables, ν, α)
+        put!(output_realfringe, realfringe)
+        put!(output_imagfringe, imagfringe)
     end
 end
 
@@ -240,8 +279,9 @@ end
 
 function setindex!(transfermatrix::TransferMatrix, block, m, channel)
     ν = transfermatrix.frequencies[channel]
+    directory = directory_name(m, ν, transfermatrix.mmax+1)
     filename = block_filename(m, ν)
-    open(joinpath(transfermatrix.path, filename), "w") do file
+    open(joinpath(transfermatrix.path, directory, filename), "w") do file
         write(file, size(block, 2), size(block, 1), block.')
     end
     block
@@ -250,8 +290,9 @@ end
 function getindex(transfermatrix::TransferMatrix, m, channel)
     local block
     ν = transfermatrix.frequencies[channel]
+    directory = directory_name(m, ν, transfermatrix.mmax+1)
     filename = block_filename(m, ν)
-    open(joinpath(transfermatrix.path, filename), "r") do file
+    open(joinpath(transfermatrix.path, directory, filename), "r") do file
         sz = tuple(read(file, Int, 2)...)
         block = read(file, Complex128, sz)
     end
