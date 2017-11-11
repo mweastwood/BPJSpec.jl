@@ -79,10 +79,10 @@ This type represents visibilities on a sidereal time grid.
 * `Ntime` is the number of sidereal time grid points
 * `frequencies` is the list of frequencies in units of Hz
 * `origin` is the sidereal time of the first grid point
-* `data` is a list of mmapped arrays where the visibilities are stored
-* `weights` is a list of mmapped arrays where the weights are stored
+* `data` is a list of arrays where the visibilities are stored
+* `weights` is a list of arrays where the weights are stored
 
-Note that in each of `data` and `weights` there is one mmapped array for each
+Note that in each of `data` and `weights` there is one array for each
 frequency channel, and each array has dimensions of `Nbase` by `Ntime`.
 
 # Implementation
@@ -100,18 +100,9 @@ within one tenth of one second to evenly dividing a sidereal day.
 However we cannot guarantee that the correlator starts at a given
 sidereal time. Therefore we need to adjust the grid to align with
 the integrations. The `origin` parameter is used to accomplish this.
-
-When gridding the visibilities we are going to be making a lot of small writes
-to several arrays that may not fit into the system memory. This is why we mmap
-the arrays onto the disk.
-
-Experiements suggest that two arrays cannot be mmapped to the same file.
-That is instead of being written one after another the two arrays are written
-on top of each other. This is why `data` and `weights` are mmapped to two
-separate files.
 """
 @define immutable GriddedVisibilities
-    path :: ASCIIString
+    path :: String
     Nbase :: Int
     Ntime :: Int
     frequencies :: Vector{Float64}
@@ -119,7 +110,7 @@ separate files.
     data :: Vector{Matrix{Complex128}}
     weights :: Vector{Matrix{Float64}}
     function GriddedVisibilities(path, Nbase, Ntime, frequencies, origin, data, weights)
-        0 ≤ origin < 1 || throw(ArgumentEttor("The sidereal time must be in the interval [0,1)"))
+        0 ≤ origin < 1 || throw(ArgumentError("The sidereal time must be in the interval [0,1)"))
         new(path, Nbase, Ntime, frequencies, origin, data, weights)
     end
 end
@@ -150,7 +141,7 @@ matrix, and $a$ is the vector of spherical harmonic coefficients.
 Note that there is one mmapped vector for each frequency and each value of $m$.
 """
 @define immutable MModes
-    path :: ASCIIString
+    path :: String
     mmax :: Int
     frequencies :: Vector{Float64}
     blocks :: Vector{Vector{Complex128}}
@@ -181,7 +172,7 @@ However each individual block of the matrix should be able to fit.
 Therefore the matrix must be stored on disk.
 """
 @define immutable TransferMatrix
-    path :: ASCIIString
+    path :: String
     lmax :: Int
     mmax :: Int
     frequencies :: Vector{Float64}
@@ -210,7 +201,7 @@ for multiple frequency channels.
 * `alms` is a list of spherical harmonic coefficients $a_{lm}$ for each frequency channel
 """
 @define immutable MultiFrequencyAlm
-    path :: ASCIIString
+    path :: String
     lmax :: Int
     mmax :: Int
     frequencies :: Vector{Float64}

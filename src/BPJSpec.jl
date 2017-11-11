@@ -43,7 +43,7 @@ include("transfermatrix.jl")
 include("alm.jl")
 
 #include("noise.jl")
-#include("sky.jl")
+include("sky.jl")
 
 end
 

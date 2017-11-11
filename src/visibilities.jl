@@ -105,8 +105,17 @@ end
 Nfreq(visibilities::GriddedVisibilities) = length(visibilities.frequencies)
 
 function getindex(visibilities::GriddedVisibilities, channel)
-    data    = visibilities.data[channel]
-    weights = visibilities.weights[channel]
+    #data    = visibilities.data[channel]
+    #weights = visibilities.weights[channel]
+    local data, weights
+    filename = block_filename(visibilities.frequencies[channel])
+    open(joinpath(visibilities.path, filename), "r") do file
+        data = read(file, Complex128, (visibilities.Nbase, visibilities.Ntime))
+    end
+    open(joinpath(visibilities.path, filename*".weights"), "r") do file
+        weights = read(file, Float64, (visibilities.Nbase, visibilities.Ntime))
+    end
+
     output  = similar(data)
     @inbounds for j = 1:visibilities.Ntime, i = 1:visibilities.Nbase
         d = data[i,j]
@@ -114,6 +123,17 @@ function getindex(visibilities::GriddedVisibilities, channel)
         output[i,j] = ifelse(w < eps(Float64), complex(0.0), d/w)
     end
     output
+end
+
+function setindex!(visibilities::GriddedVisibilities, data, channel)
+    weights = ones(Float64, size(data))
+    filename = block_filename(visibilities.frequencies[channel])
+    open(joinpath(visibilities.path, filename), "w") do file
+        write(file, data)
+    end
+    open(joinpath(visibilities.path, filename*".weights"), "w") do file
+        write(file, weights)
+    end
 end
 
 """
