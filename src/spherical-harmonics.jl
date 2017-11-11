@@ -1,6 +1,35 @@
 using FastTransforms
 import LibHealpix
 
+struct SHT
+    sph2fourier_plan
+    synthesis_plan
+    analysis_plan
+    lmax :: Int
+    mmax :: Int
+    size :: Tuple{Int, Int}
+end
+
+function plan_sht(lmax, mmax, size)
+    alm = zeros(lmax+1, 2mmax+1)
+    map = zeros(size)
+    sph2fourier_plan = plan_sph2fourier(alm)
+    synthesis_plan = FastTransforms.plan_synthesis(map)
+    analysis_plan = FastTransforms.plan_analysis(map)
+    SHT(sph2fourier_plan, synthesis_plan, analysis_plan, lmax, mmax, size)
+end
+
+function map2alm(map, lmax, mmax)
+    # analyze the map
+    analysis_plan = FastTransforms.plan_analysis(map.matrix)
+    fourier = A_mul_B!(zero(map.matrix), analysis_plan, map.matrix)
+
+    # convert to spherical harmonic coefficients
+    plan = plan_sph2fourier(fourier)
+    output = plan\fourier
+    Alm(lmax, mmax, output)
+end
+
 struct Alm
     lmax :: Int
     mmax :: Int
@@ -43,41 +72,35 @@ end
 Base.getindex(map::Map, idx) = map.matrix[idx]
 Base.size(map::Map) = size(map.matrix)
 
-function alm2map(alm)
+function alm2map(sht, alm)
     # convert to bivariate Fourier series
-    @time plan = SlowSphericalHarmonicPlan(alm.matrix)
-    @time fourier = plan*alm.matrix
+    @time fourier = sht.sph2fourier_plan*alm.matrix
 
     # pad the Fourier series to the desired map size
-    #N, M = size(fourier)
-    #padded_fourier = zeros(eltype(fourier), sz)
-    #@views padded_fourier[1:N, 1:M] = fourier
+    padded_fourier = zeros(eltype(fourier), sht.size)
+    padded_fourier[1:sht.lmax+1, 1:2sht.mmax+1] = fourier
 
     # synthesize the map
-    @time synthesis_plan = FastTransforms.plan_synthesis(fourier)
-    @show typeof(synthesis_plan)
-    @time output = A_mul_B!(zero(fourier), synthesis_plan, fourier)
+    @time output = A_mul_B!(zero(padded_fourier), sht.synthesis_plan, padded_fourier)
     Map(output)
 end
 
-function map2alm(alm)
-    # convert to bivariate Fourier series
-    @time plan = SlowSphericalHarmonicPlan(alm.matrix)
-    @time fourier = plan*alm.matrix
+function map2alm(sht, map)
+    # analyze the map
+    @time fourier = A_mul_B!(zero(map.matrix), sht.analysis_plan, map.matrix)
 
-    # pad the Fourier series to the desired map size
-    #N, M = size(fourier)
-    #padded_fourier = zeros(eltype(fourier), sz)
-    #@views padded_fourier[1:N, 1:M] = fourier
+    # cut the Fourier series down to the right size (for the desired lmax, mmax)
+    cut_fourier = fourier[1:sht.lmax+1, 1:2sht.mmax+1]
 
-    # synthesize the map
-    @time synthesis_plan = FastTransforms.plan_synthesis(fourier)
-    @time output = A_mul_B!(zero(fourier), synthesis_plan, fourier)
-    Map(output)
+    # convert to spherical harmonic coefficients
+    @time output = sht.sph2fourier_plan\cut_fourier
+    Alm(sht.lmax, sht.mmax, output)
 end
 
+Base.:*(sht::SHT, map::Map) = map2alm(sht, map)
+Base.:\(sht::SHT, alm::Alm) = alm2map(sht, alm)
 
-using PyPlot
+#using PyPlot
 
 function test(lmax, mmax)
     alm1 = LibHealpix.Alm(Complex128, lmax, mmax)
@@ -90,8 +113,14 @@ function test(lmax, mmax)
         alm2[l, m] = LibHealpix.@lm alm1[l, m]
     end
 
+    @time sht = plan_sht(lmax, mmax, (2048, 4095))
+
     @time healpix = LibHealpix.alm2map(alm1, 2048)
-    @time map2 = alm2map(alm2)
+    println("---")
+    @time map2 = sht\alm2
+    println("---")
+
+    @show vecnorm(map2-map1)/vecnorm(map1)
 
     map1 = similar(map2)
     n, m = size(map2)
@@ -101,18 +130,26 @@ function test(lmax, mmax)
         map1[idx, jdx] = LibHealpix.interpolate(healpix, θ[idx], π-ϕ[jdx])
     end
 
-    figure(1); clf()
-    subplot(3, 1, 1)
-    imshow(map1)
-    colorbar()
-    subplot(3, 1, 2)
-    imshow(map2)
-    colorbar()
-    subplot(3, 1, 3)
-    imshow(log10.(abs.(map2.-map1)))
-    colorbar()
-    tight_layout()
+    @time alm1′ = LibHealpix.map2alm(healpix, lmax, mmax, iterations=2)
+    println("---")
+    @time alm2′ = sht*map2
+    println("---")
+    @show vecnorm(alm1-alm1′)/vecnorm(alm1)
+    @show vecnorm(alm2.matrix-alm2′.matrix)/vecnorm(alm2.matrix)
 
-    vecnorm(map2-map1)/vecnorm(map1)
+
+    #figure(1); clf()
+    #subplot(3, 1, 1)
+    #imshow(map1)
+    #colorbar()
+    #subplot(3, 1, 2)
+    #imshow(map2)
+    #colorbar()
+    #subplot(3, 1, 3)
+    #imshow(log10.(abs.(map2.-map1)))
+    #colorbar()
+    #tight_layout()
+
+    nothing
 end
 
