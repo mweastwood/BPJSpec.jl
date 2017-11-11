@@ -1,4 +1,4 @@
-# Copyright (c) 2015 Michael Eastwood
+# Copyright (c) 2015-2017 Michael Eastwood
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -13,37 +13,66 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-__precompile__()
+#__precompile__()
 
 module BPJSpec
 
-export GriddedVisibilities, grid!
-export MModes, TransferMatrix
-export tikhonov
+#include("spherical-harmonics.jl")
 
-using CasaCore.Measures
-using CasaCore.Tables
+#using JLD2
+#using Unitful, UnitfulAstro
+
+using JLD2
+using StaticArrays
 using LibHealpix
-using ProgressMeter
-using TTCal
 
-importall Base.Operators
-import Cosmology
-import GSL
-import LibHealpix: Alm, lmax, mmax
-import TTCal: Nfreq
+struct SphericalHarmonicMetadata
+    lmax :: Int
+    mmax :: Int
+    ν :: Vector{typeof(1.0*u"Hz")}
+    function SphericalHarmonicMetadata(lmax, mmax, ν)
+        mmax ≤ lmax || throw(ArgumentError("spherical harmonics require mmax ≤ lmax"))
+        new(lmax, mmax, ν)
+    end
+end
 
-include("special.jl")     # special functions
-include("physics.jl")     # physical constants and cosmology
-include("parallel.jl")    # tools for parallel processing
-include("definitions.jl") # defines all the types
-include("visibilities.jl")
-include("mmodes.jl")
+struct InterferometerMetadata
+    u :: Vector{typeof{1.0*u"m"}}
+    v :: Vector{typeof{1.0*u"m"}}
+    w :: Vector{typeof{1.0*u"m"}}
+    beam :: RingHealpixMap{Float64}
+    phase_center :: SVector{3, Float64}
+end
+
 include("transfermatrix.jl")
-include("alm.jl")
 
-#include("noise.jl")
-include("sky.jl")
+#export GriddedVisibilities, grid!
+#export MModes, TransferMatrix
+#export tikhonov
+#
+#using CasaCore.Measures
+#using CasaCore.Tables
+#using LibHealpix
+#using ProgressMeter
+#using TTCal
+#
+#importall Base.Operators
+#import Cosmology
+#import GSL
+#import LibHealpix: Alm, lmax, mmax
+#import TTCal: Nfreq
+
+#include("special.jl")     # special functions
+#include("physics.jl")     # physical constants and cosmology
+#include("parallel.jl")    # tools for parallel processing
+#include("definitions.jl") # defines all the types
+#include("visibilities.jl")
+#include("mmodes.jl")
+#include("transfermatrix.jl")
+#include("alm.jl")
+
+##include("noise.jl")
+#include("sky.jl")
 
 end
 
