@@ -47,23 +47,8 @@ function setblock!(alm::Alm, x, m)
     alm
 end
 
-function *(B::TransferMatrix,alm::Alm)
-    is_single_frequency(B) || error("Expected single-frequency transfer matrix.")
-    lmax(B) == lmax(alm) || error("The values of lmax must be the same.")
-    mmax(B) == mmax(alm) || error("The values of mmax must be the same.")
-    blocks = VectorBlock[]
-    for m = 0:mmax(B)
-        Bm = B[m+1].block
-        am = getblock(alm,m)
-        vm = Bm*am
-        push!(blocks,VectorBlock(vm))
-    end
-    meta = MModesMeta(B.meta.m,B.meta.ν)
-    MModes(blocks,meta)
-end
-
 """
-    tikhonov(B::TransferMatrix, v::MModes; tolerance=0.0) -> Alm
+    tikhonov(B::TransferMatrix, v::MModes, tolerance)
 
 Solve for the spherical harmonic coefficients with the given
 transfer matrix and m-modes. `tolerance` acts as Tikhonov
@@ -77,19 +62,41 @@ observing the sky. In linear algebra this means that the transfer matrix
 must be singular, and we will therefore need some amount of numerical
 regularization to invert it.
 """
-function tikhonov(B::TransferMatrix, v::MModes;
-                  tolerance::Float64 = 0.0)
-    is_single_frequency(B) || error("Expected single-frequency transfer matrix.")
-    is_single_frequency(v) || error("Expected single-frequency m-modes.")
-    alm = Alm(Complex128,lmax(B),mmax(B))
-    for m = 0:mmax(B)
-        Bm = B[m+1].block
-        vm = v[m+1].block
-        am = tikhonov(Bm,vm,tolerance)
-        setblock!(alm,am,m)
+function tikhonov(B::TransferMatrix, v::MModes, tolerance)
+    # note for now we assume that B and v each only have one frequency channel
+    alm = Alm(Complex128, B.lmax, B.mmax)
+    p = Progress(B.mmax+1, "Solving: ")
+    for m = 0:B.mmax
+        Bm = B[m,1]
+        vm = v[m,1]
+        account_for_flags!(Bm, vm)
+        am = tikhonov(Bm, vm, tolerance)
+        setblock!(alm, am, m)
+        next!(p)
     end
     alm
 end
 
-tikhonov(A::Matrix, b::Vector, tol) = (A'*A + tol*I)\A'*b
+function tikhonov(A::Matrix, b::Vector, tol)
+    At = A'
+    AA = At*A # rate limiting step
+    Ab = At*b
+    D = tol*I
+    out = (AA + D)\Ab
+    out
+end
+
+"""
+    account_for_flags!(transfermatrix_block, mmodes_block)
+
+Flagged baselines will have their m-mode equal to zero. We therefore
+need to set the corresponding row in the transfer matrix to zero as well.
+"""
+function account_for_flags!(transfermatrix_block, mmodes_block)
+    for α = 1:length(mmodes_block)
+        if abs(mmodes_block[α]) < eps(Float64)
+            transfermatrix_block[α,:] = 0
+        end
+    end
+end
 

@@ -13,224 +13,319 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-immutable TransferMeta <: Metadata
-    lmax::Int
-    m::UnitRange{Int}
-    ν::Vector{Float64}
+function TransferMatrix(path)
+    local lmax, mmax, frequencies
+    open(joinpath(path, "METADATA"), "r") do file
+        lmax = read(file, Int)
+        mmax = read(file, Int)
+        len  = read(file, Int)
+        frequencies = read(file, Float64, len)
+    end
+    TransferMatrix(path, lmax, mmax, frequencies)
+end
 
-    function TransferMeta(lmax,m,ν)
-        if length(m) > 1 && length(ν) > 1
-            error("Cannot simultaneously have multiple values of m and multiple frequency channels.")
-        end
-        new(lmax,m,ν)
+Nfreq(matrix::TransferMatrix) = length(matrix.frequencies)
+
+"""
+    TransferMatrix(path, meta::Metadata, lmax, mmax, nside)
+
+Generate the transfer matrix. This will take some time.
+"""
+function TransferMatrix(path, meta::Metadata, lmax, mmax, nside)
+    transfermatrix = TransferMatrix(path, lmax, mmax, meta.channels)
+    variables = TransferMatrixVariables(meta, lmax, mmax, nside)
+    generate_transfermatrix!(transfermatrix, meta, variables)
+    transfermatrix
+end
+
+function TransferMatrix(path, meta::Metadata, beam::HealpixMap, lmax, mmax, nside)
+    transfermatrix = TransferMatrix(path, lmax, mmax, meta.channels)
+    variables = TransferMatrixVariables(meta, lmax, mmax, nside)
+    generate_transfermatrix!(transfermatrix, meta, beam, variables)
+    transfermatrix
+end
+
+"""
+    TransferMatrixVariables
+
+This type just holds some variables we would like to precompute
+and use while generating the transfer matrix.
+
+# Fields
+
+* `lmax` and `mmax` specify the space of spherical harmonics to use
+* `x`, `y`, and `z` give the unit vector to each pixel in the Healpix map
+* `u`, `v`, and `w` give each baseline vector in ITRF coordinates (meters)
+* `phase_center` the ITRF direction to the phase center
+"""
+immutable TransferMatrixVariables
+    lmax :: Int
+    mmax :: Int
+    x :: HealpixMap
+    y :: HealpixMap
+    z :: HealpixMap
+    u :: Vector{Float64}
+    v :: Vector{Float64}
+    w :: Vector{Float64}
+    phase_center :: Direction
+end
+
+function TransferMatrixVariables(meta, lmax, mmax, nside)
+    x = HealpixMap(Float64, nside)
+    y = HealpixMap(Float64, nside)
+    z = HealpixMap(Float64, nside)
+    for pix = 1:length(x)
+        vec = LibHealpix.pix2vec_ring(nside, pix)
+        x[pix] = vec[1]
+        y[pix] = vec[2]
+        z[pix] = vec[3]
+    end
+
+    nbase = Nbase(meta)
+    u = zeros(nbase)
+    v = zeros(nbase)
+    w = zeros(nbase)
+    for α = 1:nbase
+        antenna1 = meta.antennas[meta.baselines[α].antenna1]
+        antenna2 = meta.antennas[meta.baselines[α].antenna2]
+        u[α] = antenna1.position.x - antenna2.position.x
+        v[α] = antenna1.position.y - antenna2.position.y
+        w[α] = antenna1.position.z - antenna2.position.z
+    end
+
+    frame = TTCal.reference_frame(meta)
+    phase_center = measure(frame, meta.phase_center, dir"ITRF")
+
+    TransferMatrixVariables(lmax, mmax, x, y, z, u, v, w, phase_center)
+end
+
+function generate_transfermatrix!(transfermatrix, meta, variables)
+    for ν in transfermatrix.frequencies
+        beam = beam_map(meta, ν)
+        generate_transfermatrix_onechannel!(transfermatrix, meta, beam, variables, ν)
     end
 end
 
-TransferMeta(lmax::Int,m::Int,ν::AbstractVector) = TransferMeta(lmax,m:m,collect(ν))
-TransferMeta(lmax::Int,mmax::Int,ν::Float64) = TransferMeta(lmax,0:mmax,[ν])
+function generate_transfermatrix!(transfermatrix, meta, beam, variables)
+    for ν in transfermatrix.frequencies
+        generate_transfermatrix_onechannel!(transfermatrix, meta, beam, variables, ν)
+    end
+end
 
-==(lhs::TransferMeta,rhs::TransferMeta) = lhs.lmax == rhs.lmax && lhs.m == rhs.m && lhs.ν == rhs.ν
-
-doc"""
-    typealias TransferMatrix Blocks{MatrixBlock, TransferMeta}
-
-This type stores the transfer matrix organized into blocks.
-
-The transfer matrix represents the instrumental response of the
-interferometer to the spherical harmonic coefficients of the sky.
-This matrix is usually very large, but we can use its block
-diagonal structure to work with parts of the matrix separately.
-"""
-typealias TransferMatrix Blocks{MatrixBlock, TransferMeta}
-
-initial_block_size(::Type{TransferMatrix}, Nbase, lmax, m) = (two(m)*Nbase, lmax-m+1)
-
-function call(::Type{TransferMatrix}, Nbase::Int, lmax::Int, mmax::Int, ν::Float64)
-    meta = TransferMeta(lmax,mmax,ν)
-    blocks = MatrixBlock[]
+function generate_transfermatrix_onechannel!(transfermatrix, meta, beam, variables, ν)
+    lmax = transfermatrix.lmax
+    mmax = transfermatrix.mmax
+    # Memory map all the blocks on the master process to avoid having to
+    # open/close the files multiple times and to avoid having to read the
+    # entire matrix at once.
+    info("Running new version!")
+    info("Memory mapping files")
+    blocks = IOStream[]
+    #blocks = Matrix{Complex128}[]
     for m = 0:mmax
-        sz = initial_block_size(TransferMatrix,Nbase,lmax,m)
-        push!(blocks,MatrixBlock(sz))
+        directory = directory_name(m, ν, mmax+1)
+        directory = joinpath(transfermatrix.path, directory)
+        isdir(directory) || mkdir(directory)
+        filename = block_filename(m, ν)
+        block = open(joinpath(directory, filename), "w")
+        # Write the size of the matrix block to the start of
+        # the file because in general we don't know how many
+        # rows will be in each block of the matrix.
+        #
+        # Also note that we are storing the transpose of each
+        # block in order to make all the disk writes sequential.
+        sz = (lmax-m+1, two(m)*Nbase(meta))
+        write(block, sz[1], sz[2])
+        push!(blocks, block)
+        #open(joinpath(directory, filename), "w+") do file
+        #    # note that we store the transpose of the transfer matrix blocks to make
+        #    # all the disk writes sequential
+        #    sz = (lmax-m+1, two(m)*Nbase(meta))
+        #    write(file, sz[1], sz[2])
+        #    block = Mmap.mmap(file, Matrix{Complex128}, sz)
+        #    push!(blocks, block)
+        #end
+        #open(joinpath(directory, filename), "r+") do file
+        #    sz1 = read(file, Int)
+        #    sz2 = read(file, Int)
+        #    sz = (sz1, sz2)
+        #    block = Mmap.mmap(file, Matrix{Complex128}, sz)
+        #    push!(blocks, block)
+        #end
     end
-    TransferMatrix(blocks,meta)
-end
-
-is_single_frequency(meta::TransferMeta) = length(meta.ν) == 1
-is_single_m(meta::TransferMeta) = length(meta.m) == 1
-is_single_frequency(B::TransferMatrix) = is_single_frequency(B.meta)
-is_single_m(B::TransferMatrix) = is_single_m(B.meta)
-
-lmax(meta::TransferMeta) = meta.lmax
-lmax(B::TransferMatrix) = lmax(B.meta)
-
-mmax(meta::TransferMeta) = maximum(meta.m)
-mmax(B::TransferMatrix) = mmax(B.meta)
-
-Nfreq(meta::TransferMeta) = length(meta.ν)
-Nfreq(B::TransferMatrix) = length(B.meta)
-
-"""
-    transfer(ms::MeasurementSet, beam::TTCal.BeamModel, channel; lmax = 100, mmax = 100)
-
-Generate a transfer matrix where the instrumental parameters are read from a
-measurement set.
-"""
-function transfer(ms::MeasurementSet, beam::TTCal.BeamModel, channel;
-                  lmax::Int = 100, mmax::Int = 100)
-    healpix_beam = itrf_beam(ms.frame,beam,ms.ν[channel])
-    u,v,w = itrf_baselines(ms)
-    phasecenter = itrf_phasecenter(ms)
-    transfer(healpix_beam, u, v, w, ms.ν[channel],
-             phasecenter, lmax=lmax, mmax=mmax)
-end
-
-"""
-    transfer(beam::HealpixMap, u, v, w, ν, phasecenter; lmax = 100, mmax = 100)
-
-Construct a transfer matrix for the given beam model and observational parameters.
-"""
-function transfer(beam::HealpixMap, u, v, w, ν, phasecenter;
-                  lmax::Int = 100, mmax::Int = 100)
-    Nbase = length(u)
-    B = TransferMatrix(Nbase,lmax,mmax,ν)
-    transfer!(B,beam,u,v,w,ν,phasecenter,lmax=lmax,mmax=mmax)
-    B
-end
-
-function transfer!(B::TransferMatrix,
-                   beam::HealpixMap, u, v, w, ν, phasecenter;
-                   lmax::Int = 100, mmax::Int = 100)
-    Nbase = length(u)
-    λ = c / ν
-    u = u / λ
-    v = v / λ
-    w = w / λ
-
-    # distribute the workload across all the available workers
+    info("Beginning the computation")
     idx = 1
+    #idx = 1500
     nextidx() = (myidx = idx; idx += 1; myidx)
-    p = Progress(Nbase, 1, "Dreaming...", 50)
+    p = Progress(Nbase(meta) - idx + 1, "Progress: ")
     l = ReentrantLock()
     increment_progress() = (lock(l); next!(p); unlock(l))
     @sync for worker in workers()
-        @async while true
-            α = nextidx()
-            α ≤ Nbase || break
-            realfringe,imagfringe = remotecall_fetch(worker,fringes,beam,u[α],v[α],w[α],
-                                                                    phasecenter,lmax,mmax)
-            pack!(B,realfringe,imagfringe,α,Nbase,lmax,mmax)
-            increment_progress()
+        @async begin
+            input = RemoteChannel()
+            output_realfringe = RemoteChannel()
+            output_imagfringe = RemoteChannel()
+            remotecall(transfermatrix_worker_loop, worker,
+                       input, output_realfringe, output_imagfringe, beam, variables, ν)
+            while true
+                α = nextidx()
+                α ≤ Nbase(meta) || break
+                put!(input, α)
+                realfringe = take!(output_realfringe)
+                imagfringe = take!(output_imagfringe)
+                pack!(blocks, realfringe, imagfringe, lmax, mmax, α)
+                increment_progress()
+            end
         end
     end
-    B
+    for block in blocks
+        close(block)
+    end
+end
+
+function transfermatrix_worker_loop(input, output_realfringe, output_imagfringe, beam, variables, ν)
+    while true
+        α = take!(input)
+        realfringe, imagfringe = fringes(beam, variables, ν, α)
+        put!(output_realfringe, realfringe)
+        put!(output_imagfringe, imagfringe)
+    end
 end
 
 """
-    fringes(beam, u, v, w, phasecenter, lmax, mmax)
+    beam_map(meta::Metadata, frequency)
+
+Create a Healpix map of the Stokes I beam.
+"""
+function beam_map(meta::Metadata, frequency)
+    frame  = TTCal.reference_frame(meta)
+    position = measure(frame, TTCal.position(meta), pos"ITRF")
+    zenith = normalize!([position.x, position.y, position.z])
+    north  = gramschmidt([0.0, 0.0, 1.0], zenith)
+    east   = cross(north, zenith)
+    map = HealpixMap(zeros(nside2npix(512)))
+    for i = 1:length(map)
+        vec = LibHealpix.pix2vec_ring(512, i)
+        el = π/2 - angle_between(vec, zenith)
+        x  = dot(vec, east)
+        y  = dot(vec, north)
+        az = atan2(x, y)
+        if el < 0
+            map[i] = 0
+        else
+            J = meta.beam(frequency, az, el)
+            M = MuellerMatrix(J)
+            map[i] = M.mat[1,1]
+        end
+    end
+    map
+end
+
+"""
+    planewave(u, v, w, x, y, z, phase_center)
+
+Compute the fringe pattern over a Healpix image.
+
+```math
+exp(2 \pi i (ux+vy+wz)
+```
+"""
+function planewave(u, v, w, x, y, z, phase_center)
+    realmap = HealpixMap(Float64, nside(x))
+    imagmap = HealpixMap(Float64, nside(x))
+    for idx = 1:length(realmap)
+        δx = x[idx] - phase_center.x
+        δy = y[idx] - phase_center.y
+        δz = z[idx] - phase_center.z
+        ϕ = 2π*(u*δx + v*δy + w*δz)
+        realmap[idx] = cos(ϕ)
+        imagmap[idx] = sin(ϕ)
+    end
+    realmap, imagmap
+end
+
+"""
+    fringes(beam, variables, ν, α)
 
 Generate the spherical harmonic expansion of the fringe pattern on the sky.
+
 Note that because the Healpix library assumes you are asking for the coefficients
 of a real field, there must be one set of coefficients for the real part of
 the fringe pattern and one set of coefficients for the imaginary part of the
 fringe pattern.
 """
-function fringes(beam,u,v,w,phasecenter,lmax,mmax)
-    # Account for the extra phase due to the fact that the phase
-    # center is not perfectly orthogonal to the baseline.
-    extraphase = -2π*(u*phasecenter[1]+v*phasecenter[2]+w*phasecenter[3])
-    realfringe,imagfringe = planewave(u,v,w,extraphase,lmax=lmax,mmax=mmax)
-    # Use spherical harmonic transforms to incorporate the effects of the beam.
-    realfringe = map2alm(beam.*alm2map(realfringe,nside=512),lmax=lmax,mmax=mmax)
-    imagfringe = map2alm(beam.*alm2map(imagfringe,nside=512),lmax=lmax,mmax=mmax)
-    realfringe,imagfringe
+function fringes(beam, variables, ν, α)
+    λ = c / ν
+    u = variables.u[α] / λ
+    v = variables.v[α] / λ
+    w = variables.w[α] / λ
+    realmap, imagmap = planewave(u, v, w, variables.x, variables.y, variables.z, variables.phase_center)
+    realfringe = map2alm(beam .* realmap, variables.lmax, variables.mmax, iterations=2)
+    imagfringe = map2alm(beam .* imagmap, variables.lmax, variables.mmax, iterations=2)
+    realfringe, imagfringe
 end
 
 """
-    pack!(B, realfringe, imagfringe, α, Nbase, lmax, mmax)
+    pack!(blocks, realfringe, imagfringe, lmax, mmax, α)
 
 Having calculated the spherical harmonic expansion of the fringe pattern,
 pack those numbers into the transfer matrix.
 """
-function pack!(B,realfringe,imagfringe,α,Nbase,lmax,mmax)
+function pack!(blocks, realfringe, imagfringe, lmax, mmax, α)
     # Note that all the conjugations in this function come about because
     # Shaw et al. 2014, 2015 expand the fringe pattern in terms of the
     # spherical harmonic conjugates while we've expanded the fringe pattern
     # in terms of the spherical harmonics.
-    for l = 0:lmax
-        B[1][α,l+1] = conj(realfringe[l,0]) + 1im*conj(imagfringe[l,0])
-    end
-    for m = 1:mmax, l = m:lmax
-        α1 = α         # positive m
-        α2 = α + Nbase # negative m
-        B[m+1][α1,l-m+1] = conj(realfringe[l,m]) + 1im*conj(imagfringe[l,m])
-        B[m+1][α2,l-m+1] = conj(realfringe[l,m]) - 1im*conj(imagfringe[l,m])
-    end
-end
-
-function save(filename, B::TransferMatrix)
-    if !isfile(filename)
-        jldopen(filename,"w",compress=true) do file
-            file["description"] = "transfer matrix"
-        end
-    end
-
-    jldopen(filename,"r+",compress=true) do file
-        if read(file["description"]) != "transfer matrix"
-            error("Attempting to write to a file that does not contain a transfer matrix.")
-        end
-
-        if is_single_frequency(B)
-            ν = B.meta.ν[1]
-            name = @sprintf("%.3fMHz",ν/1e6)
-            name in names(file) || g_create(file,name)
-            group = file[name]
-            for m = 0:mmax(B)
-                block = B[m+1]
-                group[string(m)] = block.block
-            end
-        elseif is_single_m(B)
-            m = B.meta.m[1]
-            for β = 1:Nfreq(B)
-                ν = B.meta.ν[β]
-                name = @sprintf("%.3fMHz",ν/1e6)
-                name in names(file) || g_create(file,name)
-                group = file[name]
-                block = B[β]
-                group[string(m)] = block.block
-            end
-        end
+    #for l = 0:lmax
+    #    blocks[1][l+1,α] = conj(realfringe[l,0]) + 1im*conj(imagfringe[l,0])
+    #end
+    #for m = 1:mmax
+    #    block = blocks[m+1]
+    #    α1 = 2α-1 # positive m
+    #    for l = m:lmax
+    #        block[l-m+1,α1] = conj(realfringe[l,m]) + 1im*conj(imagfringe[l,m])
+    #    end
+    #    α2 = 2α-0 # negative m
+    #    for l = m:lmax
+    #        block[l-m+1,α2] = conj(realfringe[l,m]) - 1im*conj(imagfringe[l,m])
+    #    end
+    #end
+    offset = 2sizeof(Int) + (α-1)*(lmax+1)*sizeof(Complex128)
+    output = Complex128[conj(realfringe[l,0]) + 1im*conj(imagfringe[l,0]) for l = 0:lmax]
+    seek(blocks[1], offset)
+    write(blocks[1], output)
+    for m = 1:mmax
+        offset = 2sizeof(Int) + 2*(α-1)*(lmax-m+1)*sizeof(Complex128)
+        output1 = Complex128[conj(realfringe[l,m]) + 1im*conj(imagfringe[l,m]) for l = m:lmax] # positive m
+        output2 = Complex128[conj(realfringe[l,m]) - 1im*conj(imagfringe[l,m]) for l = m:lmax] # negative m
+        seek(blocks[m+1], offset)
+        write(blocks[m+1], output1, output2)
     end
 end
 
-function load(filename, meta::TransferMeta)
-    blocks = MatrixBlock[]
-    jldopen(filename,"r") do file
-        if read(file["description"]) != "transfer matrix"
-            error("Attempting to read from a file that does not contain a transfer matrix.")
-        end
-
-        if is_single_frequency(meta)
-            ν = meta.ν[1]
-            name = @sprintf("%.3fMHz",ν/1e6)
-            group = file[name]
-            for m = 0:mmax(meta)
-                block = group[string(m)] |> read
-                push!(blocks,MatrixBlock(block))
-            end
-        elseif is_single_m(meta)
-            m = meta.m[1]
-            for β = 1:Nfreq(meta)
-                ν = meta.ν[β]
-                name = @sprintf("%.3fMHz",ν/1e6)
-                group = file[name]
-                block = group[string(m)] |> read
-                push!(blocks,MatrixBlock(block))
-            end
-        end
+function setindex!(transfermatrix::TransferMatrix, block, m, channel)
+    ν = transfermatrix.frequencies[channel]
+    directory = directory_name(m, ν, transfermatrix.mmax+1)
+    filename = block_filename(m, ν)
+    open(joinpath(transfermatrix.path, directory, filename), "w") do file
+        write(file, size(block, 2), size(block, 1), block.')
     end
-    TransferMatrix(blocks,meta)
+    block
 end
 
+function getindex(transfermatrix::TransferMatrix, m, channel)
+    local block
+    ν = transfermatrix.frequencies[channel]
+    directory = directory_name(m, ν, transfermatrix.mmax+1)
+    filename = block_filename(m, ν)
+    open(joinpath(transfermatrix.path, directory, filename), "r") do file
+        sz = tuple(read(file, Int, 2)...)
+        block = read(file, Complex128, sz)
+    end
+    block.'
+end
+
+#=
 doc"""
     preserve_singular_values(B::TransferMatrix)
 
@@ -249,4 +344,5 @@ function preserve_singular_values(B::TransferMatrix)
     end
     Blocks(blocks)
 end
+=#
 

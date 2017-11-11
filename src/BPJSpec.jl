@@ -17,18 +17,12 @@ __precompile__()
 
 module BPJSpec
 
-export itrf_baselines, itrf_phasecenter, itrf_beam
-export create_empty_visibilities, grid_visibilities, load_visibilities
-
-export visibilities, mmodes, transfer, tikhonov
-export preserve_singular_values
-
-export NoiseModel, ForegroundModel, SignalModel
-export covariance_matrix, dimensionful_powerspectrum
+export GriddedVisibilities, grid!
+export MModes, TransferMatrix
+export tikhonov
 
 using CasaCore.Measures
 using CasaCore.Tables
-using HDF5, JLD
 using LibHealpix
 using ProgressMeter
 using TTCal
@@ -37,38 +31,19 @@ importall Base.Operators
 import Cosmology
 import GSL
 import LibHealpix: Alm, lmax, mmax
+import TTCal: Nfreq
 
-include("special.jl") # special functions
-include("physics.jl") # physical constants and cosmology
-include("blocks.jl")  # block vectors and matrices
-include("itrf.jl")
-
-# This function is useful to handle some of the
-# special casing required for m == 0
-two(m) = ifelse(m != 0, 2, 1)
-
+include("special.jl")     # special functions
+include("physics.jl")     # physical constants and cosmology
+include("parallel.jl")    # tools for parallel processing
+include("definitions.jl") # defines all the types
 include("visibilities.jl")
-include("transfermatrix.jl")
 include("mmodes.jl")
+include("transfermatrix.jl")
 include("alm.jl")
-include("noise.jl")
-include("sky.jl")
 
-function load(filename, args...)
-    local description
-    jldopen(filename,"r") do file
-        description = read(file["description"])
-    end
-    if description == "transfer matrix"
-        return load(filename, TransferMeta(args...))
-    elseif description == "m-modes"
-        return load(filename, MModesMeta(args...))
-    elseif description == "noise covariance matrix"
-        return load(filename, NoiseMeta(args...))
-    else
-        error("Unrecognized format.")
-    end
-end
+#include("noise.jl")
+include("sky.jl")
 
 end
 

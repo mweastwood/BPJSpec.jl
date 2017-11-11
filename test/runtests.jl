@@ -1,5 +1,10 @@
 using BPJSpec
-using Base.Test
+if VERSION >= v"0.5-"
+    using Base.Test
+else
+    using BaseTestNext
+    const Test = BaseTestNext
+end
 using CasaCore.Measures
 using CasaCore.Tables
 using LibHealpix
@@ -9,14 +14,15 @@ using JLD
 include("setup.jl")
 
 srand(123)
-include("special.jl")
-include("physics.jl")
-include("blocks.jl")
-include("itrf.jl")
-include("visibilities.jl")
-include("transfermatrix.jl")
-include("mmodes.jl")
-include("alm.jl")
-include("noise.jl")
-include("sky.jl")
+@testset "BPJSpec Tests" begin
+    include("special.jl")
+    include("physics.jl")
+    include("visibilities.jl")
+    include("mmodes.jl")
+    #include("transfermatrix.jl")
+    #include("alm.jl")
+
+    #include("noise.jl")
+    #include("sky.jl")
+end
 
