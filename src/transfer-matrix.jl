@@ -13,36 +13,77 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-abstract TransferMatrix
+abstract type TransferMatrix end
 
 struct FileBackedTransferMatrix <: TransferMatrix
     path :: String
-    metadata_sph :: SphericalHarmonicMetadata
-    metadata_int :: InterferometerMetadata
-    function FileBackedTransferMatrix(path,
-                                      metadata_sph::SphericalHarmonicMetadata,
-                                      metadata_int::InterferometerMetadata)
+    metadata :: Metadata
+    function FileBackedTransferMatrix(path, metadata)
         isdir(path) || mkdir(path)
-        save(joinpath(path, "METADATA.jld"),
-             "spherical-harmonics", metadata_sph,
-             "interferometer", metadata_int)
-        new(path, metadata_sph, metadata_int)
+        save(joinpath(path, "METADATA.jld2"), "metadata", metadata)
+        new(path, sphericalharmonics, interferometer)
     end
 end
 
 function FileBackedTransferMatrix(path)
-    metadata_sph, metadata_int = load(joinpath(path, "METADATA.jld"),
-                                      "spherical-harmonics", "interferometer")
-    FileBackedTransferMatrix(path, metadata_sph, metadata_int)
+    metadata = load(joinpath(path, "METADATA.jld2"), "metadata")
+    FileBackedTransferMatrix(path, metadata)
 end
 
 function compute!(transfermatrix::FileBackedTransferMatrix)
-    rhat = unit_vectors(nside)
+    workers = categorize_workers()
+    rhat = unit_vectors(size(transfermatrix.metadata.beam))
+    plan = plan_sht(transfermatrix.metadata, size(rhat))
+    for ν in transfermatrix.metadata.ν
+        compute!(transfermatrix, workers, rhat, ν)
+    end
 end
 
-function unit_vectors(nside)
-    [pix2vec_ring(nside, pix) for pix = 1:nside2npix(nside)]
+function compute!(transfermatrix::FileBackedTransferMatrix, workers, rhat, plan, ν)
+    metadata = transfermatrix.metadata
+
+    #for α = 1:length(interferometer.baselines)
+    for α = 1:10
+        @time real_coeff, imag_coeff = fringe_pattern(metadata.baselines[α],
+                                                metadata.phase_center,
+                                                metadata.beam,
+                                                rhat, plan, ν)
+
+    end
 end
+
+function fringe_pattern(baseline, phase_center, beam, rhat, plan, ν)
+    λ = ustrip(uconvert(u"m", UnitfulAstro.c / ν))
+    real_fringe, imag_fringe = plane_wave(rhat, baseline / λ, phase_center)
+    real_fringe .* beam, imag_fringe .* beam
+    real_coeff = plan * Map(real_fringe .* beam)
+    imag_coeff = plan * Map(imag_fringe .* beam)
+    real_coeff, imag_coeff
+end
+
+function plane_wave(rhat, baseline, phase_center)
+    real_part = similar(rhat, Float64)
+    imag_part = similar(rhat, Float64)
+    two_π = 2π
+    for idx in eachindex(rhat)
+        ϕ = uconvert(u"rad", two_π*dot(rhat[idx] - phase_center, baseline))
+        real_part[idx] = cos(ϕ)
+        imag_part[idx] = sin(ϕ)
+    end
+    Map(real_part), Map(imag_part)
+end
+
+function unit_vectors(map)
+    rhat = Matrix{Direction}(size(map))
+    for jdx = 1:size(map, 2), idx = 1:size(map, 1)
+        rhat[idx, jdx] = index2vector(map, idx, jdx)
+    end
+    rhat
+end
+
+
+
+
 
 #function baseline_vectors(metadata)
 #    uvw = zeros(3, Nbase(metadata))
@@ -62,19 +103,6 @@ end
 
 
 
-#function generate_transfermatrix!(transfermatrix, meta, variables)
-#    for ν in transfermatrix.frequencies
-#        beam = beam_map(meta, ν)
-#        generate_transfermatrix_onechannel!(transfermatrix, meta, beam, variables, ν)
-#    end
-#end
-#
-#function generate_transfermatrix!(transfermatrix, meta, beam, variables)
-#    for ν in transfermatrix.frequencies
-#        generate_transfermatrix_onechannel!(transfermatrix, meta, beam, variables, ν)
-#    end
-#end
-#
 #function generate_transfermatrix_onechannel!(transfermatrix, meta, beam, variables, ν)
 #    lmax = transfermatrix.lmax
 #    mmax = transfermatrix.mmax
@@ -153,29 +181,6 @@ end
 #        put!(output_realfringe, realfringe)
 #        put!(output_imagfringe, imagfringe)
 #    end
-#end
-#
-#"""
-#    planewave(u, v, w, x, y, z, phase_center)
-#
-#Compute the fringe pattern over a Healpix image.
-#
-#```math
-#exp(2 \pi i (ux+vy+wz)
-#```
-#"""
-#function planewave(u, v, w, x, y, z, phase_center)
-#    realmap = HealpixMap(Float64, nside(x))
-#    imagmap = HealpixMap(Float64, nside(x))
-#    for idx = 1:length(realmap)
-#        δx = x[idx] - phase_center.x
-#        δy = y[idx] - phase_center.y
-#        δz = z[idx] - phase_center.z
-#        ϕ = 2π*(u*δx + v*δy + w*δz)
-#        realmap[idx] = cos(ϕ)
-#        imagmap[idx] = sin(ϕ)
-#    end
-#    realmap, imagmap
 #end
 #
 #"""
@@ -259,7 +264,7 @@ end
 #    block.'
 #end
 #
-##=
+#
 #doc"""
 #    preserve_singular_values(B::TransferMatrix)
 #
@@ -278,5 +283,5 @@ end
 #    end
 #    Blocks(blocks)
 #end
-#=#
+#
 

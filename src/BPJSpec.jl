@@ -17,34 +17,19 @@
 
 module BPJSpec
 
-#include("spherical-harmonics.jl")
+export TransferMatrix
 
-#using JLD2
-#using Unitful, UnitfulAstro
-
+using CasaCore.Measures
+using FastTransforms
 using JLD2
+using ProgressMeter
 using StaticArrays
-using LibHealpix
+using Unitful, UnitfulAstro
 
-struct SphericalHarmonicMetadata
-    lmax :: Int
-    mmax :: Int
-    ν :: Vector{typeof(1.0*u"Hz")}
-    function SphericalHarmonicMetadata(lmax, mmax, ν)
-        mmax ≤ lmax || throw(ArgumentError("spherical harmonics require mmax ≤ lmax"))
-        new(lmax, mmax, ν)
-    end
-end
-
-struct InterferometerMetadata
-    u :: Vector{typeof{1.0*u"m"}}
-    v :: Vector{typeof{1.0*u"m"}}
-    w :: Vector{typeof{1.0*u"m"}}
-    beam :: RingHealpixMap{Float64}
-    phase_center :: SVector{3, Float64}
-end
-
-include("transfermatrix.jl")
+include("parallel.jl")
+include("spherical-harmonics.jl")
+include("metadata.jl")
+include("transfer-matrix.jl")
 
 #export GriddedVisibilities, grid!
 #export MModes, TransferMatrix
@@ -53,7 +38,6 @@ include("transfermatrix.jl")
 #using CasaCore.Measures
 #using CasaCore.Tables
 #using LibHealpix
-#using ProgressMeter
 #using TTCal
 #
 #importall Base.Operators

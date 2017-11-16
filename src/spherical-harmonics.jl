@@ -1,5 +1,17 @@
-using FastTransforms
-import LibHealpix
+# Copyright (c) 2015-2017 Michael Eastwood
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 struct SHT
     sph2fourier_plan
@@ -19,15 +31,8 @@ function plan_sht(lmax, mmax, size)
     SHT(sph2fourier_plan, synthesis_plan, analysis_plan, lmax, mmax, size)
 end
 
-function map2alm(map, lmax, mmax)
-    # analyze the map
-    analysis_plan = FastTransforms.plan_analysis(map.matrix)
-    fourier = A_mul_B!(zero(map.matrix), analysis_plan, map.matrix)
-
-    # convert to spherical harmonic coefficients
-    plan = plan_sph2fourier(fourier)
-    output = plan\fourier
-    Alm(lmax, mmax, output)
+function plan_sht(metadata, size)
+    plan_sht(sphericalharmonics.lmax, sphericalharmonics.mmax, size)
 end
 
 struct Alm
@@ -69,7 +74,8 @@ struct Map <: AbstractMatrix{Float64}
     matrix :: Matrix{Float64}
 end
 
-Base.getindex(map::Map, idx) = map.matrix[idx]
+Base.getindex(map::Map, idx...) = map.matrix[idx...]
+Base.setindex!(map::Map, value, idx...) = map.matrix[idx...] = value
 Base.size(map::Map) = size(map.matrix)
 
 function alm2map(sht, alm)
@@ -100,56 +106,14 @@ end
 Base.:*(sht::SHT, map::Map) = map2alm(sht, map)
 Base.:\(sht::SHT, alm::Alm) = alm2map(sht, alm)
 
-#using PyPlot
-
-function test(lmax, mmax)
-    alm1 = LibHealpix.Alm(Complex128, lmax, mmax)
-    for m = 0:mmax, l = m:lmax
-        LibHealpix.@lm alm1[l, m] = complex(randn(), randn())
-    end
-
-    alm2 = Alm(lmax, mmax)
-    for m = 0:mmax, l = m:lmax
-        alm2[l, m] = LibHealpix.@lm alm1[l, m]
-    end
-
-    @time sht = plan_sht(lmax, mmax, (2048, 4095))
-
-    @time healpix = LibHealpix.alm2map(alm1, 2048)
-    println("---")
-    @time map2 = sht\alm2
-    println("---")
-
-    @show vecnorm(map2-map1)/vecnorm(map1)
-
-    map1 = similar(map2)
-    n, m = size(map2)
-    θ = (0.5:n-0.5)*π/n
-    ϕ = (0:m-1)*2π/m
-    for jdx = 1:m, idx = 1:n
-        map1[idx, jdx] = LibHealpix.interpolate(healpix, θ[idx], π-ϕ[jdx])
-    end
-
-    @time alm1′ = LibHealpix.map2alm(healpix, lmax, mmax, iterations=2)
-    println("---")
-    @time alm2′ = sht*map2
-    println("---")
-    @show vecnorm(alm1-alm1′)/vecnorm(alm1)
-    @show vecnorm(alm2.matrix-alm2′.matrix)/vecnorm(alm2.matrix)
-
-
-    #figure(1); clf()
-    #subplot(3, 1, 1)
-    #imshow(map1)
-    #colorbar()
-    #subplot(3, 1, 2)
-    #imshow(map2)
-    #colorbar()
-    #subplot(3, 1, 3)
-    #imshow(log10.(abs.(map2.-map1)))
-    #colorbar()
-    #tight_layout()
-
-    nothing
+function index2vector(map::Map, idx, jdx)
+    n, m = size(map)
+    θ = π*(idx-0.5)/n
+    ϕ = π - 2π*(jdx-1)/m
+    s = sin(θ)
+    x = s*cos(ϕ)
+    y = s*sin(ϕ)
+    z = cos(θ)
+    Direction(dir"ITRF", x, y, z)
 end
 
