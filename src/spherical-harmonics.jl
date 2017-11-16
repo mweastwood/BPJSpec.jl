@@ -25,7 +25,7 @@ end
 function plan_sht(lmax, mmax, size)
     alm = zeros(lmax+1, 2mmax+1)
     map = zeros(size)
-    sph2fourier_plan = plan_sph2fourier(alm)
+    sph2fourier_plan = plan_sph2fourier(alm, sketch=:none)
     synthesis_plan = FastTransforms.plan_synthesis(map)
     analysis_plan = FastTransforms.plan_analysis(map)
     SHT(sph2fourier_plan, synthesis_plan, analysis_plan, lmax, mmax, size)
