@@ -30,6 +30,7 @@ include("parallel.jl")
 include("spherical-harmonics.jl")
 
 include("metadata.jl")
+include("hierarchy.jl")
 include("transfer-matrix.jl")
 
 #export GriddedVisibilities, grid!

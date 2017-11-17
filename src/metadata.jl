@@ -20,60 +20,6 @@ struct Metadata
     phase_center :: Direction        # ITRF
 end
 
-function baseline_hierarchy(metadata::Metadata)
-    νmax = maximum(metadata.frequencies)
-    λmin = u"c" / νmax
-    lmax_float = Float64.(2π .* norm.(metadata.baselines) ./ λmin)
-    # Add some extra slack because the sensitivity of a baseline of a given length extends a little
-    # bit past the edge of the estimate given on the previous line.
-    lmax = ceil.(Int, lmax_float .* 1.1)
-
-    # Compute the category boundaries
-    lmax_range = 0:maximum(lmax)+1
-    histogram = zeros(length(lmax_range))
-    for l in lmax
-        histogram[l+1] += 1
-    end
-    cumulative_histogram = cumsum(histogram)
-    divisions = find_crossover_points(cumulative_histogram, 4)
-
-    # Separate the baselines into the categories
-    categories = zeros(Int, length(metadata.baselines))
-    for idx = 1:length(divisions)-1
-        categories[divisions[idx] .≤ lmax .< divisions[idx+1]] = idx
-    end
-
-    lmax, divisions, categories, cumulative_histogram
-end
-
-function find_crossover_points(cumulative_histogram, depth)
-    lmin = 0
-    lmax = length(cumulative_histogram) - 1
-    divisions = [lmin, lmax]
-    find_crossover_points!(divisions, cumulative_histogram, lmin, lmax, depth)
-    sort!(divisions)
-end
-
-function find_crossover_points!(divisions, cumulative_histogram, lmin, lmax, depth)
-    if depth > 0
-        l = find_crossover_point(cumulative_histogram, lmin, lmax)
-        push!(divisions, l)
-        find_crossover_points!(divisions, cumulative_histogram, lmin, l+0, depth-1)
-        find_crossover_points!(divisions, cumulative_histogram, l+1, lmax, depth-1)
-    end
-end
-
-function find_crossover_point(cumulative_histogram, lmin, lmax)
-    for l = lmin:lmax
-        space_below = (cumulative_histogram[l+1]-cumulative_histogram[lmin+1]) * (l+1)^2
-        space_above = (cumulative_histogram[lmax+1]-cumulative_histogram[l+1]) * (lmax+1)^2
-        if space_below > space_above
-            return l
-        end
-    end
-    lmax
-end
-
 # compatibility with TTCal
 
 function from_ttcal(ttcal_metadata)

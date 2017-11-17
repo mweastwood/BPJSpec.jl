@@ -15,31 +15,33 @@
 
 abstract type TransferMatrix end
 
-struct FileBackedTransferMatrix <: TransferMatrix
+struct HierarchicalTransferMatrix <: TransferMatrix
     path :: String
     metadata :: Metadata
-    function FileBackedTransferMatrix(path, metadata)
+    beam :: Map
+    function HierarchicalTransferMatrix(path, metadata)
         isdir(path) || mkdir(path)
-        save(joinpath(path, "METADATA.jld2"), "metadata", metadata)
+        save(joinpath(path, "METADATA.jld2"), "metadata", metadata, "beam", beam)
         new(path, sphericalharmonics, interferometer)
     end
 end
 
-function FileBackedTransferMatrix(path)
-    metadata = load(joinpath(path, "METADATA.jld2"), "metadata")
-    FileBackedTransferMatrix(path, metadata)
+function HierarchicalTransferMatrix(path)
+    metadata, beam = load(joinpath(path, "METADATA.jld2"), "metadata", "beam")
+    HierarchicalTransferMatrix(path, metadata, beam)
 end
 
-function compute!(transfermatrix::FileBackedTransferMatrix)
+function compute!(transfermatrix::HierarchicalTransferMatrix)
     workers = categorize_workers()
-    rhat = unit_vectors(size(transfermatrix.metadata.beam))
-    plan = plan_sht(transfermatrix.metadata, size(rhat))
-    for ν in transfermatrix.metadata.ν
-        compute!(transfermatrix, workers, rhat, ν)
-    end
+    hierarchy = compute_baseline_hierarchy(transfermatrix.metadata)
+    #rhat = unit_vectors(size(transfermatrix.metadata.beam))
+    #plan = plan_sht(transfermatrix.metadata, size(rhat))
+    #for ν in transfermatrix.metadata.frequencies
+        #compute!(transfermatrix, workers, rhat, ν)
+    #end
 end
 
-function compute!(transfermatrix::FileBackedTransferMatrix, workers, rhat, plan, ν)
+function compute!(transfermatrix::HierarchicalTransferMatrix, workers, rhat, plan, ν)
     metadata = transfermatrix.metadata
 
     #for α = 1:length(interferometer.baselines)
@@ -52,6 +54,11 @@ function compute!(transfermatrix::FileBackedTransferMatrix, workers, rhat, plan,
     end
 end
 
+function compute_one_baseline_one_frequency(baseline, phase_center, beam, plan, ν)
+    real_coeff, imag_coeff
+end
+
+"Compute the spherical harmonic transform of the fringe pattern for the given baseline."
 function fringe_pattern(baseline, phase_center, beam, rhat, plan, ν)
     λ = ustrip(uconvert(u"m", UnitfulAstro.c / ν))
     real_fringe, imag_fringe = plane_wave(rhat, baseline / λ, phase_center)
@@ -72,6 +79,7 @@ function plane_wave(rhat, baseline, phase_center)
     Map(real_part), Map(imag_part)
 end
 
+"Compute the unit vector to each point on the sky."
 function unit_vectors(map)
     rhat = Matrix{Direction}(size(map))
     for jdx = 1:size(map, 2), idx = 1:size(map, 1)
@@ -80,6 +88,7 @@ function unit_vectors(map)
     rhat
 end
 
+"Creat an image of the beam model."
 function create_beam_map(f, metadata, size)
     zenith = Direction(metadata.position)
     north  = gram_schmidt(Direction(dir"ITRF", 0, 0, 1), zenith)
