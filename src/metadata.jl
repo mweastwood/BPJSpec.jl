@@ -14,28 +14,87 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 struct Metadata
-    lmax :: Int
-    mmax :: Int
-    ν :: Vector{typeof(1.0*u"Hz")}
-    baselines :: Vector{Baseline}
-    beam :: Map
-    phase_center :: Direction
+    frequencies  :: Vector{typeof(1.0*u"Hz")}
+    position     :: Position         # ITRF
+    baselines    :: Vector{Baseline} # ITRF
+    phase_center :: Direction        # ITRF
+end
+
+function baseline_hierarchy(metadata::Metadata)
+    νmax = maximum(metadata.frequencies)
+    λmin = u"c" / νmax
+    lmax_float = Float64.(2π .* norm.(metadata.baselines) ./ λmin)
+    # Add some extra slack because the sensitivity of a baseline of a given length extends a little
+    # bit past the edge of the estimate given on the previous line.
+    lmax = ceil.(Int, lmax_float .* 1.1)
+
+    # Compute the category boundaries
+    lmax_range = 0:maximum(lmax)+1
+    histogram = zeros(length(lmax_range))
+    for l in lmax
+        histogram[l+1] += 1
+    end
+    cumulative_histogram = cumsum(histogram)
+    divisions = find_crossover_points(cumulative_histogram, 4)
+
+    # Separate the baselines into the categories
+    categories = zeros(Int, length(metadata.baselines))
+    for idx = 1:length(divisions)-1
+        categories[divisions[idx] .≤ lmax .< divisions[idx+1]] = idx
+    end
+
+    lmax, divisions, categories, cumulative_histogram
+end
+
+function find_crossover_points(cumulative_histogram, depth)
+    lmin = 0
+    lmax = length(cumulative_histogram) - 1
+    divisions = [lmin, lmax]
+    find_crossover_points!(divisions, cumulative_histogram, lmin, lmax, depth)
+    sort!(divisions)
+end
+
+function find_crossover_points!(divisions, cumulative_histogram, lmin, lmax, depth)
+    if depth > 0
+        l = find_crossover_point(cumulative_histogram, lmin, lmax)
+        push!(divisions, l)
+        find_crossover_points!(divisions, cumulative_histogram, lmin, l+0, depth-1)
+        find_crossover_points!(divisions, cumulative_histogram, l+1, lmax, depth-1)
+    end
+end
+
+function find_crossover_point(cumulative_histogram, lmin, lmax)
+    for l = lmin:lmax
+        space_below = (cumulative_histogram[l+1]-cumulative_histogram[lmin+1]) * (l+1)^2
+        space_above = (cumulative_histogram[lmax+1]-cumulative_histogram[l+1]) * (lmax+1)^2
+        if space_below > space_above
+            return l
+        end
+    end
+    lmax
 end
 
 # compatibility with TTCal
 
-function from_ttcal(frame, ttcal_metadata, lmax, mmax, ν, beam)
-    baselines = ttcal_baselines(frame, ttcal_metadata)
-    phase_center = ttcal_phase_center(frame, ttcal_metadata)
-    Metadata(lmax, mmax, ν, baselines, beam, phase_center)
+function from_ttcal(ttcal_metadata)
+    frequencies  = ttcal_metadata.channels * u"Hz"
+    position     = ttcal_position(ttcal_metadata)
+    baselines    = ttcal_baselines(ttcal_metadata)
+    phase_center = ttcal_metadata.phase_center
+    Metadata(frequencies, position, baselines, phase_center)
 end
 
-function ttcal_baselines(frame, ttcal_metadata)
-    antennas = [measure(frame, antenna.position, pos"ITRF") for antenna in ttcal_metadata.antennas]
+function ttcal_position(ttcal_metadata)
+    antenna_positions = getfield.(ttcal_metadata.antennas, :position)
+    mean(antenna_positions)
+end
+
+function ttcal_baselines(ttcal_metadata)
+    antenna_positions = getfield.(ttcal_metadata.antennas, :position)
     baselines = Baseline[]
     for α = 1:length(ttcal_metadata.baselines)
-        antenna1 = antennas[ttcal_metadata.baselines[α].antenna1]
-        antenna2 = antennas[ttcal_metadata.baselines[α].antenna2]
+        antenna1 = antenna_positions[ttcal_metadata.baselines[α].antenna1]
+        antenna2 = antenna_positions[ttcal_metadata.baselines[α].antenna2]
         baseline = Baseline(baseline"ITRF",
                             antenna1.x - antenna2.x,
                             antenna1.y - antenna2.y,
@@ -43,9 +102,5 @@ function ttcal_baselines(frame, ttcal_metadata)
         push!(baselines, baseline)
     end
     baselines
-end
-
-function ttcal_phase_center(frame, ttcal_metadata)
-    measure(frame, ttcal_metadata.phase_center, dir"ITRF")
 end
 

@@ -55,7 +55,6 @@ end
 function fringe_pattern(baseline, phase_center, beam, rhat, plan, ν)
     λ = ustrip(uconvert(u"m", UnitfulAstro.c / ν))
     real_fringe, imag_fringe = plane_wave(rhat, baseline / λ, phase_center)
-    real_fringe .* beam, imag_fringe .* beam
     real_coeff = plan * Map(real_fringe .* beam)
     imag_coeff = plan * Map(imag_fringe .* beam)
     real_coeff, imag_coeff
@@ -80,6 +79,41 @@ function unit_vectors(map)
     end
     rhat
 end
+
+function create_beam_map(f, metadata, size)
+    zenith = Direction(metadata.position)
+    north  = gram_schmidt(Direction(dir"ITRF", 0, 0, 1), zenith)
+    east   = cross(north, zenith)
+
+    map = BPJSpec.Map(zeros(size))
+    for jdx = 1:size[2], idx = 1:size[1]
+        vec = index2vector(map, idx, jdx)
+        x = dot(vec, east)
+        y = dot(vec, north)
+        z = dot(vec, zenith)
+        elevation = asin(clamp(z, -1, 1))
+        azimuth   = atan2(x, y)
+        threshold = deg2rad(20) # soften the beam edge below this elevation
+        map[idx, jdx] = f(azimuth, elevation)
+    end
+    map
+end
+
+#        if elevation < 0
+#            map[idx, jdx] = 0
+#        else
+#            map[idx, jdx] = f(azimuth, elevation)
+#            #if elevation < threshold
+#            #    # Shaping function from http://www.flong.com/texts/code/shapers_poly/
+#            #    shape = 4/9*(el/threshold)^6 - 17/9*(el/threshold)^4 + 22/9*(el/threshold)^2
+#            #    map[idx, jdx] = beam*shape
+#            #else
+#                map[idx, jdx] = beam
+#            #end
+#        end
+#    end
+#    map
+#end
 
 
 
