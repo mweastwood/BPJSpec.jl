@@ -15,8 +15,8 @@
 
 struct SHT
     sph2fourier_plan
-    synthesis_plan
-    analysis_plan
+    #synthesis_plan
+    #analysis_plan
     lmax :: Int
     mmax :: Int
     size :: Tuple{Int, Int}
@@ -26,9 +26,9 @@ function plan_sht(lmax, mmax, size)
     alm = zeros(lmax+1, 2mmax+1)
     map = zeros(size)
     sph2fourier_plan = plan_sph2fourier(alm, sketch=:none)
-    synthesis_plan = FastTransforms.plan_synthesis(map)
-    analysis_plan = FastTransforms.plan_analysis(map)
-    SHT(sph2fourier_plan, synthesis_plan, analysis_plan, lmax, mmax, size)
+    #synthesis_plan = FastTransforms.plan_synthesis(map)
+    #analysis_plan = FastTransforms.plan_analysis(map)
+    SHT(sph2fourier_plan, lmax, mmax, size)
 end
 
 function plan_sht(metadata, size)
@@ -80,26 +80,30 @@ Base.size(map::Map) = size(map.matrix)
 
 function alm2map(sht, alm)
     # convert to bivariate Fourier series
-    @time fourier = sht.sph2fourier_plan*alm.matrix
+    fourier = sht.sph2fourier_plan*alm.matrix
 
     # pad the Fourier series to the desired map size
-    padded_fourier = zeros(eltype(fourier), sht.size)
-    padded_fourier[1:sht.lmax+1, 1:2sht.mmax+1] = fourier
+    #padded_fourier = zeros(eltype(fourier), sht.size)
+    #padded_fourier[1:sht.lmax+1, 1:2sht.mmax+1] = fourier
+    padded_fourier = fourier
 
     # synthesize the map
-    @time output = A_mul_B!(zero(padded_fourier), sht.synthesis_plan, padded_fourier)
+    synthesis_plan = FastTransforms.plan_synthesis(padded_fourier)
+    output = A_mul_B!(zero(padded_fourier), synthesis_plan, padded_fourier)
     Map(output)
 end
 
 function map2alm(sht, map)
     # analyze the map
-    @time fourier = A_mul_B!(zero(map.matrix), sht.analysis_plan, map.matrix)
+    analysis_plan = FastTransforms.plan_analysis(map.matrix)
+    fourier = A_mul_B!(zero(map.matrix), analysis_plan, map.matrix)
 
     # cut the Fourier series down to the right size (for the desired lmax, mmax)
-    cut_fourier = fourier[1:sht.lmax+1, 1:2sht.mmax+1]
+    #cut_fourier = fourier[1:sht.lmax+1, 1:2sht.mmax+1]
+    cut_fourier = fourier
 
     # convert to spherical harmonic coefficients
-    @time output = sht.sph2fourier_plan\cut_fourier
+    output = sht.sph2fourier_plan\cut_fourier
     Alm(sht.lmax, sht.mmax, output)
 end
 

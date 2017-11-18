@@ -13,6 +13,10 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+struct Workers
+    dict :: Dict{String, Vector{Int}}
+end
+
 function categorize_workers()
     futures = [remotecall(() -> chomp(readstring(`hostname`)), worker) for worker in workers()]
     hierarchy = Dict{String, Vector{Int}}()
@@ -24,7 +28,18 @@ function categorize_workers()
             hierarchy[hostname] = [worker]
         end
     end
-    hierarchy
+    Workers(hierarchy)
+end
+
+function Base.show(io::IO, workers::Workers)
+    hosts = collect(keys(workers.dict))
+    sort!(hosts)
+    println("| Workers")
+    println("|---------")
+    for host in hosts
+        ids = workers.dict[host]
+        @printf(io, "| %7s : %s\n", host, join(string.(ids), ", "))
+    end
 end
 
 #"""

@@ -18,11 +18,11 @@ abstract type TransferMatrix end
 struct HierarchicalTransferMatrix <: TransferMatrix
     path :: String
     metadata :: Metadata
-    beam :: Map
-    function HierarchicalTransferMatrix(path, metadata)
+    beam :: Function
+    function HierarchicalTransferMatrix(path, metadata, beam)
         isdir(path) || mkdir(path)
         save(joinpath(path, "METADATA.jld2"), "metadata", metadata, "beam", beam)
-        new(path, sphericalharmonics, interferometer)
+        new(path, metadata, beam)
     end
 end
 
@@ -32,47 +32,129 @@ function HierarchicalTransferMatrix(path)
 end
 
 function compute!(transfermatrix::HierarchicalTransferMatrix)
+    println("")
+    println("| Starting transfer matrix calculation *")
+    println("|---------")
+    println("| ($(now()))")
+    println("")
+
     workers = categorize_workers()
+    println(workers)
+
     hierarchy = compute_baseline_hierarchy(transfermatrix.metadata)
-    #rhat = unit_vectors(size(transfermatrix.metadata.beam))
-    #plan = plan_sht(transfermatrix.metadata, size(rhat))
+    println(hierarchy)
+    save(joinpath(transfermatrix.path, "HIERARCHY.jld2"), "hierarchy", hierarchy)
+
     #for ν in transfermatrix.metadata.frequencies
-        #compute!(transfermatrix, workers, rhat, ν)
+        ν = transfermatrix.metadata.frequencies[55]
+        compute_one_frequency!(transfermatrix, workers, hierarchy, ν)
     #end
 end
 
-function compute!(transfermatrix::HierarchicalTransferMatrix, workers, rhat, plan, ν)
+function compute_one_frequency!(transfermatrix::HierarchicalTransferMatrix,
+                                workers, hierarchy, ν)
     metadata = transfermatrix.metadata
 
-    #for α = 1:length(interferometer.baselines)
-    for α = 1:10
-        @time real_coeff, imag_coeff = fringe_pattern(metadata.baselines[α],
-                                                metadata.phase_center,
-                                                metadata.beam,
-                                                rhat, plan, ν)
-
+    for idx = 1:length(hierarchy.divisions)-1
+        lmax = hierarchy.divisions[idx+1]
+        baselines = transfermatrix.metadata.baselines[hierarchy.baselines[idx]]
+        compute_baseline_group_one_frequency!(transfermatrix, workers.dict["astm11"],
+                                              baselines, lmax, ν)
     end
 end
 
-function compute_one_baseline_one_frequency(baseline, phase_center, beam, plan, ν)
-    real_coeff, imag_coeff
+function compute_baseline_group_one_frequency!(transfermatrix::HierarchicalTransferMatrix,
+                                               workers, baselines, lmax, ν)
+    if length(workers) > 1
+        # make sure this process isn't in the worker pool
+        deleteat!(workers, workers .== myid())
+    end
+    pool = CachingPool(workers)
+
+    # "... but in this world nothing can be said to be certain, except death
+    #  and taxes and lmax=mmax"
+    #   - Benjamin Franklin, 1789
+    mmax = lmax
+    phase_center = transfermatrix.metadata.phase_center
+    beam = create_beam_map(transfermatrix.beam, transfermatrix.metadata, (lmax+1, 2mmax+1))
+    rhat = unit_vectors(beam)
+    plan = plan_sht(lmax, mmax, size(rhat))
+
+    queue  = collect(1:length(baselines))
+    blocks = [zeros(Complex128, two(m)*length(baselines), lmax-m+1) for m = 0:mmax]
+
+    function just_do_it(α)
+        real_coeff, imag_coeff = fringe_pattern(baselines[α], phase_center, beam, rhat, plan, ν)
+    end
+
+    lck = ReentrantLock()
+    prg = Progress(length(queue))
+    increment() = (lock(lck); next!(prg); unlock(lck))
+
+    @sync for worker in workers
+        @async while length(queue) > 0
+            α = pop!(queue)
+            real_coeff, imag_coeff = remotecall_fetch(just_do_it, pool, α)
+            write_to_blocks!(blocks, real_coeff, imag_coeff, lmax, mmax, α)
+            increment()
+        end
+    end
+
+    path = joinpath(transfermatrix.path, @sprintf("%.3fMHz", ustrip(uconvert(u"MHz", ν))))
+    isdir(path) || mkdir(path)
+    path = joinpath(path, @sprintf("lmax=%04d", lmax))
+    isdir(path) || mkdir(path)
+
+    prg = Progress(mmax+1)
+    for m = 0:mmax
+        save(joinpath(path, @sprintf("m=%04d.jld2", m)), "block", blocks[m+1], compress=true)
+        next!(prg)
+    end
+
+    blocks
 end
+
+function write_to_blocks!(blocks, real_coeff, imag_coeff, lmax, mmax, α)
+    # m = 0
+    block = blocks[1]
+    for l = 0:lmax
+        block[α, l+1] = conj(real_coeff[l, 0]) + 1im*conj(imag_coeff[l, 0])
+    end
+    # m > 0
+    for m = 1:mmax
+        block = blocks[m+1]
+        α1 = 2α-1 # positive m
+        α2 = 2α-0 # negative m
+        for l = m:lmax
+            block[α1, l-m+1] = conj(real_coeff[l, m]) + 1im*conj(imag_coeff[l, m])
+            block[α2, l-m+1] = conj(real_coeff[l, m]) - 1im*conj(imag_coeff[l, m])
+        end
+    end
+end
+
+
+
+
+
+
+
+
 
 "Compute the spherical harmonic transform of the fringe pattern for the given baseline."
 function fringe_pattern(baseline, phase_center, beam, rhat, plan, ν)
-    λ = ustrip(uconvert(u"m", UnitfulAstro.c / ν))
-    real_fringe, imag_fringe = plane_wave(rhat, baseline / λ, phase_center)
+    λ = u"c" / ν
+    real_fringe, imag_fringe = plane_wave(rhat, baseline, phase_center, λ)
     real_coeff = plan * Map(real_fringe .* beam)
     imag_coeff = plan * Map(imag_fringe .* beam)
     real_coeff, imag_coeff
 end
 
-function plane_wave(rhat, baseline, phase_center)
+function plane_wave(rhat, baseline, phase_center, λ)
     real_part = similar(rhat, Float64)
     imag_part = similar(rhat, Float64)
     two_π = 2π
     for idx in eachindex(rhat)
-        ϕ = uconvert(u"rad", two_π*dot(rhat[idx] - phase_center, baseline))
+        ϕ = uconvert(u"rad", two_π*dot(rhat[idx] - phase_center, baseline)/λ)
         real_part[idx] = cos(ϕ)
         imag_part[idx] = sin(ϕ)
     end
@@ -102,45 +184,10 @@ function create_beam_map(f, metadata, size)
         z = dot(vec, zenith)
         elevation = asin(clamp(z, -1, 1))
         azimuth   = atan2(x, y)
-        threshold = deg2rad(20) # soften the beam edge below this elevation
         map[idx, jdx] = f(azimuth, elevation)
     end
     map
 end
-
-#        if elevation < 0
-#            map[idx, jdx] = 0
-#        else
-#            map[idx, jdx] = f(azimuth, elevation)
-#            #if elevation < threshold
-#            #    # Shaping function from http://www.flong.com/texts/code/shapers_poly/
-#            #    shape = 4/9*(el/threshold)^6 - 17/9*(el/threshold)^4 + 22/9*(el/threshold)^2
-#            #    map[idx, jdx] = beam*shape
-#            #else
-#                map[idx, jdx] = beam
-#            #end
-#        end
-#    end
-#    map
-#end
-
-
-
-
-
-#function baseline_vectors(metadata)
-#    uvw = zeros(3, Nbase(metadata))
-#    for α = 1:Nbase(metadata)
-#        antenna1 = metadata.antennas[metadata.baselines[α].antenna1]
-#        antenna2 = metadata.antennas[metadata.baselines[α].antenna2]
-#        uvw[1, α] = antenna1.position.x - antenna2.position.x
-#        vvw[2, α] = antenna1.position.y - antenna2.position.y
-#        wvw[3, α] = antenna1.position.z - antenna2.position.z
-#    end
-#    frame = TTCal.reference_frame(metadata)
-#    phase_center = measure(frame, metadata.phase_center, dir"ITRF")
-#    uvw, phase_center
-#end
 
 
 
