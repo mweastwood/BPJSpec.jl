@@ -33,7 +33,7 @@ end
 
 function compute!(transfermatrix::HierarchicalTransferMatrix)
     println("")
-    println("| Starting transfer matrix calculation *")
+    println("| Starting transfer matrix calculation")
     println("|---------")
     println("| ($(now()))")
     println("")
@@ -45,10 +45,10 @@ function compute!(transfermatrix::HierarchicalTransferMatrix)
     println(hierarchy)
     save(joinpath(transfermatrix.path, "HIERARCHY.jld2"), "hierarchy", hierarchy)
 
-    #for ν in transfermatrix.metadata.frequencies
-        ν = transfermatrix.metadata.frequencies[55]
-        compute_one_frequency!(transfermatrix, workers, hierarchy, ν)
-    #end
+    for ν in transfermatrix.metadata.frequencies
+        @show ν
+        @time compute_one_frequency!(transfermatrix, workers, hierarchy, ν)
+    end
 end
 
 function compute_one_frequency!(transfermatrix::HierarchicalTransferMatrix,
@@ -56,10 +56,15 @@ function compute_one_frequency!(transfermatrix::HierarchicalTransferMatrix,
     metadata = transfermatrix.metadata
 
     for idx = 1:length(hierarchy.divisions)-1
-        lmax = hierarchy.divisions[idx+1]
-        baselines = transfermatrix.metadata.baselines[hierarchy.baselines[idx]]
-        compute_baseline_group_one_frequency!(transfermatrix, workers.dict["astm11"],
-                                              baselines, lmax, ν)
+        @time begin
+            lmax = hierarchy.divisions[idx+1]
+            baselines = transfermatrix.metadata.baselines[hierarchy.baselines[idx]]
+            blocks = compute_baseline_group_one_frequency!(transfermatrix, workers.dict["astm11"],
+                                                  baselines, lmax, ν)
+            resize!(blocks, 0)
+            finalize(blocks)
+            gc(); gc() # please please please garbage collect `blocks`
+        end
     end
 end
 
@@ -102,13 +107,13 @@ function compute_baseline_group_one_frequency!(transfermatrix::HierarchicalTrans
 
     path = joinpath(transfermatrix.path, @sprintf("%.3fMHz", ustrip(uconvert(u"MHz", ν))))
     isdir(path) || mkdir(path)
-    path = joinpath(path, @sprintf("lmax=%04d", lmax))
-    isdir(path) || mkdir(path)
 
     prg = Progress(mmax+1)
-    for m = 0:mmax
-        save(joinpath(path, @sprintf("m=%04d.jld2", m)), "block", blocks[m+1], compress=true)
-        next!(prg)
+    jldopen(joinpath(path, @sprintf("lmax=%04d.jld2", lmax)), "w") do file
+        for m = 0:mmax
+            file[@sprintf("%04d", m)] = blocks[m+1]
+            next!(prg)
+        end
     end
 
     blocks
@@ -153,8 +158,9 @@ function plane_wave(rhat, baseline, phase_center, λ)
     real_part = similar(rhat, Float64)
     imag_part = similar(rhat, Float64)
     two_π = 2π
+    δϕ = two_π*dot(phase_center, baseline)/λ
     for idx in eachindex(rhat)
-        ϕ = uconvert(u"rad", two_π*dot(rhat[idx] - phase_center, baseline)/λ)
+        ϕ = uconvert(u"rad", two_π*dot(rhat[idx], baseline)/λ - δϕ)
         real_part[idx] = cos(ϕ)
         imag_part[idx] = sin(ϕ)
     end
