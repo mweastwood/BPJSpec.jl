@@ -137,14 +137,6 @@ function write_to_blocks!(blocks, real_coeff, imag_coeff, lmax, mmax, α)
     end
 end
 
-
-
-
-
-
-
-
-
 "Compute the spherical harmonic transform of the fringe pattern for the given baseline."
 function fringe_pattern(baseline, phase_center, beam, rhat, plan, ν)
     λ = u"c" / ν
@@ -195,149 +187,40 @@ function create_beam_map(f, metadata, size)
     map
 end
 
+function getindex(transfermatrix::HierarchicalTransferMatrix, m, ν)
+    if !(uconvert(u"Hz", ν) in transfermatrix.metadata.frequencies)
+        error("unkown frequency")
+    end
 
+    # load each hierarchical component of the transfer matrix
+    hierarchy = load(joinpath(transfermatrix.path, "HIERARCY.jld2"), "hierarchy")
+    path = joinpath(transfermatrix.path, @sprintf("%.3fMHz", ustrip(uconvert(u"MHz", ν))))
+    blocks = Matrix{Complex128}[]
+    for idx = 1:length(hierarchy.divisions)-1
+        lmax = hierarchy.divisions[idx+1]
+        filename   = @sprintf("lmax=%04d.jld2", lmax)
+        objectname = @sprintf("%04d", m)
+        push!(blocks, load(joinpath(path, filename), objectname))
+    end
 
+    # stitch the components together into a single matrix
+    Nbase = length(transfermatrix.metadata.baselines)
+    lmax  = hierarchy.divisions[end]
+    output = zeros(Complex128, two(m)*Nbase, lmax-m+1)
+    offset = 1
+    for idx = 1:length(hierarchy.divisions)-1
+        my_Nbase = length(hierarchy.baselines[idx])
+        my_lmax  = hierarchy.divisions[idx+1]
+        block = blocks[idx]
+        range1 = offset:offset+two(m)*my_Nbase
+        range2 = 1:my_lmax-m+1
+        output_view = @view output[range1, range2]
+        copy!(output_view, block)
+        offset += two(m)*my_Nbase
+    end
+    output
+end
 
-
-#function generate_transfermatrix_onechannel!(transfermatrix, meta, beam, variables, ν)
-#    lmax = transfermatrix.lmax
-#    mmax = transfermatrix.mmax
-#    # Memory map all the blocks on the master process to avoid having to
-#    # open/close the files multiple times and to avoid having to read the
-#    # entire matrix at once.
-#    info("Running new version!")
-#    info("Memory mapping files")
-#    blocks = IOStream[]
-#    #blocks = Matrix{Complex128}[]
-#    for m = 0:mmax
-#        directory = directory_name(m, ν, mmax+1)
-#        directory = joinpath(transfermatrix.path, directory)
-#        isdir(directory) || mkdir(directory)
-#        filename = block_filename(m, ν)
-#        block = open(joinpath(directory, filename), "w")
-#        # Write the size of the matrix block to the start of
-#        # the file because in general we don't know how many
-#        # rows will be in each block of the matrix.
-#        #
-#        # Also note that we are storing the transpose of each
-#        # block in order to make all the disk writes sequential.
-#        sz = (lmax-m+1, two(m)*Nbase(meta))
-#        write(block, sz[1], sz[2])
-#        push!(blocks, block)
-#        #open(joinpath(directory, filename), "w+") do file
-#        #    # note that we store the transpose of the transfer matrix blocks to make
-#        #    # all the disk writes sequential
-#        #    sz = (lmax-m+1, two(m)*Nbase(meta))
-#        #    write(file, sz[1], sz[2])
-#        #    block = Mmap.mmap(file, Matrix{Complex128}, sz)
-#        #    push!(blocks, block)
-#        #end
-#        #open(joinpath(directory, filename), "r+") do file
-#        #    sz1 = read(file, Int)
-#        #    sz2 = read(file, Int)
-#        #    sz = (sz1, sz2)
-#        #    block = Mmap.mmap(file, Matrix{Complex128}, sz)
-#        #    push!(blocks, block)
-#        #end
-#    end
-#    info("Beginning the computation")
-#    idx = 1
-#    #idx = 1500
-#    nextidx() = (myidx = idx; idx += 1; myidx)
-#    p = Progress(Nbase(meta) - idx + 1, "Progress: ")
-#    l = ReentrantLock()
-#    increment_progress() = (lock(l); next!(p); unlock(l))
-#    @sync for worker in workers()
-#        @async begin
-#            input = RemoteChannel()
-#            output_realfringe = RemoteChannel()
-#            output_imagfringe = RemoteChannel()
-#            remotecall(transfermatrix_worker_loop, worker,
-#                       input, output_realfringe, output_imagfringe, beam, variables, ν)
-#            while true
-#                α = nextidx()
-#                α ≤ Nbase(meta) || break
-#                put!(input, α)
-#                realfringe = take!(output_realfringe)
-#                imagfringe = take!(output_imagfringe)
-#                pack!(blocks, realfringe, imagfringe, lmax, mmax, α)
-#                increment_progress()
-#            end
-#        end
-#    end
-#    for block in blocks
-#        close(block)
-#    end
-#end
-#
-#function transfermatrix_worker_loop(input, output_realfringe, output_imagfringe, beam, variables, ν)
-#    while true
-#        α = take!(input)
-#        realfringe, imagfringe = fringes(beam, variables, ν, α)
-#        put!(output_realfringe, realfringe)
-#        put!(output_imagfringe, imagfringe)
-#    end
-#end
-#
-#"""
-#    fringes(beam, variables, ν, α)
-#
-#Generate the spherical harmonic expansion of the fringe pattern on the sky.
-#
-#Note that because the Healpix library assumes you are asking for the coefficients
-#of a real field, there must be one set of coefficients for the real part of
-#the fringe pattern and one set of coefficients for the imaginary part of the
-#fringe pattern.
-#"""
-#function fringes(beam, variables, ν, α)
-#    λ = c / ν
-#    u = variables.u[α] / λ
-#    v = variables.v[α] / λ
-#    w = variables.w[α] / λ
-#    realmap, imagmap = planewave(u, v, w, variables.x, variables.y, variables.z, variables.phase_center)
-#    realfringe = map2alm(beam .* realmap, variables.lmax, variables.mmax, iterations=2)
-#    imagfringe = map2alm(beam .* imagmap, variables.lmax, variables.mmax, iterations=2)
-#    realfringe, imagfringe
-#end
-#
-#"""
-#    pack!(blocks, realfringe, imagfringe, lmax, mmax, α)
-#
-#Having calculated the spherical harmonic expansion of the fringe pattern,
-#pack those numbers into the transfer matrix.
-#"""
-#function pack!(blocks, realfringe, imagfringe, lmax, mmax, α)
-#    # Note that all the conjugations in this function come about because
-#    # Shaw et al. 2014, 2015 expand the fringe pattern in terms of the
-#    # spherical harmonic conjugates while we've expanded the fringe pattern
-#    # in terms of the spherical harmonics.
-#    #for l = 0:lmax
-#    #    blocks[1][l+1,α] = conj(realfringe[l,0]) + 1im*conj(imagfringe[l,0])
-#    #end
-#    #for m = 1:mmax
-#    #    block = blocks[m+1]
-#    #    α1 = 2α-1 # positive m
-#    #    for l = m:lmax
-#    #        block[l-m+1,α1] = conj(realfringe[l,m]) + 1im*conj(imagfringe[l,m])
-#    #    end
-#    #    α2 = 2α-0 # negative m
-#    #    for l = m:lmax
-#    #        block[l-m+1,α2] = conj(realfringe[l,m]) - 1im*conj(imagfringe[l,m])
-#    #    end
-#    #end
-#    offset = 2sizeof(Int) + (α-1)*(lmax+1)*sizeof(Complex128)
-#    output = Complex128[conj(realfringe[l,0]) + 1im*conj(imagfringe[l,0]) for l = 0:lmax]
-#    seek(blocks[1], offset)
-#    write(blocks[1], output)
-#    for m = 1:mmax
-#        offset = 2sizeof(Int) + 2*(α-1)*(lmax-m+1)*sizeof(Complex128)
-#        output1 = Complex128[conj(realfringe[l,m]) + 1im*conj(imagfringe[l,m]) for l = m:lmax] # positive m
-#        output2 = Complex128[conj(realfringe[l,m]) - 1im*conj(imagfringe[l,m]) for l = m:lmax] # negative m
-#        seek(blocks[m+1], offset)
-#        write(blocks[m+1], output1, output2)
-#    end
-#end
-#
 #function setindex!(transfermatrix::TransferMatrix, block, m, channel)
 #    ν = transfermatrix.frequencies[channel]
 #    directory = directory_name(m, ν, transfermatrix.mmax+1)

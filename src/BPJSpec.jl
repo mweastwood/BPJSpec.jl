@@ -33,7 +33,9 @@ include("spherical-harmonics.jl")
 
 include("metadata.jl")
 include("hierarchy.jl")
+include("m-modes.jl")
 include("transfer-matrix.jl")
+include("imaging.jl")
 
 #export GriddedVisibilities, grid!
 #export MModes, TransferMatrix
