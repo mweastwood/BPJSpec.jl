@@ -18,6 +18,7 @@
 module BPJSpec
 
 export TransferMatrix
+export MModes
 
 using CasaCore.Measures
 using FastTransforms

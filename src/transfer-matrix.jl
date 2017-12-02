@@ -16,11 +16,11 @@
 abstract type TransferMatrix end
 
 struct HierarchicalTransferMatrix <: TransferMatrix
-    path :: String
+    path     :: String
     metadata :: Metadata
-    beam :: Function
+    beam     :: Function
     function HierarchicalTransferMatrix(path, metadata, beam)
-        isdir(path) || mkdir(path)
+        isdir(path) || mkpath(path)
         save(joinpath(path, "METADATA.jld2"), "metadata", metadata, "beam", beam)
         new(path, metadata, beam)
     end
@@ -168,7 +168,7 @@ function unit_vectors(map)
     rhat
 end
 
-"Creat an image of the beam model."
+"Create an image of the beam model."
 function create_beam_map(f, metadata, size)
     zenith = Direction(metadata.position)
     north  = gram_schmidt(Direction(dir"ITRF", 0, 0, 1), zenith)

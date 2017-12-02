@@ -22,31 +22,31 @@ end
 
 # compatibility with TTCal
 
-#function from_ttcal(ttcal_metadata)
-#    frequencies  = ttcal_metadata.channels * u"Hz"
-#    position     = ttcal_position(ttcal_metadata)
-#    baselines    = ttcal_baselines(ttcal_metadata)
-#    phase_center = ttcal_metadata.phase_center
-#    Metadata(frequencies, position, baselines, phase_center)
-#end
-#
-#function ttcal_position(ttcal_metadata)
-#    antenna_positions = getfield.(ttcal_metadata.antennas, :position)
-#    mean(antenna_positions)
-#end
-#
-#function ttcal_baselines(ttcal_metadata)
-#    antenna_positions = getfield.(ttcal_metadata.antennas, :position)
-#    baselines = Baseline[]
-#    for α = 1:length(ttcal_metadata.baselines)
-#        antenna1 = antenna_positions[ttcal_metadata.baselines[α].antenna1]
-#        antenna2 = antenna_positions[ttcal_metadata.baselines[α].antenna2]
-#        baseline = Baseline(baseline"ITRF",
-#                            antenna1.x - antenna2.x,
-#                            antenna1.y - antenna2.y,
-#                            antenna1.z - antenna2.z)
-#        push!(baselines, baseline)
-#    end
-#    baselines
-#end
+function from_ttcal(ttcal_metadata)
+    frequencies  = ttcal_metadata.frequencies
+    position     = ttcal_position(ttcal_metadata)
+    baselines    = ttcal_baselines(ttcal_metadata)
+    phase_center = ttcal_metadata.phase_centers[1]
+    Metadata(frequencies, position, baselines, phase_center)
+end
+
+function ttcal_position(ttcal_metadata)
+    mean(ttcal_metadata.positions)
+end
+
+function ttcal_baselines(ttcal_metadata)
+    positions = ttcal_metadata.positions
+    baselines = Baseline[]
+    Nant = length(positions)
+    for antenna1 = 1:Nant, antenna2 = antenna1:Nant
+        antenna1 = positions[antenna1]
+        antenna2 = positions[antenna2]
+        baseline = Baseline(baseline"ITRF",
+                            antenna1.x - antenna2.x,
+                            antenna1.y - antenna2.y,
+                            antenna1.z - antenna2.z)
+        push!(baselines, baseline)
+    end
+    baselines
+end
 

@@ -14,9 +14,77 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 struct MModes
-    path :: String
+    path     :: String
+    mmax     :: Int
     metadata :: Metadata
-    blocks :: Matrix{Vector{Complex128}}
+    function MModes(path, metadata)
+        isdir(path) || mkpath(path)
+        save(joinpath(path, "METADATA.jld2"), "metadata", metadata, "mmax", mmax)
+        new(path, metadata)
+    end
+end
+
+function MModes(path)
+    metadata, mmax = load(joinpath(path, "METADATA.jld2"), "metadata", "mmax")
+    MModes(path, mmax, metadata)
+end
+
+"Compute m-modes from two dimensional matrix of visibilities (time × baseline)."
+function compute!(mmodes::MModes, visibilities::Matrix{Complex128}, ν)
+    store!(mmodes, fourier_transform(visibilities), ν)
+end
+
+function fourier_transform(matrix)
+    Ntime, Nbase = size(matrix)
+    planned_fft = plan_fft(matrix, 1)
+    (planned_fft*matrix) ./ Ntime
+end
+
+function store!(mmodes, transformed_visibilities, ν)
+    Ntime, Nbase = size(transformed_visibilities)
+    filename   = @sprintf("%.3fMHz", ustrip(uconvert(u"MHz", ν)))
+    objectname = m -> @sprintf("%04d", m)
+    jldopen(joinpath(mmodes.path, filename)) do file
+        # m = 0
+        block = zeros(Nbase)
+        for α = 1:Nbase
+            block[α] = transformed_visibilities[1, α]
+        end
+        file[objectname(0)] = block
+
+        # m > 0
+        block = zeros(2Nbase)
+        for m = 1:mmax
+            for α = 1:Nbase
+                α1 = 2α-1 # positive m
+                α2 = 2α-0 # negative m
+                block[α1] =      transformed_visibilities[      m+1, α]
+                block[α2] = conj(transformed_visibilities[Ntime+1-m, α])
+            end
+            file[objectname(m)] = block
+        end
+    end
+end
+
+function getindex(mmodes::MModes, m, ν)
+    if !(uconvert(u"Hz", ν) in transfermatrix.metadata.frequencies)
+        error("unkown frequency")
+    end
+    filename   = @sprintf("%.3fMHz", ustrip(uconvert(u"MHz", ν)))
+    objectname = @sprintf("%04d", m)
+    load(joinpath(mmodes.path, filename), objectname) :: Vector{Complex128}
+end
+
+function setindex!(mmodes::MModes, block::Vector{Complex128}, m, ν)
+    if !(uconvert(u"Hz", ν) in transfermatrix.metadata.frequencies)
+        error("unkown frequency")
+    end
+    filename   = @sprintf("%.3fMHz", ustrip(uconvert(u"MHz", ν)))
+    objectname = @sprintf("%04d", m)
+    jldopen(joinpath(mmodes.path, filename), "a+") do file
+        filename[objectname] = block
+    end
+    block
 end
 
 #function MModes(path, mmax, frequencies)
@@ -104,32 +172,6 @@ end
 #        pack_mmodes!(mmodes.blocks, transformed_visibilities, mmax, channel)
 #    end
 #    mmodes
-#end
-#
-#function do_fourier_transform(matrix)
-#    Nbase, Ntime = size(matrix)
-#    planned_fft = plan_fft(matrix, 2)
-#    planned_fft * matrix / Ntime
-#end
-#
-#function pack_mmodes!(blocks, transformed_visibilities, mmax, channel)
-#    Nbase, Ntime = size(transformed_visibilities)
-#    for m = 0:mmax
-#        idx = block_index(mmax, m, channel)
-#        block = blocks[idx]
-#        if m == 0
-#            for α = 1:Nbase
-#                block[α] = transformed_visibilities[α,1]
-#            end
-#        else
-#            for α = 1:Nbase
-#                α1 = 2α-1 # positive m
-#                α2 = 2α-0 # negative m
-#                block[α1] =      transformed_visibilities[α,m+1]
-#                block[α2] = conj(transformed_visibilities[α,Ntime+1-m])
-#            end
-#        end
-#    end
 #end
 #
 #Nfreq(mmodes::MModes) = length(mmodes.frequencies)
