@@ -39,12 +39,12 @@ function ttcal_baselines(ttcal_metadata)
     baselines = Baseline[]
     Nant = length(positions)
     for antenna1 = 1:Nant, antenna2 = antenna1:Nant
-        antenna1 = positions[antenna1]
-        antenna2 = positions[antenna2]
+        position1 = positions[antenna1]
+        position2 = positions[antenna2]
         baseline = Baseline(baseline"ITRF",
-                            antenna1.x - antenna2.x,
-                            antenna1.y - antenna2.y,
-                            antenna1.z - antenna2.z)
+                            position1.x - position2.x,
+                            position1.y - position2.y,
+                            position1.z - position2.z)
         push!(baselines, baseline)
     end
     baselines

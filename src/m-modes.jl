@@ -15,18 +15,18 @@
 
 struct MModes
     path     :: String
-    mmax     :: Int
     metadata :: Metadata
-    function MModes(path, metadata)
+    mmax     :: Int
+    function MModes(path, metadata, mmax)
         isdir(path) || mkpath(path)
         save(joinpath(path, "METADATA.jld2"), "metadata", metadata, "mmax", mmax)
-        new(path, metadata)
+        new(path, metadata, mmax)
     end
 end
 
 function MModes(path)
     metadata, mmax = load(joinpath(path, "METADATA.jld2"), "metadata", "mmax")
-    MModes(path, mmax, metadata)
+    MModes(path, metadata, mmax)
 end
 
 "Compute m-modes from two dimensional matrix of visibilities (time × baseline)."
@@ -42,19 +42,19 @@ end
 
 function store!(mmodes, transformed_visibilities, ν)
     Ntime, Nbase = size(transformed_visibilities)
-    filename   = @sprintf("%.3fMHz", ustrip(uconvert(u"MHz", ν)))
+    filename   = @sprintf("%.3fMHz.jld2", ustrip(uconvert(u"MHz", ν)))
     objectname = m -> @sprintf("%04d", m)
-    jldopen(joinpath(mmodes.path, filename)) do file
+    jldopen(joinpath(mmodes.path, filename), "w") do file
         # m = 0
-        block = zeros(Nbase)
+        block = zeros(Complex128, Nbase)
         for α = 1:Nbase
             block[α] = transformed_visibilities[1, α]
         end
         file[objectname(0)] = block
 
         # m > 0
-        block = zeros(2Nbase)
-        for m = 1:mmax
+        block = zeros(Complex128, 2Nbase)
+        for m = 1:mmodes.mmax
             for α = 1:Nbase
                 α1 = 2α-1 # positive m
                 α2 = 2α-0 # negative m
@@ -66,7 +66,7 @@ function store!(mmodes, transformed_visibilities, ν)
     end
 end
 
-function getindex(mmodes::MModes, m, ν)
+function Base.getindex(mmodes::MModes, m, ν)
     if !(uconvert(u"Hz", ν) in transfermatrix.metadata.frequencies)
         error("unkown frequency")
     end
@@ -75,7 +75,7 @@ function getindex(mmodes::MModes, m, ν)
     load(joinpath(mmodes.path, filename), objectname) :: Vector{Complex128}
 end
 
-function setindex!(mmodes::MModes, block::Vector{Complex128}, m, ν)
+function Base.setindex!(mmodes::MModes, block::Vector{Complex128}, m, ν)
     if !(uconvert(u"Hz", ν) in transfermatrix.metadata.frequencies)
         error("unkown frequency")
     end

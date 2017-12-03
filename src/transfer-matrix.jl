@@ -187,7 +187,7 @@ function create_beam_map(f, metadata, size)
     map
 end
 
-function getindex(transfermatrix::HierarchicalTransferMatrix, m, ν)
+function Base.getindex(transfermatrix::HierarchicalTransferMatrix, m, ν)
     if !(uconvert(u"Hz", ν) in transfermatrix.metadata.frequencies)
         error("unkown frequency")
     end
