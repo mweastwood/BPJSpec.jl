@@ -15,23 +15,39 @@
 
 abstract type TransferMatrix end
 
+#struct FileBackedTransferMatrix <: TransferMatrix
+#    path     :: String
+#    metadata :: Metadata
+#    function FileBackedTransferMatrix(path, metadata)
+#        isdir(path) || mkpath(path)
+#        save(joinpath(path, "METADATA.jld2"), "metadata", metadata)
+#        new(path, metadata)
+#    end
+#end
+
 struct HierarchicalTransferMatrix <: TransferMatrix
     path     :: String
     metadata :: Metadata
-    beam     :: Function
-    function HierarchicalTransferMatrix(path, metadata, beam)
+    #beam     :: Function
+    #function HierarchicalTransferMatrix(path, metadata, beam)
+    function HierarchicalTransferMatrix(path, metadata)
         isdir(path) || mkpath(path)
-        save(joinpath(path, "METADATA.jld2"), "metadata", metadata, "beam", beam)
-        new(path, metadata, beam)
+        #save(joinpath(path, "METADATA.jld2"), "metadata", metadata, "beam", beam)
+        save(joinpath(path, "METADATA.jld2"), "metadata", metadata)
+        #new(path, metadata, beam)
+        new(path, metadata)
     end
 end
 
 function HierarchicalTransferMatrix(path)
-    metadata, beam = load(joinpath(path, "METADATA.jld2"), "metadata", "beam")
-    HierarchicalTransferMatrix(path, metadata, beam)
+    #metadata, beam = load(joinpath(path, "METADATA.jld2"), "metadata", "beam")
+    metadata = load(joinpath(path, "METADATA.jld2"), "metadata")
+    #HierarchicalTransferMatrix(path, metadata, beam)
+    HierarchicalTransferMatrix(path, metadata)
 end
 
-function compute!(transfermatrix::HierarchicalTransferMatrix)
+function compute!(transfermatrix::HierarchicalTransferMatrix, beam;
+                  lmax=maximum(maximum_multipole_moment(transfermatrix.metadata)))
     println("")
     println("| Starting transfer matrix calculation")
     println("|---------")
@@ -41,18 +57,18 @@ function compute!(transfermatrix::HierarchicalTransferMatrix)
     workers = categorize_workers()
     println(workers)
 
-    hierarchy = compute_baseline_hierarchy(transfermatrix.metadata)
+    hierarchy = compute_baseline_hierarchy(transfermatrix.metadata, lmax)
     println(hierarchy)
     save(joinpath(transfermatrix.path, "HIERARCHY.jld2"), "hierarchy", hierarchy)
 
-    for ν in transfermatrix.metadata.frequencies
+    for ν in transfermatrix.metadata.frequencies[11:end]
         @show ν
-        @time compute_one_frequency!(transfermatrix, workers, hierarchy, ν)
+        @time compute_one_frequency!(transfermatrix, workers, hierarchy, beam, ν)
     end
 end
 
 function compute_one_frequency!(transfermatrix::HierarchicalTransferMatrix,
-                                workers, hierarchy, ν)
+                                workers, hierarchy, beam, ν)
     metadata = transfermatrix.metadata
 
     for idx = 1:length(hierarchy.divisions)-1
@@ -60,7 +76,7 @@ function compute_one_frequency!(transfermatrix::HierarchicalTransferMatrix,
             lmax = hierarchy.divisions[idx+1]
             baselines = transfermatrix.metadata.baselines[hierarchy.baselines[idx]]
             blocks = compute_baseline_group_one_frequency!(transfermatrix, workers.dict["astm11"],
-                                                  baselines, lmax, ν)
+                                                           beam, baselines, lmax, ν)
             resize!(blocks, 0)
             finalize(blocks)
             gc(); gc() # please please please garbage collect `blocks`
@@ -69,7 +85,7 @@ function compute_one_frequency!(transfermatrix::HierarchicalTransferMatrix,
 end
 
 function compute_baseline_group_one_frequency!(transfermatrix::HierarchicalTransferMatrix,
-                                               workers, baselines, lmax, ν)
+                                               workers, beam, baselines, lmax, ν)
     if length(workers) > 1
         # make sure this process isn't in the worker pool
         deleteat!(workers, workers .== myid())
@@ -81,15 +97,15 @@ function compute_baseline_group_one_frequency!(transfermatrix::HierarchicalTrans
     #   - Benjamin Franklin, 1789
     mmax = lmax
     phase_center = transfermatrix.metadata.phase_center
-    beam = create_beam_map(transfermatrix.beam, transfermatrix.metadata, (lmax+1, 2mmax+1))
-    rhat = unit_vectors(beam)
+    beam_map = create_beam_map(beam, transfermatrix.metadata, (lmax+1, 2mmax+1))
+    rhat = unit_vectors(beam_map)
     plan = plan_sht(lmax, mmax, size(rhat))
 
     queue  = collect(1:length(baselines))
     blocks = [zeros(Complex128, two(m)*length(baselines), lmax-m+1) for m = 0:mmax]
 
     function just_do_it(α)
-        real_coeff, imag_coeff = fringe_pattern(baselines[α], phase_center, beam, rhat, plan, ν)
+        real_coeff, imag_coeff = fringe_pattern(baselines[α], phase_center, beam_map, rhat, plan, ν)
     end
 
     lck = ReentrantLock()
@@ -138,11 +154,11 @@ function write_to_blocks!(blocks, real_coeff, imag_coeff, lmax, mmax, α)
 end
 
 "Compute the spherical harmonic transform of the fringe pattern for the given baseline."
-function fringe_pattern(baseline, phase_center, beam, rhat, plan, ν)
+function fringe_pattern(baseline, phase_center, beam_map, rhat, plan, ν)
     λ = u"c" / ν
     real_fringe, imag_fringe = plane_wave(rhat, baseline, phase_center, λ)
-    real_coeff = plan * Map(real_fringe .* beam)
-    imag_coeff = plan * Map(imag_fringe .* beam)
+    real_coeff = plan * Map(real_fringe .* beam_map)
+    imag_coeff = plan * Map(imag_fringe .* beam_map)
     real_coeff, imag_coeff
 end
 
@@ -193,32 +209,54 @@ function Base.getindex(transfermatrix::HierarchicalTransferMatrix, m, ν)
     end
 
     # load each hierarchical component of the transfer matrix
-    hierarchy = load(joinpath(transfermatrix.path, "HIERARCY.jld2"), "hierarchy")
+    hierarchy = load(joinpath(transfermatrix.path, "HIERARCHY.jld2"), "hierarchy")
     path = joinpath(transfermatrix.path, @sprintf("%.3fMHz", ustrip(uconvert(u"MHz", ν))))
     blocks = Matrix{Complex128}[]
     for idx = 1:length(hierarchy.divisions)-1
         lmax = hierarchy.divisions[idx+1]
+        m > lmax && continue
         filename   = @sprintf("lmax=%04d.jld2", lmax)
         objectname = @sprintf("%04d", m)
         push!(blocks, load(joinpath(path, filename), objectname))
     end
 
     # stitch the components together into a single matrix
-    Nbase = length(transfermatrix.metadata.baselines)
-    lmax  = hierarchy.divisions[end]
-    output = zeros(Complex128, two(m)*Nbase, lmax-m+1)
+    output = zeros(Complex128, sum(size(block, 1) for block in blocks),
+                   maximum(size(block, 2) for block in blocks))
     offset = 1
-    for idx = 1:length(hierarchy.divisions)-1
-        my_Nbase = length(hierarchy.baselines[idx])
-        my_lmax  = hierarchy.divisions[idx+1]
-        block = blocks[idx]
-        range1 = offset:offset+two(m)*my_Nbase
-        range2 = 1:my_lmax-m+1
+    for block in blocks
+        range1 = offset:offset+size(block, 1)-1
+        range2 = 1:size(block, 2)
         output_view = @view output[range1, range2]
         copy!(output_view, block)
-        offset += two(m)*my_Nbase
+        offset += size(block, 1)
     end
     output
+end
+
+function getlmax(transfermatrix::HierarchicalTransferMatrix)
+    # TODO: I'd like to have this stored as a field...
+    hierarchy = load(joinpath(transfermatrix.path, "HIERARCHY.jld2"), "hierarchy")
+    hierarchy.divisions[end]
+end
+
+"Get the baseline permutation vector for the given value of m."
+function baseline_permutation(transfermatrix::HierarchicalTransferMatrix, m)
+    hierarchy = load(joinpath(transfermatrix.path, "HIERARCHY.jld2"), "hierarchy")
+    indices = Int[]
+    for idx = 1:length(hierarchy.divisions)-1
+        lmax = hierarchy.divisions[idx+1]
+        m > lmax && continue
+        if m == 0
+            append!(indices, hierarchy.baselines[idx])
+        else
+            for baseline in hierarchy.baselines[idx]
+                push!(indices, 2*baseline-1) # positive m
+                push!(indices, 2*baseline-0) # negative m
+            end
+        end
+    end
+    indices
 end
 
 #function setindex!(transfermatrix::TransferMatrix, block, m, channel)

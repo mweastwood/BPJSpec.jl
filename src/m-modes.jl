@@ -67,19 +67,19 @@ function store!(mmodes, transformed_visibilities, ν)
 end
 
 function Base.getindex(mmodes::MModes, m, ν)
-    if !(uconvert(u"Hz", ν) in transfermatrix.metadata.frequencies)
+    if !(uconvert(u"Hz", ν) in mmodes.metadata.frequencies)
         error("unkown frequency")
     end
-    filename   = @sprintf("%.3fMHz", ustrip(uconvert(u"MHz", ν)))
+    filename   = @sprintf("%.3fMHz.jld2", ustrip(uconvert(u"MHz", ν)))
     objectname = @sprintf("%04d", m)
     load(joinpath(mmodes.path, filename), objectname) :: Vector{Complex128}
 end
 
 function Base.setindex!(mmodes::MModes, block::Vector{Complex128}, m, ν)
-    if !(uconvert(u"Hz", ν) in transfermatrix.metadata.frequencies)
+    if !(uconvert(u"Hz", ν) in mmodes.metadata.frequencies)
         error("unkown frequency")
     end
-    filename   = @sprintf("%.3fMHz", ustrip(uconvert(u"MHz", ν)))
+    filename   = @sprintf("%.3fMHz.jld2", ustrip(uconvert(u"MHz", ν)))
     objectname = @sprintf("%04d", m)
     jldopen(joinpath(mmodes.path, filename), "a+") do file
         filename[objectname] = block

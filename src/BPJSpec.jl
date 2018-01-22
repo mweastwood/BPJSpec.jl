@@ -17,7 +17,7 @@
 
 module BPJSpec
 
-export TransferMatrix
+export HierarchicalTransferMatrix
 export MModes
 
 using CasaCore.Measures
@@ -36,6 +36,7 @@ include("metadata.jl")
 include("hierarchy.jl")
 include("m-modes.jl")
 include("transfer-matrix.jl")
+include("compress.jl")
 include("imaging.jl")
 
 #export GriddedVisibilities, grid!

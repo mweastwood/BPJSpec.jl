@@ -38,9 +38,9 @@ function Base.show(io::IO, hierarchy::Hierarchy)
     @printf("|--------------+-----------+-------------|\n")
 end
 
-function compute_baseline_hierarchy(metadata::Metadata)
+function compute_baseline_hierarchy(metadata::Metadata, cutoff)
     lmax = maximum_multipole_moment(metadata)
-    divisions = identify_divisions(lmax)
+    divisions = identify_divisions(lmax, cutoff)
     baselines = categorize_baselines(lmax, divisions)
     Hierarchy(divisions, baselines)
 end
@@ -62,12 +62,13 @@ Separate the baselines based on their length. We will try to do this by recursiv
 baselines into two groups where each group requires roughly the same amount of space (in the
 transfer matrix).
 """
-function identify_divisions(lmax)
+function identify_divisions(lmax, cutoff)
     lmax_range = 0:maximum(lmax)+1
     histogram = zeros(length(lmax_range))
     for l in lmax
         histogram[l+1] += 1
     end
+    histogram = histogram[1:cutoff+1]
     cumulative_histogram = cumsum(histogram)
     find_crossover_points(cumulative_histogram, 4)
 end
