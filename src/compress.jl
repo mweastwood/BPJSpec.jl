@@ -22,9 +22,9 @@
 # m-modes before discarding the SVD.
 
 function lossless_compress(path, input::TransferMatrix) # TODO: compress m-modes simultaneously
-    output = FileBackedTransferMatrix(path, input.metadata)
     lmax = getlmax(input)
     mmax = lmax
+    output = SpectralBlockDiagonalMatrix(path, mmax, input.metadata.frequencies)
 
     pool  = CachingPool(workers())
     queue = [(m, ν) for ν in input.metadata.frequencies for m = 0:mmax]
@@ -36,7 +36,7 @@ function lossless_compress(path, input::TransferMatrix) # TODO: compress m-modes
     @sync for worker in workers()
         @async while length(queue) > 0
             m, ν = pop!(queue)
-            B = remotecall_fetch(_lossless_compress, pool, input, output, m, ν)
+            B = remotecall_fetch(_lossless_compress, pool, input, m, ν)
             output[m, ν] = B
             increment()
         end
@@ -44,7 +44,7 @@ function lossless_compress(path, input::TransferMatrix) # TODO: compress m-modes
     output
 end
 
-function _lossless_compress(input, output, m, ν)
+function _lossless_compress(input, m, ν)
     B = input[m, ν]
     _lossless_compress_svd(B)
 end

@@ -15,16 +15,6 @@
 
 abstract type TransferMatrix <: BlockMatrix end
 
-struct FileBackedTransferMatrix <: TransferMatrix
-    path     :: String
-    metadata :: Metadata
-    function FileBackedTransferMatrix(path, metadata)
-        isdir(path) || mkpath(path)
-        save(joinpath(path, "METADATA.jld2"), "metadata", metadata)
-        new(path, metadata)
-    end
-end
-
 struct HierarchicalTransferMatrix <: TransferMatrix
     path     :: String
     metadata :: Metadata
@@ -33,11 +23,6 @@ struct HierarchicalTransferMatrix <: TransferMatrix
         save(joinpath(path, "METADATA.jld2"), "metadata", metadata)
         new(path, metadata)
     end
-end
-
-function FileBackedTransferMatrix(path)
-    metadata = load(joinpath(path, "METADATA.jld2"), "metadata")
-    FileBackedTransferMatrix(path, metadata)
 end
 
 function HierarchicalTransferMatrix(path)
@@ -256,26 +241,5 @@ function baseline_permutation(transfermatrix::HierarchicalTransferMatrix, m)
         end
     end
     indices
-end
-
-function Base.getindex(transfermatrix::FileBackedTransferMatrix, m, ν)
-    if !(uconvert(u"Hz", ν) in transfermatrix.metadata.frequencies)
-        error("unkown frequency")
-    end
-    filename   = @sprintf("%.3fMHz.jld2", ustrip(uconvert(u"MHz", ν)))
-    objectname = @sprintf("%04d", m)
-    load(joinpath(transfermatrix.path, filename), objectname) :: Matrix{Complex128}
-end
-
-function Base.setindex!(transfermatrix::FileBackedTransferMatrix, block, m, ν)
-    if !(uconvert(u"Hz", ν) in transfermatrix.metadata.frequencies)
-        error("unkown frequency")
-    end
-    filename   = @sprintf("%.3fMHz.jld2", ustrip(uconvert(u"MHz", ν)))
-    objectname = @sprintf("%04d", m)
-    jldopen(joinpath(transfermatrix.path, filename), "a+") do file
-        file[objectname] = block
-    end
-    block
 end
 

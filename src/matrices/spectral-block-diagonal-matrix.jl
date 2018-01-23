@@ -16,29 +16,35 @@
 struct SpectralBlockDiagonalMatrix <: BlockMatrix
     path  :: String
     mmax  :: Int
-    Nfreq :: Int
-    function SpectralBlockDiagonalMatrix(path, mmax, Nfreq)
+    frequencies :: Vector{typeof(1.0*u"Hz")}
+    function SpectralBlockDiagonalMatrix(path, mmax, frequencies)
         isdir(path) || mkpath(path)
-        save(joinpath(path, "METADATA.jld2"), "mmax", mmax, "Nfreq", Nfreq)
-        new(path, metadata)
+        save(joinpath(path, "METADATA.jld2"), "mmax", mmax, "frequencies", frequencies)
+        new(path, mmax, frequencies)
     end
 end
 
 function SpectralBlockDiagonalMatrix(path)
-    mmax, Nfreq = load(joinpath(path, "METADATA.jld2"), "mmax", "Nfreq")
-    SpectralBlockDiagonalMatrix(path, mmax, Nfreq)
+    mmax, frequencies = load(joinpath(path, "METADATA.jld2"), "mmax", "frequencies")
+    SpectralBlockDiagonalMatrix(path, mmax, frequencies)
 end
 
-function Base.getindex(matrix::SpectralBlockDiagonalMatrix, m, channel)
-    filename   = @sprintf("m=%04d.jld2", m)
-    objectname = @sprintf("%04d", channel)
-    load(joinpath(transfermatrix.path, filename), objectname) :: Matrix{Complex128}
+function Base.getindex(matrix::SpectralBlockDiagonalMatrix, m, ν)
+    if !(uconvert(u"Hz", ν) in matrix.frequencies)
+        error("unkown frequency")
+    end
+    filename   = @sprintf("%.3fMHz.jld2", ustrip(uconvert(u"MHz", ν)))
+    objectname = @sprintf("%04d", m)
+    load(joinpath(matrix.path, filename), objectname) :: Matrix{Complex128}
 end
 
-function Base.setindex!(matrix::SpectralBlockDiagonalMatrix, block, m, channel)
-    filename   = @sprintf("m=%04d.jld2", m)
-    objectname = @sprintf("%04d", channel)
-    jldopen(joinpath(transfermatrix.path, filename), "a+") do file
+function Base.setindex!(matrix::SpectralBlockDiagonalMatrix, block, m, ν)
+    if !(uconvert(u"Hz", ν) in matrix.frequencies)
+        error("unkown frequency")
+    end
+    filename   = @sprintf("%.3fMHz.jld2", ustrip(uconvert(u"MHz", ν)))
+    objectname = @sprintf("%04d", m)
+    jldopen(joinpath(matrix.path, filename), "a+") do file
         file[objectname] = block
     end
     block

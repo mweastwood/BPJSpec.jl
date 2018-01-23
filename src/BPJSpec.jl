@@ -18,10 +18,10 @@
 module BPJSpec
 
 export HierarchicalTransferMatrix
-export FileBackedTransferMatrix
 export MModes
 
 using CasaCore.Measures
+using Cosmology
 using FastTransforms
 using FileIO, JLD2
 using ProgressMeter

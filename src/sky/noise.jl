@@ -28,7 +28,7 @@
 #NoiseMeta(m::Int,ν::AbstractVector) = NoiseMeta(m:m,collect(ν))
 #NoiseMeta(mmax::Int,ν::Float64) = NoiseMeta(0:mmax,[ν])
 #
-#==(lhs::NoiseMeta,rhs::NoiseMeta) = lhs.m == rhs.m && lhs.ν == rhs.ν
+# ==(lhs::NoiseMeta,rhs::NoiseMeta) = lhs.m == rhs.m && lhs.ν == rhs.ν
 #
 #typealias DiagonalNoiseMatrix Blocks{DiagonalMatrixBlock, NoiseMeta}
 #typealias NoiseMatrix Blocks{MatrixBlock, NoiseMeta}
