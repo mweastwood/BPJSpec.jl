@@ -21,7 +21,6 @@
 # disk space to store. Therefore we will compute the SVD, compress both the transfer matrix and the
 # m-modes before discarding the SVD.
 
-
 function lossless_compress(path, input::TransferMatrix) # TODO: compress m-modes simultaneously
     output = FileBackedTransferMatrix(path, input.metadata)
     lmax = getlmax(input)

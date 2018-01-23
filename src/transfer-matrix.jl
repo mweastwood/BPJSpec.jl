@@ -279,23 +279,3 @@ function Base.setindex!(transfermatrix::FileBackedTransferMatrix, block, m, ν)
     block
 end
 
-#doc"""
-#    preserve_singular_values(B::TransferMatrix)
-#
-#Construct a matrix that projects the $m$-modes onto a lower dimensional
-#space while preserving all the singular values of the transfer matrix.
-#
-#Multiplying by this matrix will compress the data, make the transfer
-#matrix square, and leave the information about the sky untouched.
-#"""
-#function preserve_singular_values(B::TransferMatrix)
-#    N = length(B.blocks)
-#    blocks = Array{MatrixBlock}(N)
-#    for i = 1:N
-#        U,σ,V = svd(B.blocks[i])
-#        blocks[i] = MatrixBlock(U')
-#    end
-#    Blocks(blocks)
-#end
-#
-

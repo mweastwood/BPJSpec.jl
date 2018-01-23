@@ -18,6 +18,7 @@
 module BPJSpec
 
 export HierarchicalTransferMatrix
+export FileBackedTransferMatrix
 export MModes
 
 using CasaCore.Measures
@@ -30,7 +31,9 @@ using Unitful, UnitfulAstro
 two(m) = ifelse(m > 0, 2, 1)
 
 include("parallel.jl")
+include("cosmology.jl")
 include("spherical-harmonics.jl")
+include("block-diagonal-matrix.jl")
 
 include("metadata.jl")
 include("hierarchy.jl")
@@ -38,6 +41,11 @@ include("m-modes.jl")
 include("transfer-matrix.jl")
 include("compress.jl")
 include("imaging.jl")
+
+abstract type SkyComponent end
+include("sky/foregrounds.jl")
+include("sky/signal.jl")
+include("sky/noise.jl")
 
 #export GriddedVisibilities, grid!
 #export MModes, TransferMatrix

@@ -14,22 +14,26 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 """
-    covariance_matrix(component::SkyComponent, ν, lmax, m)
+    Cforeground(l, ν1, ν2, ν0, A, α, β, ζ)
 
-Construct a covariance matrix for the given component of the sky.
+Evaluate a model for the multifrequency angular power spectrum of a foreground component. Note that
+`ν0`, `A`, `α`, `β`, and `ζ` are all parameters of the model.
 """
-function covariance_matrix(component::SkyComponent, ν, lmax, m)
-    Nfreq = length(ν)
-    Ncoef = lmax-m+1 # number of spherical harmonic coefficients
+function Cforeground(l, ν1, ν2, ν0, A, α, β, ζ)
+    (A * (l+1)^(-α)
+        * (ν1*ν2/ν0^2)^(-β)
+        * exp(-log(ν1/ν2)^2/(2*ζ^2)))
+end
 
-    C = zeros(Complex128,Nfreq*Ncoef,Nfreq*Ncoef)
-    for β2 = 1:Nfreq, β1 = 1:Nfreq
-        block = zeros(Complex128,Ncoef,Ncoef)
-        for l = m:lmax
-            block[l-m+1,l-m+1] = component(l,ν[β1],ν[β2])
-        end
-        C[(β1-1)*Ncoef+1:β1*Ncoef,(β2-1)*Ncoef+1:β2*Ncoef] = block
-    end
-    C
+immutable ForegroundComponent <: SkyComponent
+    ν0 :: Float64
+    A  :: Float64
+    α  :: Float64
+    β  :: Float64
+    ζ  :: Float64
+end
+
+function (::ForegroundComponent)(l, ν1, ν2)
+    Cforeground(l, ν1, ν2, model.ν0, model.A, model.α, model.β, model.ζ)
 end
 
