@@ -13,29 +13,29 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-struct BlockDiagonalMatrix
+struct AngularCovarianceMatrix <: BlockMatrix
     path :: String
-    mmax :: Int
-    function BlockDiagonalMatrix(path, mmax)
+    lmax :: Int
+    function AngularCovarianceMatrix(path, lmax)
         isdir(path) || mkpath(path)
-        save(joinpath(path, "METADATA.jld2"), "mmax", mmax)
-        new(path, mmax)
+        save(joinpath(path, "METADATA.jld2"), "lmax", lmax)
+        new(path, lmax)
     end
 end
 
-function BlockDiagonalMatrix(path)
-    mmax = load(joinpath(path, "METADATA.jld2"), "mmax")
-    BlockDiagonalMatrix(path, mmax)
+function AngularCovarianceMatrix(path)
+    lmax = load(joinpath(path, "METADATA.jld2"), "lmax")
+    AngularCovarianceMatrix(path, lmax)
 end
 
-function Base.getindex(matrix::BlockDiagonalMatrix, m)
-    filename   = @sprintf("m=%4d.jld2", m)
+function Base.getindex(matrix::AngularCovarianceMatrix, l)
+    filename   = @sprintf("l=%4d.jld2", l)
     objectname = "block"
-    load(joinpath(transfermatrix.path, filename), objectname) :: Matrix{Complex128}
+    load(joinpath(transfermatrix.path, filename), objectname) :: Matrix{Float64}
 end
 
-function Base.setindex!(matrix::BlockDiagonalMatrix, block::Matrix{Complex128}, m)
-    filename   = @sprintf("m=%4d.jld2", m)
+function Base.setindex!(matrix::AngularCovarianceMatrix, block, l)
+    filename   = @sprintf("l=%4d.jld2", l)
     objectname = "block"
     save(joinpath(transfermatrix.path, filename), objectname, block)
     block

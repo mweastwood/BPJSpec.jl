@@ -33,19 +33,23 @@ two(m) = ifelse(m > 0, 2, 1)
 include("parallel.jl")
 include("cosmology.jl")
 include("spherical-harmonics.jl")
-include("block-diagonal-matrix.jl")
-
 include("metadata.jl")
-include("hierarchy.jl")
-include("m-modes.jl")
-include("transfer-matrix.jl")
-include("compress.jl")
-include("imaging.jl")
 
 abstract type SkyComponent end
 include("sky/foregrounds.jl")
 include("sky/signal.jl")
 include("sky/noise.jl")
+
+abstract type BlockMatrix end
+include("matrices/block-diagonal-matrix.jl")
+include("matrices/spectral-block-diagonal-matrix.jl")
+include("matrices/angular-covariance-matrix.jl")
+include("matrices/transfer-matrix.jl")
+
+include("hierarchy.jl")
+include("m-modes.jl")
+include("compress.jl")
+include("imaging.jl")
 
 #export GriddedVisibilities, grid!
 #export MModes, TransferMatrix
