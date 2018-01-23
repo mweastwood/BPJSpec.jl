@@ -13,9 +13,52 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-function compress(transfermatrix::TransferMatrix, mmodes::MModes, mmax)
-    queue = [(m, ν) for ν in transfermatrix.metadata.frqeuencies for m = 0:mmax]
-    @show queue
+# Design decision
+# ===============
+# We are going to be compressing the transfer matrix using its singular value decomposition, however
+# we'd like to also use the results of the SVD to compress the m-modes. The essential problem
+# however is that the SVD is just as large as the transfer matrix itself, so it will take a lot of
+# disk space to store. Therefore we will compute the SVD, compress both the transfer matrix and the
+# m-modes before discarding the SVD.
+
+
+function lossless_compress(path, input::TransferMatrix) # TODO: compress m-modes simultaneously
+    output = FileBackedTransferMatrix(path, input.metadata)
+    lmax = getlmax(input)
+    mmax = lmax
+
+    pool  = CachingPool(workers())
+    queue = [(m, ν) for ν in input.metadata.frequencies for m = 0:mmax]
+
+    lck = ReentrantLock()
+    prg = Progress(length(queue))
+    increment() = (lock(lck); next!(prg); unlock(lck))
+
+    @sync for worker in workers()
+        @async while length(queue) > 0
+            m, ν = pop!(queue)
+            B = remotecall_fetch(_lossless_compress, pool, input, output, m, ν)
+            output[m, ν] = B
+            increment()
+        end
+    end
+    output
+end
+
+function _lossless_compress(input, output, m, ν)
+    B = input[m, ν]
+    _lossless_compress_svd(B)
+end
+
+function _lossless_compress_svd(B)
+    F = svdfact(B)
+    F[:U]'*B
+end
+
+
+
+
+function average_channels(path, input::TransferMatrix, N)
 end
 
 

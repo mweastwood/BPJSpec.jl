@@ -15,34 +15,33 @@
 
 abstract type TransferMatrix end
 
-#struct FileBackedTransferMatrix <: TransferMatrix
-#    path     :: String
-#    metadata :: Metadata
-#    function FileBackedTransferMatrix(path, metadata)
-#        isdir(path) || mkpath(path)
-#        save(joinpath(path, "METADATA.jld2"), "metadata", metadata)
-#        new(path, metadata)
-#    end
-#end
-
-struct HierarchicalTransferMatrix <: TransferMatrix
+struct FileBackedTransferMatrix <: TransferMatrix
     path     :: String
     metadata :: Metadata
-    #beam     :: Function
-    #function HierarchicalTransferMatrix(path, metadata, beam)
-    function HierarchicalTransferMatrix(path, metadata)
+    function FileBackedTransferMatrix(path, metadata)
         isdir(path) || mkpath(path)
-        #save(joinpath(path, "METADATA.jld2"), "metadata", metadata, "beam", beam)
         save(joinpath(path, "METADATA.jld2"), "metadata", metadata)
-        #new(path, metadata, beam)
         new(path, metadata)
     end
 end
 
-function HierarchicalTransferMatrix(path)
-    #metadata, beam = load(joinpath(path, "METADATA.jld2"), "metadata", "beam")
+struct HierarchicalTransferMatrix <: TransferMatrix
+    path     :: String
+    metadata :: Metadata
+    function HierarchicalTransferMatrix(path, metadata)
+        isdir(path) || mkpath(path)
+        save(joinpath(path, "METADATA.jld2"), "metadata", metadata)
+        new(path, metadata)
+    end
+end
+
+function FileBackedTransferMatrix(path)
     metadata = load(joinpath(path, "METADATA.jld2"), "metadata")
-    #HierarchicalTransferMatrix(path, metadata, beam)
+    FileBackedTransferMatrix(path, metadata)
+end
+
+function HierarchicalTransferMatrix(path)
+    metadata = load(joinpath(path, "METADATA.jld2"), "metadata")
     HierarchicalTransferMatrix(path, metadata)
 end
 
@@ -259,29 +258,27 @@ function baseline_permutation(transfermatrix::HierarchicalTransferMatrix, m)
     indices
 end
 
-#function setindex!(transfermatrix::TransferMatrix, block, m, channel)
-#    ν = transfermatrix.frequencies[channel]
-#    directory = directory_name(m, ν, transfermatrix.mmax+1)
-#    filename = block_filename(m, ν)
-#    open(joinpath(transfermatrix.path, directory, filename), "w") do file
-#        write(file, size(block, 2), size(block, 1), block.')
-#    end
-#    block
-#end
-#
-#function getindex(transfermatrix::TransferMatrix, m, channel)
-#    local block
-#    ν = transfermatrix.frequencies[channel]
-#    directory = directory_name(m, ν, transfermatrix.mmax+1)
-#    filename = block_filename(m, ν)
-#    open(joinpath(transfermatrix.path, directory, filename), "r") do file
-#        sz = tuple(read(file, Int, 2)...)
-#        block = read(file, Complex128, sz)
-#    end
-#    block.'
-#end
-#
-#
+function Base.getindex(transfermatrix::FileBackedTransferMatrix, m, ν)
+    if !(uconvert(u"Hz", ν) in transfermatrix.metadata.frequencies)
+        error("unkown frequency")
+    end
+    filename   = @sprintf("%.3fMHz.jld2", ustrip(uconvert(u"MHz", ν)))
+    objectname = @sprintf("%04d", m)
+    load(joinpath(transfermatrix.path, filename), objectname) :: Matrix{Complex128}
+end
+
+function Base.setindex!(transfermatrix::FileBackedTransferMatrix, block, m, ν)
+    if !(uconvert(u"Hz", ν) in transfermatrix.metadata.frequencies)
+        error("unkown frequency")
+    end
+    filename   = @sprintf("%.3fMHz.jld2", ustrip(uconvert(u"MHz", ν)))
+    objectname = @sprintf("%04d", m)
+    jldopen(joinpath(transfermatrix.path, filename), "a+") do file
+        file[objectname] = block
+    end
+    block
+end
+
 #doc"""
 #    preserve_singular_values(B::TransferMatrix)
 #
