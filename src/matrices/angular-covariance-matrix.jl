@@ -16,9 +16,12 @@
 struct AngularCovarianceMatrix <: BlockMatrix
     path :: String
     lmax :: Int
-    function AngularCovarianceMatrix(path, lmax)
+    frequencies :: Vector{typeof(1.0*u"Hz")}
+    component   :: SkyComponent
+    function AngularCovarianceMatrix(path, lmax, frequencies, component)
         isdir(path) || mkpath(path)
-        save(joinpath(path, "METADATA.jld2"), "lmax", lmax)
+        save(joinpath(path, "METADATA.jld2"), "lmax", lmax,
+             "frequencies", frequencies, "component", component)
         new(path, lmax)
     end
 end
@@ -39,5 +42,22 @@ function Base.setindex!(matrix::AngularCovarianceMatrix, block, l)
     objectname = "block"
     save(joinpath(transfermatrix.path, filename), objectname, block)
     block
+end
+
+function compute!(matrix::AngularCovarianceMatrix)
+    Nfreq = length(matrix.frequencies)
+    for l = 0:matrix.lmax
+        block = zeros(Float64, Nfreq, Nfreq)
+        for β1 = 1:Nfreq
+            ν1 = matrix.frequencies[β1]
+            block[β1, β1] = matrix.component(l, ν1, ν1)
+            for β2 = β1+1:Nfreq
+                ν2 = matrix.frequencies[β2]
+                block[β1, β2] = matrix.component(l, ν1, ν2)
+                block[β2, β1] = block[β2, β1]
+            end
+        end
+        matrix[l] = block
+    end
 end
 

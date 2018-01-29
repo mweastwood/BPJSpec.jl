@@ -54,11 +54,36 @@ function _lossless_compress_svd(B)
     F[:U]'*B
 end
 
+function average_channels(path, input, Navg)
+    Nfreq  = length(input.frequencies)
+    Nfreq′ = Nfreq ÷ Navg + 1
+    mmax  = input.mmax
 
+    frequencies = zeros(eltype(input.frequencies), Nfreq′)
+    output = SpectralBlockDiagonalMatrix(path, mmax, frequencies)
 
+    prg = Progress(Nfreq′)
+    for idx = 1:Nfreq′
+        range = (1:Navg) + (idx-1)*Navg
+        range = range[1]:min(range[end], Nfreq)
+        frequencies[idx] = mean(input.frequencies[range])
+        for m = 0:mmax
+            block = input[m, input.frequencies[range[1]]]
+            for ν in input.frequencies[range[2:end]]
+                block = [block; input[m, ν]]
+            end
+            block = _lossless_compress_svd(block)
+            output[m, frequencies[idx]] = block
+        end
+        next!(prg)
+    end
 
-function average_channels(path, input::TransferMatrix, N)
+    #output_frequencies = [mean(frequencies[range+N*idx]) for idx = 0:Nfreq÷N-1]
+    #@show frequencies
+    #@show output_frequencies
+
+    #pool  = CachingPool(workers())
+    #queue = [(m, ν) for ν in frequencies[1:N] for m = 0:mmax]
+
 end
-
-
 
