@@ -22,30 +22,32 @@ struct AngularCovarianceMatrix <: BlockMatrix
         isdir(path) || mkpath(path)
         save(joinpath(path, "METADATA.jld2"), "lmax", lmax,
              "frequencies", frequencies, "component", component)
-        new(path, lmax)
+        new(path, lmax, frequencies, component)
     end
 end
 
 function AngularCovarianceMatrix(path)
-    lmax = load(joinpath(path, "METADATA.jld2"), "lmax")
-    AngularCovarianceMatrix(path, lmax)
+    lmax, frequencies, component = load(joinpath(path, "METADATA.jld2"),
+                                        "lmax", "frequencies", "component")
+    AngularCovarianceMatrix(path, lmax, frequencies, component)
 end
 
 function Base.getindex(matrix::AngularCovarianceMatrix, l)
-    filename   = @sprintf("l=%4d.jld2", l)
+    filename   = @sprintf("l=%04d.jld2", l)
     objectname = "block"
-    load(joinpath(transfermatrix.path, filename), objectname) :: Matrix{Float64}
+    load(joinpath(matrix.path, filename), objectname) :: Matrix{Float64}
 end
 
 function Base.setindex!(matrix::AngularCovarianceMatrix, block, l)
-    filename   = @sprintf("l=%4d.jld2", l)
+    filename   = @sprintf("l=%04d.jld2", l)
     objectname = "block"
-    save(joinpath(transfermatrix.path, filename), objectname, block)
+    save(joinpath(matrix.path, filename), objectname, block)
     block
 end
 
 function compute!(matrix::AngularCovarianceMatrix)
     Nfreq = length(matrix.frequencies)
+    prg = Progress(matrix.lmax+1)
     for l = 0:matrix.lmax
         block = zeros(Float64, Nfreq, Nfreq)
         for β1 = 1:Nfreq
@@ -54,10 +56,11 @@ function compute!(matrix::AngularCovarianceMatrix)
             for β2 = β1+1:Nfreq
                 ν2 = matrix.frequencies[β2]
                 block[β1, β2] = matrix.component(l, ν1, ν2)
-                block[β2, β1] = block[β2, β1]
+                block[β2, β1] = block[β1, β2]
             end
         end
         matrix[l] = block
+        next!(prg)
     end
 end
 
