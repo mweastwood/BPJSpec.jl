@@ -21,26 +21,55 @@ function Csignal(l, ν1, ν2, kpara, kperp, power)
     end
 end
 
+# The exact integral that needs to be performed is
+#
+#     Cₗ(ν₁, ν₂) = 2/π ∫ jₗ(k r₁) jₗ(k r₂) P(k) k² dk
+#
+# For the given frequencies ν₁ and ν₂ and corresponding comoving distances r₁ and r₂. The problem is
+# that the spherical Bessel functions jₗ are highly oscillatory and this integral is very difficult
+# to evaluate numerically.
+#
+# It turns out that the two spherical Bessel functions oscillate at slightly different frequencies
+# and so there is a slow beat pattern imposed on the rapid oscillations. We can therefore
+# approximate this integral as
+#
+#     Cₗ(ν₁, ν₂) = 1/(π r₁ r₂) ∫ sin(k Δr) P(k) k/sqrt(k² - k⟂²) dk
+#
+# Where k⟂ is l/r and r is some mean comoving distance to the given redshift (this is an ok
+# approximation because we've already assumed that the comoving distances aren't so different when
+# we right down a single power spectrum for both redshifts).
+#
+# But so far we've assumed a spherical power spectrum parameterized by the wave number k. In
+# practice all the cool kids are doing cylindrically averaged power spectra parameterized by k⟂ and
+# k∥. How do we generalize this integral in that case?
+#
+#     Cₗ(ν₁, ν₂) = 1/(π r₁ r₂) ∫ sin(k∥ Δr) P(k⟂, k∥) dk∥
+#
+# Ref: http://adsabs.harvard.edu/abs/2015PhRvD..91h3514S
+#
+# Now we're going to be given the power spectrum sampled on some grid. We will model the power
+# spectrum as a piecewise linear interpolation of this grid (although we may want to look into a
+# quadratic interpolation at some point).
+
 function Csignal_same_redshift(l, ν, kpara, kperp, power)
     z = redshift(ν)
     χ = comoving_distance(z)
 
-    # calculate weights for interpolating the value of the power spectrum at k_perp = l/χ
-    j = searchsortedlast(kperp,l/χ)
+    # calculate weights for interpolating the value of the power spectrum at kperp = l/χ
+    j = searchsortedlast(kperp, l/χ)
     weight_left  = 1 - (l/χ  -  kperp[j]) / (kperp[j+1] - kperp[j])
     weight_right = 1 - (kperp[j+1] - l/χ) / (kperp[j+1] - kperp[j])
 
-    # integrate over k_para assuming that the power spectrum is linear between the grid points
-    out = 0.0
+    # integrate over kpara assuming that the power spectrum is linear between the grid points
+    out = 0.0u"K^2*Mpc^2"
     for i = 1:length(kpara)-1
         k_start = kpara[i]
         k_stop  = kpara[i+1]
-        P_start = weight_left*power[i,  j] + weight_right*power[i,  j+1]
-        P_stop  = weight_left*power[i+1,j] + weight_right*power[i+1,j+1]
+        P_start = weight_left*power[i,   j] + weight_right*power[i,   j+1]
+        P_stop  = weight_left*power[i+1, j] + weight_right*power[i+1, j+1]
         out += 0.5*(P_start+P_stop)*(k_stop-k_start)
     end
-    out /= π*χ^2
-    out
+    ustrip(uconvert(u"K^2", out/(π*χ^2)))
 end
 
 function Csignal_different_redshift(l, ν1, ν2, kpara, kperp, power)
@@ -51,13 +80,13 @@ function Csignal_different_redshift(l, ν1, ν2, kpara, kperp, power)
     Δχ = χ2-χ1
     χ  = 0.5*(χ1+χ2)
 
-    # calculate weights for interpolating the value of the power spectrum at k_perp = l/χ
+    # calculate weights for interpolating the value of the power spectrum at kperp = l/χ
     j = searchsortedlast(kperp,l/χ)
     weight_left  = 1 - (l/χ  -  kperp[j]) / (kperp[j+1] - kperp[j])
     weight_right = 1 - (kperp[j+1] - l/χ) / (kperp[j+1] - kperp[j])
 
-    # integrate over k_para assuming that the power spectrum is linear between the grid points
-    out = 0.0
+    # integrate over kpara assuming that the power spectrum is linear between the grid points
+    out = 0.0u"K^2*Mpc^2"
     for i = 1:length(kpara)-1
         k_start = kpara[i]
         k_stop  = kpara[i+1]
@@ -66,16 +95,15 @@ function Csignal_different_redshift(l, ν1, ν2, kpara, kperp, power)
         out += (P_stop*sin(k_stop*Δχ) - P_start*sin(k_start*Δχ)) / Δχ
         out += (P_stop-P_start) * (cos(k_stop*Δχ)-cos(k_start*Δχ)) / (k_stop-k_start) / Δχ^2
     end
-    out /= π*χ1*χ2
-    out
+    ustrip(uconvert(u"K^2", out/(π*χ1*χ2)))
 end
 
-#immutable SignalModel <: SkyComponent
-#    kpara :: Vector{Float64} # Mpc⁻¹
-#    kperp :: Vector{Float64} # Mpc⁻¹
-#    power :: Matrix{Float64} # K² Mpc³
-#end
-#
+struct SignalModel <: SkyComponent
+    kpara :: Vector{typeof(1.0u"Mpc^-1")}
+    kperp :: Vector{typeof(1.0u"Mpc^-1")}
+    power :: Matrix{typeof(1.0u"K^2*Mpc^3")}
+end
+
 #function dimensionful_powerspectrum(kpara,kperp,Δ²)
 #    out = similar(Δ²)
 #    for j = 1:length(kperp), i = 1:length(kpara)
@@ -88,8 +116,18 @@ end
 #    end
 #    out
 #end
-#
-#function call(model::SignalModel,l,ν1,ν2)
-#    Csignal(l,ν1,ν2,model.kpara,model.kperp,model.power)
-#end
+
+function (model::SignalModel)(l, ν1, ν2)
+    Csignal(l, ν1, ν2, model.kpara, model.kperp, model.power)
+end
+
+function fiducial_signal_model()
+    kpara = logspace(-4, +1, 10).*u"Mpc^-1"
+    kperp = logspace(-4, -1, 11).*u"Mpc^-1"
+    unshift!(kpara, 0u"Mpc^-1")
+    unshift!(kperp, 0u"Mpc^-1")
+    k = sqrt.(kpara.^2 .+ kperp.'.^2)
+    power = 1.0u"K^2" ./ (k+1e-4u"Mpc^-1").^3
+    SignalModel(kpara, kperp, power)
+end
 

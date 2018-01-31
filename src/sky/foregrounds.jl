@@ -26,7 +26,7 @@ function Cforeground(l, ν1, ν2, ν0, A, α, β, ζ)
     ustrip(uconvert(u"K^2", A * x^-α * y^-β * exp(-z^2/(2ζ^2))))
 end
 
-immutable ForegroundComponent <: SkyComponent
+struct ForegroundComponent <: SkyComponent
     ν0 :: typeof(1.0u"Hz")
     A  :: typeof(1.0u"K^2")
     α  :: Float64
