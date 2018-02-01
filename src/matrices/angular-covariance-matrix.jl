@@ -64,3 +64,19 @@ function compute!(matrix::AngularCovarianceMatrix)
     end
 end
 
+function densify(matrix::AngularCovarianceMatrix, m=0)
+    Nfreq = length(matrix.frequencies)
+    lmax  = matrix.lmax
+    N = (lmax-m+1)*Nfreq
+    output = zeros(Float64, N, N)
+    for l = m:lmax
+        block = matrix[l]
+        for β1 = 1:Nfreq, β2 = 1:Nfreq
+            x = (lmax-m+1)*(β1-1) + l + 1
+            y = (lmax-m+1)*(β2-1) + l + 1
+            output[x, y] = block[β1, β2]
+        end
+    end
+    output
+end
+

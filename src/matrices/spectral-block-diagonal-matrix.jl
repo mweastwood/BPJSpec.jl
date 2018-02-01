@@ -50,3 +50,17 @@ function Base.setindex!(matrix::SpectralBlockDiagonalMatrix, block, m, ν)
     block
 end
 
+function densify(matrix::SpectralBlockDiagonalMatrix, m)
+    blocks = [matrix[m, ν] for ν in matrix.frequencies]
+    X = sum(size.(blocks, 1))
+    Y = sum(size.(blocks, 2))
+    output = zeros(Complex128, X, Y)
+    x = y = 1
+    for block in blocks
+        output[x:x+size(block, 1)-1, y:y+size(block, 2)-1] = block
+        x += size(block, 1)
+        y += size(block, 2)
+    end
+    output
+end
+
