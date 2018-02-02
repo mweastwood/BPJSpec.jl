@@ -17,17 +17,23 @@ struct SpectralBlockDiagonalMatrix <: BlockMatrix
     path  :: String
     mmax  :: Int
     frequencies :: Vector{typeof(1.0*u"Hz")}
-    function SpectralBlockDiagonalMatrix(path, mmax, frequencies)
-        isdir(path) || mkpath(path)
-        save(joinpath(path, "METADATA.jld2"), "mmax", mmax, "frequencies", frequencies)
+    function SpectralBlockDiagonalMatrix(path, mmax, frequencies, write=true)
+        if write
+            isdir(path) || mkpath(path)
+            save(joinpath(path, "METADATA.jld2"), "mmax", mmax, "frequencies", frequencies)
+        end
         new(path, mmax, frequencies)
     end
 end
 
 function SpectralBlockDiagonalMatrix(path)
     mmax, frequencies = load(joinpath(path, "METADATA.jld2"), "mmax", "frequencies")
-    SpectralBlockDiagonalMatrix(path, mmax, frequencies)
+    SpectralBlockDiagonalMatrix(path, mmax, frequencies, false)
 end
+
+Base.show(io::IO, matrix::SpectralBlockDiagonalMatrix) =
+    print(io, "SpectralBlockDiagonalMatrix: ", matrix.path)
+Base.indices(matrix::SpectralBlockDiagonalMatrix) = (0:matrix.mmax, matrix.frequencies)
 
 function Base.getindex(matrix::SpectralBlockDiagonalMatrix, m, ν)
     if !(uconvert(u"Hz", ν) in matrix.frequencies)
@@ -50,7 +56,7 @@ function Base.setindex!(matrix::SpectralBlockDiagonalMatrix, block, m, ν)
     block
 end
 
-function densify(matrix::SpectralBlockDiagonalMatrix, m)
+function Base.getindex(matrix::SpectralBlockDiagonalMatrix, m)
     blocks = [matrix[m, ν] for ν in matrix.frequencies]
     X = sum(size.(blocks, 1))
     Y = sum(size.(blocks, 2))

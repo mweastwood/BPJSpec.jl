@@ -46,6 +46,8 @@ include("matrices/spectral-block-diagonal-matrix.jl")
 include("matrices/angular-covariance-matrix.jl")
 include("matrices/transfer-matrix.jl")
 
+include("broadcasting.jl")
+
 include("hierarchy.jl")
 include("m-modes.jl")
 include("compress.jl")
