@@ -64,7 +64,7 @@ function compute!(matrix::AngularCovarianceMatrix)
     end
 end
 
-function densify(matrix::AngularCovarianceMatrix, m=0)
+function densify(matrix::AngularCovarianceMatrix, m)
     Nfreq = length(matrix.frequencies)
     lmax  = matrix.lmax
     N = (lmax-m+1)*Nfreq

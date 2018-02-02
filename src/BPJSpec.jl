@@ -50,6 +50,7 @@ include("hierarchy.jl")
 include("m-modes.jl")
 include("compress.jl")
 include("imaging.jl")
+include("fisher.jl")
 
 #export GriddedVisibilities, grid!
 #export MModes, TransferMatrix
