@@ -14,42 +14,53 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 struct SpectralBlockDiagonalMatrix <: BlockMatrix
-    path :: String
-    mmax :: Int
+    path        :: String
+    progressbar :: Bool
+    distribute  :: Bool
+    cached      :: Ref{Bool}
+    mmax        :: Int
     frequencies :: Vector{typeof(1.0*u"Hz")}
-    function SpectralBlockDiagonalMatrix(path, mmax, frequencies, write=true)
+    blocks      :: Matrix{Matrix{Complex128}}
+
+    function SpectralBlockDiagonalMatrix(path, mmax, frequencies, write=true;
+                                         progressbar=false, distribute=false, cached=false)
         if write
             isdir(path) || mkpath(path)
             save(joinpath(path, "METADATA.jld2"), "mmax", mmax, "frequencies", frequencies)
         end
-        new(path, mmax, frequencies)
+        blocks = Array{Matrix{Complex128}}(mmax+1, length(frequencies))
+        output = new(path, progressbar, distribute, Ref(cached), mmax, frequencies, blocks)
+        if cached
+            cache!(output)
+        end
+        output
     end
 end
 
-function SpectralBlockDiagonalMatrix(path)
+function SpectralBlockDiagonalMatrix(path; kwargs...)
     mmax, frequencies = load(joinpath(path, "METADATA.jld2"), "mmax", "frequencies")
-    SpectralBlockDiagonalMatrix(path, mmax, frequencies, false)
+    SpectralBlockDiagonalMatrix(path, mmax, frequencies, false; kwargs...)
 end
 
 Base.show(io::IO, matrix::SpectralBlockDiagonalMatrix) =
     print(io, "SpectralBlockDiagonalMatrix: ", matrix.path)
-Base.indices(matrix::SpectralBlockDiagonalMatrix) = (0:matrix.mmax, 1:length(matrix.frequencies))
-normalize_indices(::SpectralBlockDiagonalMatrix, m) = m+1
-normalize_indices(::SpectralBlockDiagonalMatrix, m, β) = (m+1, β)
+
+indices(matrix::SpectralBlockDiagonalMatrix) =
+    [(m, β) for m = 0:matrix.mmax for β = 1:length(matrix.frequencies)]
 
 function Base.getindex(matrix::SpectralBlockDiagonalMatrix, m, β)
-    ν = matrix.frequencies[β]
-    filename   = @sprintf("%.3fMHz.jld2", ustrip(uconvert(u"MHz", ν)))
-    objectname = @sprintf("%04d", m)
-    load(joinpath(matrix.path, filename), objectname) :: Matrix{Complex128}
+    if matrix.cached[]
+        return matrix.blocks[m+1, β]
+    else
+        return read_from_disk(matrix, m, β)
+    end
 end
 
 function Base.setindex!(matrix::SpectralBlockDiagonalMatrix, block, m, β)
-    ν = matrix.frequencies[β]
-    filename   = @sprintf("%.3fMHz.jld2", ustrip(uconvert(u"MHz", ν)))
-    objectname = @sprintf("%04d", m)
-    jldopen(joinpath(matrix.path, filename), "a+") do file
-        file[objectname] = block
+    if matrix.cached[]
+        matrix.blocks[m+1, β] = block
+    else
+        write_to_disk(matrix, block, m, β)
     end
     block
 end
@@ -66,5 +77,38 @@ function Base.getindex(matrix::SpectralBlockDiagonalMatrix, m)
         y += size(block, 2)
     end
     output
+end
+
+function cache!(matrix::SpectralBlockDiagonalMatrix)
+    matrix.cached[] = true
+    for β = 1:length(matrix.frequencies), m = 0:matrix.mmax
+        matrix.blocks[m+1, β] = read_from_disk(matrix, m, β)
+    end
+    matrix
+end
+
+function flush!(matrix::SpectralBlockDiagonalMatrix)
+    for β = 1:length(matrix.frequencies), m = 0:matrix.mmax
+        write_to_disk(matrix, matrix.blocks[m+1, β], m, β)
+    end
+    matrix.cached[] = false
+    matrix
+end
+
+function read_from_disk(matrix::SpectralBlockDiagonalMatrix, m, β)
+    ν = matrix.frequencies[β]
+    filename   = @sprintf("%.3fMHz.jld2", ustrip(uconvert(u"MHz", ν)))
+    objectname = @sprintf("%04d", m)
+    load(joinpath(matrix.path, filename), objectname) :: Matrix{Complex128}
+end
+
+function write_to_disk(matrix::SpectralBlockDiagonalMatrix, block::Matrix{Complex128}, m, β)
+    ν = matrix.frequencies[β]
+    filename   = @sprintf("%.3fMHz.jld2", ustrip(uconvert(u"MHz", ν)))
+    objectname = @sprintf("%04d", m)
+    jldopen(joinpath(matrix.path, filename), "a+") do file
+        file[objectname] = block
+    end
+    block
 end
 

@@ -18,8 +18,16 @@ struct CachedBlockMatrix{M, B} <: BlockMatrix
     blocks :: B
 end
 
-function cache(matrix::BlockMatrix)
-    blocks = [matrix[idx...] for idx in Iterators.product(indices(matrix)...)]
+function cache(matrix::BlockMatrix; progressbar=true)
+    _indices = indices(matrix)
+    #progressbar && (prg = Progress(length(_indices), desc="Caching: "))
+    function load(idx)
+        @show idx
+        output = matrix[idx...]
+        #progressbar && next!(prg)
+        output
+    end
+    blocks = [load(idx) for idx in _indices]
     CachedBlockMatrix(matrix, blocks)
 end
 
@@ -27,6 +35,9 @@ Base.indices(matrix::CachedBlockMatrix) = indices(matrix.matrix)
 normalize_indices(::BlockMatrix, idx) = idx
 normalize_indices(::BlockMatrix, idx, jdx) = (idx, jdx)
 @inline normalize_indices(::BlockMatrix, idx...) = idx
+
+progressbar(matrix::BlockMatrix) = progressbar(matrix.matrix)
+distribute(matrix::BlockMatrix)  = false
 
 @inline function Base.getindex(matrix::CachedBlockMatrix, idx...)
     idx = normalize_indices(matrix.matrix, idx...)

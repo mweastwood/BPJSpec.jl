@@ -14,45 +14,65 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 struct AngularCovarianceMatrix <: BlockMatrix
-    path :: String
-    lmax :: Int
+    path        :: String
+    progressbar :: Bool
+    distribute  :: Bool
+    cached      :: Ref{Bool}
+    lmax        :: Int
     frequencies :: Vector{typeof(1.0*u"Hz")}
     component   :: SkyComponent
-    function AngularCovarianceMatrix(path, lmax, frequencies, component, write=true)
+    blocks      :: Vector{Matrix{Float64}}
+
+    function AngularCovarianceMatrix(path, lmax, frequencies, component, write=true;
+                                     progressbar=false, distribute=false, cached=false)
         if write
             isdir(path) || mkpath(path)
             save(joinpath(path, "METADATA.jld2"), "lmax", lmax,
                  "frequencies", frequencies, "component", component)
         end
-        output = new(path, lmax, frequencies, component)
-        write && compute!(output)
+        blocks = Matrix{Float64}[]
+        output = new(path, progressbar, distribute, Ref(cached),
+                     lmax, frequencies, component, blocks)
+        if write
+            compute!(output)
+        elseif cached
+            cache!(output)
+        end
         output
     end
 end
 
-function AngularCovarianceMatrix(path)
+function AngularCovarianceMatrix(path; kwargs...)
     lmax, frequencies, component = load(joinpath(path, "METADATA.jld2"),
                                         "lmax", "frequencies", "component")
-    AngularCovarianceMatrix(path, lmax, frequencies, component, false)
+    AngularCovarianceMatrix(path, lmax, frequencies, component, false; kwargs...)
 end
 
 Base.show(io::IO, matrix::AngularCovarianceMatrix) =
     print(io, "AngularCovarianceMatrix: ", matrix.path)
-Base.indices(matrix::AngularCovarianceMatrix) = (0:matrix.lmax,)
-normalize_indices(::AngularCovarianceMatrix, l) = l+1
 
-function Base.getindex(matrix::AngularCovarianceMatrix, l)
-    filename   = @sprintf("l=%04d.jld2", l)
-    objectname = "block"
-    load(joinpath(matrix.path, filename), objectname) :: Matrix{Float64}
+indices(matrix::AngularCovarianceMatrix) =
+    [(l, m) for l = 0:matrix.lmax for m = l:matrix.lmax]
+
+function Base.getindex(matrix::AngularCovarianceMatrix, l::Integer)
+    if matrix.cached[]
+        return matrix.blocks[l+1]
+    else
+        return read_from_disk(matrix, l)
+    end
 end
 
-function Base.setindex!(matrix::AngularCovarianceMatrix, block, l)
-    filename   = @sprintf("l=%04d.jld2", l)
-    objectname = "block"
-    save(joinpath(matrix.path, filename), objectname, block)
+function Base.setindex!(matrix::AngularCovarianceMatrix, block, l::Integer)
+    if matrix.cached[]
+        matrix.blocks[l+1] = block
+    else
+        write_to_disk(matrix, block, l)
+    end
     block
 end
+
+Base.getindex(matrix::AngularCovarianceMatrix, l, m) = matrix[l]
+Base.setindex!(matrix::AngularCovarianceMatrix, block, l, m) = matrix[l] = block
 
 function compute!(matrix::AngularCovarianceMatrix)
     Nfreq = length(matrix.frequencies)
@@ -71,19 +91,34 @@ function compute!(matrix::AngularCovarianceMatrix)
     end
 end
 
-#function densify(matrix::AngularCovarianceMatrix, m)
-#    Nfreq = length(matrix.frequencies)
-#    lmax  = matrix.lmax
-#    N = (lmax-m+1)*Nfreq
-#    output = zeros(Float64, N, N)
-#    for l = m:lmax
-#        block = matrix[l]
-#        for β1 = 1:Nfreq, β2 = 1:Nfreq
-#            x = (lmax-m+1)*(β1-1) + l + 1
-#            y = (lmax-m+1)*(β2-1) + l + 1
-#            output[x, y] = block[β1, β2]
-#        end
-#    end
-#    output
-#end
+function cache!(matrix::AngularCovarianceMatrix)
+    matrix.cached[] = true
+    empty!(matrix.blocks)
+    for l = 0:matrix.lmax
+        push!(matrix.blocks, read_from_disk(matrix, l))
+    end
+    matrix
+end
+
+function flush!(matrix::AngularCovarianceMatrix)
+    for l = 0:matrix.lmax
+        write_to_disk(matrix, matrix.blocks[l+1], l)
+    end
+    empty!(matrix.blocks)
+    matrix.cached[] = false
+    matrix
+end
+
+function read_from_disk(matrix::AngularCovarianceMatrix, l::Integer)
+    filename   = @sprintf("l=%04d.jld2", l)
+    objectname = "block"
+    load(joinpath(matrix.path, filename), objectname) :: Matrix{Float64}
+end
+
+function write_to_disk(matrix::AngularCovarianceMatrix, block::Matrix{Float64}, l::Integer)
+    filename   = @sprintf("l=%04d.jld2", l)
+    objectname = "block"
+    save(joinpath(matrix.path, filename), objectname, block)
+    block
+end
 

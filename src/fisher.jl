@@ -14,11 +14,11 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 function fisher(transfermatrix, covariancematrices)
-    #@time B = cache(transfermatrix)
-    #@time C = [cache(matrix) for matrix in covariancematrices]
+    @time cache!(transfermatrix)
+    @time foreach(cache!, covariancematrices)
     #save("/dev/shm/mweastwood/cache.jld2", "B", B, "C", C)
-    @time B, C = load("/dev/shm/mweastwood/cache.jld2", "B", "C")
-    @time fisher_iteration(B, C)
+    #@time B, C = load("/dev/shm/mweastwood/cache.jld2", "B", "C")
+    #@time fisher_iteration(B, C)
 end
 
 function fisher_iteration(B, C)

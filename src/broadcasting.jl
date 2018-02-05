@@ -13,24 +13,50 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+progressbar(matrix) = matrix.progressbar
+distribute(matrix) = matrix.distribute
+#flatten(x) = reshape(x, length(x))
+
 function Base.broadcast!(f, output::Union{BlockVector, BlockMatrix}, args...)
-    flatten(x) = reshape(x, length(x))
-    queue = flatten(collect(Iterators.product(indices(output)...)))
+    if distribute(output)
+        return distributed_broadcast!(f, output, args...)
+    else
+        return local_broadcast!(f, output, args...)
+    end
+end
+
+function local_broadcast!(f, output, args...)
+    #queue = flatten(collect(Iterators.product(indices(output)...)))
+    queue = indices(output)
+    if progresbar(output)
+        prg = Progress(length(queue))
+    end
+    for indices in queue
+        just_do_it!(f, output, args, indices)
+    end
+    output
+end
+
+function distributed_broadcast!(f, output, args...)
+    #queue = flatten(collect(Iterators.product(indices(output)...)))
+    queue = indices(output)
     pool  = CachingPool(workers())
-    #lck = ReentrantLock()
-    #prg = Progress(length(queue))
-    #increment() = (lock(lck); next!(prg); unlock(lck))
+    if progressbar(output)
+        lck = ReentrantLock()
+        prg = Progress(length(queue))
+        increment() = (lock(lck); next!(prg); unlock(lck))
+    end
     @sync for worker in workers()
         @async while length(queue) > 0
             indices = shift!(queue)
-            remotecall_fetch(do_on_remote!, pool, f, output, args, indices)
-            #increment()
+            remotecall_fetch(just_do_it!, pool, f, output, args, indices)
+            progressbar(output) && increment()
         end
     end
     output
 end
 
-function do_on_remote!(f, output, args, indices)
+function just_do_it!(f, output, args, indices) # (c) Nike
     output[indices...] = f(getindex.(args, indices...)...)
 end
 
