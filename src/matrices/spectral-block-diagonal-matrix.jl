@@ -46,7 +46,7 @@ Base.show(io::IO, matrix::SpectralBlockDiagonalMatrix) =
     print(io, "SpectralBlockDiagonalMatrix: ", matrix.path)
 
 indices(matrix::SpectralBlockDiagonalMatrix) =
-    [(m, β) for m = 0:matrix.mmax for β = 1:length(matrix.frequencies)]
+    [(m, β) for β = 1:length(matrix.frequencies) for m = 0:matrix.mmax]
 
 function Base.getindex(matrix::SpectralBlockDiagonalMatrix, m, β)
     if matrix.cached[]

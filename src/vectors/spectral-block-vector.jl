@@ -14,9 +14,9 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 struct SpectralBlockVector <: BlockVector
-    mmax :: Int
+    mmax        :: Int
     frequencies :: Vector{typeof(1.0*u"Hz")}
-    blocks :: Matrix{Vector{Complex128}}
+    blocks      :: Matrix{Vector{Complex128}}
 end
 
 function SpectralBlockVector(mmax, frequencies)
@@ -24,7 +24,9 @@ function SpectralBlockVector(mmax, frequencies)
     SpectralBlockVector(mmax, frequencies, blocks)
 end
 
-Base.indices(vector::SpectralBlockVector) = (0:vector.mmax, 1:length(vector.frequencies))
+indices(matrix::SpectralBlockVector) =
+    [(m, β) for β = 1:length(matrix.frequencies) for m = 0:matrix.mmax]
+
 Base.getindex(vector::SpectralBlockVector, m, β) = vector.blocks[m+1, β]
 Base.setindex!(vector::SpectralBlockVector, block, m, β) = vector.blocks[m+1, β] = block
 

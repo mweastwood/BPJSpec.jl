@@ -25,3 +25,8 @@ function Base.:*(A::Matrix, w::WhiteNoiseMachine)
     A*v
 end
 
+function Base.:+(v::Vector, w::WhiteNoiseMachine)
+    [element+w() for element in v]
+end
+Base.:+(w::WhiteNoiseMachine, v::Vector) = v + w
+

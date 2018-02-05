@@ -14,46 +14,31 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 function fisher(transfermatrix, covariancematrices)
-    @time cache!(transfermatrix)
-    @time foreach(cache!, covariancematrices)
-    #save("/dev/shm/mweastwood/cache.jld2", "B", B, "C", C)
-    #@time B, C = load("/dev/shm/mweastwood/cache.jld2", "B", "C")
-    #@time fisher_iteration(B, C)
+    #@time cache!(transfermatrix)
+    #@time foreach(cache!, covariancematrices)
+    #save("/dev/shm/mweastwood/cache.jld2", "B", transfermatrix, "C", covariancematrices)
+    @time transfermatrix, covariancematrices = load("/dev/shm/mweastwood/cache.jld2", "B", "C")
+    @time fisher_iteration(transfermatrix, covariancematrices)
 end
 
 function fisher_iteration(B, C)
-    lmax = mmax = B.matrix.mmax
-    frequencies = B.matrix.frequencies
+    N = length(C)
+    lmax = mmax = B.mmax
+    frequencies = B.frequencies
     v  = WhiteNoiseVector()
     Bv = SpectralBlockVector(mmax, frequencies)
     @. Bv = B * v
-    q = zeros(Complex128, mmax+1, length(C))
-    for m = 0:mmax
-        Bv′ = reorder(Bv, m)
-        for a = 1:length(C)
-            Ca = C[a]
-            CBv = AngularBlockVector(lmax, m)
-            @. CBv = Ca * Bv′
-            q[m+1, a] = dot(Bv′, CBv)
-        end
+    Bv′ = AngularBlockVector(Bv)
+    CBv = AngularBlockVector(lmax, mmax)
+    q = zeros(Complex128, N)
+    prg = Progress(N)
+    for a = 1:N
+        Ca = C[a]
+        @. CBv = Ca * Bv′
+        q[a] = dot(CBv, Bv′)
+        next!(prg)
     end
     q
-end
-
-function reorder(input, m)
-    lmax  = input.mmax
-    Nfreq = length(input.frequencies)
-    N = lmax - m + 1
-    output = AngularBlockVector(lmax, m)
-    for l = m:lmax
-        output_block = zeros(Complex128, Nfreq)
-        for β = 1:Nfreq
-            input_block = input[m, β]
-            output_block[β] = input_block[l-m+1]
-        end
-        output[l] = output_block
-    end
-    output
 end
 
 

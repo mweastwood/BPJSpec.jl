@@ -15,31 +15,79 @@
 
 struct BlockDiagonalMatrix <: BlockMatrix
     path :: String
-    mmax :: Int
-    function BlockDiagonalMatrix(path, mmax, write=true)
+    progressbar :: Bool
+    distribute  :: Bool
+    cached      :: Ref{Bool}
+    mmax        :: Int
+    blocks      :: Vector{Matrix{Complex128}}
+
+    function BlockDiagonalMatrix(path, mmax, write=true;
+                                 progressbar=false, distribute=false, cached=true)
         if write
             isdir(path) || mkpath(path)
             save(joinpath(path, "METADATA.jld2"), "mmax", mmax)
         end
-        new(path, mmax)
+        blocks = Matrix{Complex128}[]
+        output = new(path, progressbar, distribute, Ref(cached), mmax, blocks)
+        if cached
+            cache!(output)
+        end
+        output
     end
 end
 
-function BlockDiagonalMatrix(path)
+function BlockDiagonalMatrix(path; kwargs...)
     mmax = load(joinpath(path, "METADATA.jld2"), "mmax")
-    BlockDiagonalMatrix(path, mmax, false)
+    BlockDiagonalMatrix(path, mmax, false; kwargs...)
 end
 
-Base.show(io::IO, matrix::BlockDiagonalMatrix) = print(io, "BlockDiagonalMatrix: ", matrix.path)
-Base.indices(matrix::BlockDiagonalMatrix) = (0:matrix.mmax,)
+Base.show(io::IO, matrix::BlockDiagonalMatrix) =
+    print(io, "BlockDiagonalMatrix: ", matrix.path)
+
+Base.indices(matrix::BlockDiagonalMatrix) = collect(0:matrix.mmax)
 
 function Base.getindex(matrix::BlockDiagonalMatrix, m)
+    if matrix.cached[]
+        return matrix.blocks[m+1]
+    else
+        return read_from_disk(matrix, m)
+    end
+end
+
+function Base.setindex!(matrix::BlockDiagonalMatrix, block, m)
+    if matrix.cached[]
+        matrix.blocks[m+1] = block
+    else
+        write_to_disk(matrix, block, m)
+    end
+    block
+end
+
+function cache!(matrix::BlockDiagonalMatrix)
+    matrix.cached[] = true
+    empty!(matrix.blocks)
+    for m = 0:matrix.mmax
+        push!(matrix.blocks, read_from_disk(matrix, m))
+    end
+    matrix
+end
+
+function flush!(matrix::BlockDiagonalMatrix)
+    for m = 0:matrix.mmax
+        write_to_disk(matrix, matrix.blocks[m+1], m)
+    end
+    empty!(matrix.blocks)
+    matrix.cached[] = false
+    matrix
+end
+
+function read_from_disk(matrix::BlockDiagonalMatrix, m)
     filename   = @sprintf("m=%4d.jld2", m)
     objectname = "block"
     load(joinpath(transfermatrix.path, filename), objectname) :: Matrix{Complex128}
 end
 
-function Base.setindex!(matrix::BlockDiagonalMatrix, block::Matrix{Complex128}, m)
+function write_to_disk(matrix::BlockDiagonalMatrix, block::Matrix{Complex128}, m)
     filename   = @sprintf("m=%4d.jld2", m)
     objectname = "block"
     save(joinpath(transfermatrix.path, filename), objectname, block)

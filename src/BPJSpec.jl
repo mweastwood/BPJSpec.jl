@@ -45,7 +45,7 @@ include("matrices/block-diagonal-matrix.jl")
 include("matrices/spectral-block-diagonal-matrix.jl")
 include("matrices/angular-covariance-matrix.jl")
 include("matrices/transfer-matrix.jl")
-include("matrices/cached-block-matrix.jl")
+#include("matrices/cached-block-matrix.jl")
 
 abstract type BlockVector end
 include("vectors/spectral-block-vector.jl")

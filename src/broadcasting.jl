@@ -13,9 +13,10 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-progressbar(matrix) = matrix.progressbar
-distribute(matrix) = matrix.distribute
-#flatten(x) = reshape(x, length(x))
+progressbar(matrix::BlockMatrix) = matrix.progressbar
+distribute(matrix::BlockMatrix)  = matrix.distribute
+progressbar(::BlockVector) = false
+distribute(::BlockVector)  = false
 
 function Base.broadcast!(f, output::Union{BlockVector, BlockMatrix}, args...)
     if distribute(output)
@@ -26,9 +27,8 @@ function Base.broadcast!(f, output::Union{BlockVector, BlockMatrix}, args...)
 end
 
 function local_broadcast!(f, output, args...)
-    #queue = flatten(collect(Iterators.product(indices(output)...)))
     queue = indices(output)
-    if progresbar(output)
+    if progressbar(output)
         prg = Progress(length(queue))
     end
     for indices in queue
@@ -38,7 +38,6 @@ function local_broadcast!(f, output, args...)
 end
 
 function distributed_broadcast!(f, output, args...)
-    #queue = flatten(collect(Iterators.product(indices(output)...)))
     queue = indices(output)
     pool  = CachingPool(workers())
     if progressbar(output)

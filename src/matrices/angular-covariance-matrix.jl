@@ -52,7 +52,7 @@ Base.show(io::IO, matrix::AngularCovarianceMatrix) =
     print(io, "AngularCovarianceMatrix: ", matrix.path)
 
 indices(matrix::AngularCovarianceMatrix) =
-    [(l, m) for l = 0:matrix.lmax for m = l:matrix.lmax]
+    [(l, m) for m = 0:matrix.mmax for l = m:matrix.lmax]
 
 function Base.getindex(matrix::AngularCovarianceMatrix, l::Integer)
     if matrix.cached[]
