@@ -18,19 +18,28 @@ struct AngularCovarianceMatrix <: BlockMatrix
     lmax :: Int
     frequencies :: Vector{typeof(1.0*u"Hz")}
     component   :: SkyComponent
-    function AngularCovarianceMatrix(path, lmax, frequencies, component)
-        isdir(path) || mkpath(path)
-        save(joinpath(path, "METADATA.jld2"), "lmax", lmax,
-             "frequencies", frequencies, "component", component)
-        new(path, lmax, frequencies, component)
+    function AngularCovarianceMatrix(path, lmax, frequencies, component, write=true)
+        if write
+            isdir(path) || mkpath(path)
+            save(joinpath(path, "METADATA.jld2"), "lmax", lmax,
+                 "frequencies", frequencies, "component", component)
+        end
+        output = new(path, lmax, frequencies, component)
+        write && compute!(output)
+        output
     end
 end
 
 function AngularCovarianceMatrix(path)
     lmax, frequencies, component = load(joinpath(path, "METADATA.jld2"),
                                         "lmax", "frequencies", "component")
-    AngularCovarianceMatrix(path, lmax, frequencies, component)
+    AngularCovarianceMatrix(path, lmax, frequencies, component, false)
 end
+
+Base.show(io::IO, matrix::AngularCovarianceMatrix) =
+    print(io, "AngularCovarianceMatrix: ", matrix.path)
+Base.indices(matrix::AngularCovarianceMatrix) = (0:matrix.lmax,)
+normalize_indices(::AngularCovarianceMatrix, l) = l+1
 
 function Base.getindex(matrix::AngularCovarianceMatrix, l)
     filename   = @sprintf("l=%04d.jld2", l)
@@ -47,7 +56,6 @@ end
 
 function compute!(matrix::AngularCovarianceMatrix)
     Nfreq = length(matrix.frequencies)
-    prg = Progress(matrix.lmax+1)
     for l = 0:matrix.lmax
         block = zeros(Float64, Nfreq, Nfreq)
         for β1 = 1:Nfreq
@@ -60,23 +68,22 @@ function compute!(matrix::AngularCovarianceMatrix)
             end
         end
         matrix[l] = block
-        next!(prg)
     end
 end
 
-function densify(matrix::AngularCovarianceMatrix, m)
-    Nfreq = length(matrix.frequencies)
-    lmax  = matrix.lmax
-    N = (lmax-m+1)*Nfreq
-    output = zeros(Float64, N, N)
-    for l = m:lmax
-        block = matrix[l]
-        for β1 = 1:Nfreq, β2 = 1:Nfreq
-            x = (lmax-m+1)*(β1-1) + l + 1
-            y = (lmax-m+1)*(β2-1) + l + 1
-            output[x, y] = block[β1, β2]
-        end
-    end
-    output
-end
+#function densify(matrix::AngularCovarianceMatrix, m)
+#    Nfreq = length(matrix.frequencies)
+#    lmax  = matrix.lmax
+#    N = (lmax-m+1)*Nfreq
+#    output = zeros(Float64, N, N)
+#    for l = m:lmax
+#        block = matrix[l]
+#        for β1 = 1:Nfreq, β2 = 1:Nfreq
+#            x = (lmax-m+1)*(β1-1) + l + 1
+#            y = (lmax-m+1)*(β2-1) + l + 1
+#            output[x, y] = block[β1, β2]
+#        end
+#    end
+#    output
+#end
 

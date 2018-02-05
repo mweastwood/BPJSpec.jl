@@ -13,24 +13,22 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-function Base.broadcast!(f, output::Union{BlockVector, BlockMatrix}, args...)
-    flatten(x) = reshape(x, length(x))
-    queue = flatten(collect(Iterators.product(indices(output)...)))
-    pool  = CachingPool(workers())
-    #lck = ReentrantLock()
-    #prg = Progress(length(queue))
-    #increment() = (lock(lck); next!(prg); unlock(lck))
-    @sync for worker in workers()
-        @async while length(queue) > 0
-            indices = shift!(queue)
-            remotecall_fetch(do_on_remote!, pool, f, output, args, indices)
-            #increment()
-        end
-    end
-    output
+struct AngularBlockVector <: BlockVector
+    lmax :: Int
+    m    :: Int
+    blocks :: Vector{Vector{Complex128}}
 end
 
-function do_on_remote!(f, output, args, indices)
-    output[indices...] = f(getindex.(args, indices...)...)
+function AngularBlockVector(lmax, m)
+    blocks = Array{Vector{Complex128}}(lmax-m+1)
+    AngularBlockVector(lmax, m, blocks)
+end
+
+Base.indices(vector::AngularBlockVector) = (vector.m:vector.lmax,)
+Base.getindex(vector::AngularBlockVector, l) = vector.blocks[l-vector.m+1]
+Base.setindex!(vector::AngularBlockVector, block, l) = vector.blocks[l-vector.m+1] = block
+
+function Base.dot(lhs::AngularBlockVector, rhs::AngularBlockVector)
+    sum(dot(b1, b2) for (b1, b2) in zip(lhs.blocks, rhs.blocks))
 end
 

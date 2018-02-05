@@ -187,10 +187,8 @@ function create_beam_map(f, metadata, size)
     map
 end
 
-function Base.getindex(transfermatrix::HierarchicalTransferMatrix, m, ν)
-    if !(uconvert(u"Hz", ν) in transfermatrix.metadata.frequencies)
-        error("unkown frequency")
-    end
+function Base.getindex(transfermatrix::HierarchicalTransferMatrix, m, β)
+    ν = transfermatrix.metadata.frequencies[β]
 
     # load each hierarchical component of the transfer matrix
     hierarchy = load(joinpath(transfermatrix.path, "HIERARCHY.jld2"), "hierarchy")

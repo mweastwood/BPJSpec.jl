@@ -25,13 +25,13 @@ struct BlockDiagonalMatrix <: BlockMatrix
     end
 end
 
-Base.show(io::IO, matrix::BlockDiagonalMatrix) = print(io, "BlockDiagonalMatrix: ", matrix.path)
-Base.indices(matrix::BlockDiagonalMatrix) = 0:matrix.mmax
-
 function BlockDiagonalMatrix(path)
     mmax = load(joinpath(path, "METADATA.jld2"), "mmax")
     BlockDiagonalMatrix(path, mmax, false)
 end
+
+Base.show(io::IO, matrix::BlockDiagonalMatrix) = print(io, "BlockDiagonalMatrix: ", matrix.path)
+Base.indices(matrix::BlockDiagonalMatrix) = (0:matrix.mmax,)
 
 function Base.getindex(matrix::BlockDiagonalMatrix, m)
     filename   = @sprintf("m=%4d.jld2", m)

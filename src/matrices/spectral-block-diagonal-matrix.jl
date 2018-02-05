@@ -14,8 +14,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 struct SpectralBlockDiagonalMatrix <: BlockMatrix
-    path  :: String
-    mmax  :: Int
+    path :: String
+    mmax :: Int
     frequencies :: Vector{typeof(1.0*u"Hz")}
     function SpectralBlockDiagonalMatrix(path, mmax, frequencies, write=true)
         if write
@@ -33,21 +33,19 @@ end
 
 Base.show(io::IO, matrix::SpectralBlockDiagonalMatrix) =
     print(io, "SpectralBlockDiagonalMatrix: ", matrix.path)
-Base.indices(matrix::SpectralBlockDiagonalMatrix) = (0:matrix.mmax, matrix.frequencies)
+Base.indices(matrix::SpectralBlockDiagonalMatrix) = (0:matrix.mmax, 1:length(matrix.frequencies))
+normalize_indices(::SpectralBlockDiagonalMatrix, m) = m+1
+normalize_indices(::SpectralBlockDiagonalMatrix, m, β) = (m+1, β)
 
-function Base.getindex(matrix::SpectralBlockDiagonalMatrix, m, ν)
-    if !(uconvert(u"Hz", ν) in matrix.frequencies)
-        error("unkown frequency")
-    end
+function Base.getindex(matrix::SpectralBlockDiagonalMatrix, m, β)
+    ν = matrix.frequencies[β]
     filename   = @sprintf("%.3fMHz.jld2", ustrip(uconvert(u"MHz", ν)))
     objectname = @sprintf("%04d", m)
     load(joinpath(matrix.path, filename), objectname) :: Matrix{Complex128}
 end
 
-function Base.setindex!(matrix::SpectralBlockDiagonalMatrix, block, m, ν)
-    if !(uconvert(u"Hz", ν) in matrix.frequencies)
-        error("unkown frequency")
-    end
+function Base.setindex!(matrix::SpectralBlockDiagonalMatrix, block, m, β)
+    ν = matrix.frequencies[β]
     filename   = @sprintf("%.3fMHz.jld2", ustrip(uconvert(u"MHz", ν)))
     objectname = @sprintf("%04d", m)
     jldopen(joinpath(matrix.path, filename), "a+") do file
@@ -57,7 +55,7 @@ function Base.setindex!(matrix::SpectralBlockDiagonalMatrix, block, m, ν)
 end
 
 function Base.getindex(matrix::SpectralBlockDiagonalMatrix, m)
-    blocks = [matrix[m, ν] for ν in matrix.frequencies]
+    blocks = [matrix[m, β] for β = 1:length(matrix.frequencies)]
     X = sum(size.(blocks, 1))
     Y = sum(size.(blocks, 2))
     output = zeros(Complex128, X, Y)
