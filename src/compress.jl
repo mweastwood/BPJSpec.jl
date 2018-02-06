@@ -21,40 +21,32 @@
 # disk space to store. Therefore we will compute the SVD, compress both the transfer matrix and the
 # m-modes before discarding the SVD.
 
-function lossless_compress(path, input::TransferMatrix) # TODO: compress m-modes simultaneously
+function full_rank_compress(transfermatrix::TransferMatrix, noise::NoiseMatrix)
+    path = dirname(transfermatrix.path)
     lmax = getlmax(input)
     mmax = lmax
-    output = SpectralBlockDiagonalMatrix(path, mmax, input.metadata.frequencies)
+    frequencies = transfermatrix.metadata.frequencies
 
-    pool  = CachingPool(workers())
-    queue = [(m, ν) for ν in input.metadata.frequencies for m = 0:mmax]
+    output_transfermatrix = SpectralBlockDiagonalMatrix(joinpath(path, "transfermatrix-compressed"),
+                                                        mmax, transfermatrix.metadata.frequencies,
+                                                        progressbar=true, distribute=true)
 
-    lck = ReentrantLock()
-    prg = Progress(length(queue))
-    increment() = (lock(lck); next!(prg); unlock(lck))
+    output_noise = SpectralBlockDiagonalMatrix(joinpath(path, "noisematrix-compressed"),
+                                               mmax, transfermatrix.metadata.frequencies,
+                                               progressbar=true, distribute=true)
 
-    @sync for worker in workers()
-        @async while length(queue) > 0
-            m, ν = pop!(queue)
-            B = remotecall_fetch(_lossless_compress, pool, input, m, ν)
-            output[m, ν] = B
-            increment()
-        end
-    end
-    output
+    multi_broadcast!(compress, (output_transfermatrix, output_noise), (transfermatrix, noise))
 end
 
-function _lossless_compress(input, m, ν)
-    B = input[m, ν]
-    _lossless_compress_svd(B)
-end
-
-function _lossless_compress_svd(B)
+function compress(B, N)
     F = svdfact(B)
-    F[:U]'*B
+    B′ = F[:U]'*B
+    N′ = F[:U]'*N*F[:U]
+    B′, N′
 end
 
-function average_channels(path, input, Navg)
+function average_channels(transfermatrix::SpectralBlockDiagonalMatrix,
+                          noise::SpectralBlockDiagonalMatrix, Navg)
     Nfreq  = length(input.frequencies)
     Nfreq′ = Nfreq ÷ Navg + 1
     mmax  = input.mmax
@@ -72,9 +64,9 @@ function average_channels(path, input, Navg)
         range = (1:Navg) + (idx-1)*Navg
         range = range[1]:min(range[end], Nfreq)
         for m = 0:mmax
-            block = input[m, input.frequencies[range[1]]]
-            for ν in input.frequencies[range[2:end]]
-                block = [block; input[m, ν]]
+            block = input[m, range[1]]
+            for β in range[2:end]
+                block = [block; input[m, β]]
             end
             block = _lossless_compress_svd(block)
             output[m, frequencies[idx]] = block

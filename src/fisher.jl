@@ -30,12 +30,12 @@ function fisher_iteration(B, C)
     @. Bv = B * v
     Bv′ = AngularBlockVector(Bv)
     CBv = AngularBlockVector(lmax, mmax)
-    q = zeros(Complex128, N)
+    q = zeros(N)
     prg = Progress(N)
     for a = 1:N
         Ca = C[a]
         @. CBv = Ca * Bv′
-        q[a] = dot(CBv, Bv′)
+        q[a] = real(dot(CBv, Bv′))
         next!(prg)
     end
     q

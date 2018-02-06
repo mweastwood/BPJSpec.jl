@@ -20,13 +20,13 @@ distribute(::BlockVector)  = false
 
 function Base.broadcast!(f, output::Union{BlockVector, BlockMatrix}, args...)
     if distribute(output)
-        return distributed_broadcast!(f, output, args...)
+        return distributed_broadcast!(f, output, args)
     else
-        return local_broadcast!(f, output, args...)
+        return local_broadcast!(f, output, args)
     end
 end
 
-function local_broadcast!(f, output, args...)
+function local_broadcast!(f, output, args)
     queue = indices(output)
     if progressbar(output)
         prg = Progress(length(queue))
@@ -37,7 +37,7 @@ function local_broadcast!(f, output, args...)
     output
 end
 
-function distributed_broadcast!(f, output, args...)
+function distributed_broadcast!(f, output, args)
     queue = indices(output)
     pool  = CachingPool(workers())
     if progressbar(output)
@@ -55,7 +55,32 @@ function distributed_broadcast!(f, output, args...)
     output
 end
 
+function multi_broadcast!(f, outputs, args)
+    queue = indices(outputs[1])
+    pool  = CachingPool(workers())
+    if progressbar(outputs[1])
+        lck = ReentrantLock()
+        prg = Progress(length(queue))
+        increment() = (lock(lck); next!(prg); unlock(lck))
+    end
+    @sync for worker in workers()
+        @async while length(queue) > 0
+            indices = shift!(queue)
+            remotecall_fetch(just_do_it!, pool, f, outputs, args, indices)
+            progressbar(outputs[1]) && increment()
+        end
+    end
+    output
+end
+
 function just_do_it!(f, output, args, indices) # (c) Nike
     output[indices...] = f(getindex.(args, indices...)...)
+end
+
+function just_do_it!(f, outputs::Tuple, args, indices) # (c) Nike
+    result = f(getindex.(args, indices...)...)
+    for idx = 1:length(result)
+        output[idx][indices...] = result[idx]
+    end
 end
 

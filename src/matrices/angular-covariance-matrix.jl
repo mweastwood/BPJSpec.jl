@@ -48,6 +48,23 @@ function AngularCovarianceMatrix(path; kwargs...)
     AngularCovarianceMatrix(path, lmax, frequencies, component, false; kwargs...)
 end
 
+function compute!(matrix::AngularCovarianceMatrix)
+    Nfreq = length(matrix.frequencies)
+    for l = 0:matrix.lmax
+        block = zeros(Float64, Nfreq, Nfreq)
+        for β1 = 1:Nfreq
+            ν1 = matrix.frequencies[β1]
+            block[β1, β1] = matrix.component(l, ν1, ν1)
+            for β2 = β1+1:Nfreq
+                ν2 = matrix.frequencies[β2]
+                block[β1, β2] = matrix.component(l, ν1, ν2)
+                block[β2, β1] = block[β1, β2]
+            end
+        end
+        matrix[l] = block
+    end
+end
+
 Base.show(io::IO, matrix::AngularCovarianceMatrix) =
     print(io, "AngularCovarianceMatrix: ", matrix.path)
 
@@ -73,23 +90,6 @@ end
 
 Base.getindex(matrix::AngularCovarianceMatrix, l, m) = matrix[l]
 Base.setindex!(matrix::AngularCovarianceMatrix, block, l, m) = matrix[l] = block
-
-function compute!(matrix::AngularCovarianceMatrix)
-    Nfreq = length(matrix.frequencies)
-    for l = 0:matrix.lmax
-        block = zeros(Float64, Nfreq, Nfreq)
-        for β1 = 1:Nfreq
-            ν1 = matrix.frequencies[β1]
-            block[β1, β1] = matrix.component(l, ν1, ν1)
-            for β2 = β1+1:Nfreq
-                ν2 = matrix.frequencies[β2]
-                block[β1, β2] = matrix.component(l, ν1, ν2)
-                block[β2, β1] = block[β1, β2]
-            end
-        end
-        matrix[l] = block
-    end
-end
 
 function cache!(matrix::AngularCovarianceMatrix)
     matrix.cached[] = true

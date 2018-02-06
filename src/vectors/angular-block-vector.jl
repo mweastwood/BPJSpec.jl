@@ -39,6 +39,10 @@ function AngularBlockVector(input::SpectralBlockVector)
     output
 end
 
+function SpectralBlockVector(input::AngularBlockVector)
+
+end
+
 indices(matrix::AngularBlockVector) =
     [(l, m) for m = 0:matrix.mmax for l = m:matrix.lmax]
 
