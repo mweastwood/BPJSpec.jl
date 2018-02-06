@@ -100,6 +100,7 @@ function compute_baseline_group_one_frequency!(transfermatrix::HierarchicalTrans
         @async while length(queue) > 0
             α = pop!(queue)
             real_coeff, imag_coeff = remotecall_fetch(just_do_it, pool, α)
+            fix_scaling!(real_coeff, imag_coeff, ν)
             write_to_blocks!(blocks, real_coeff, imag_coeff, lmax, mmax, α)
             increment()
         end
@@ -117,6 +118,17 @@ function compute_baseline_group_one_frequency!(transfermatrix::HierarchicalTrans
     end
 
     blocks
+end
+
+function fix_scaling!(real_coeff, imag_coeff, ν)
+    # Our m-modes are in units of Jy, but our alm are in units of K. Here we apply the scaling
+    # factor to the transfer matrix that makes this work with the right units.
+
+    # This is the conversion factor I have been using to convert my alm into units of K. We'll apply
+    # the inverse here to the transfer matrix so that this conversion factor is no longer necessary.
+    factor = ustrip(uconvert(u"K", u"Jy * c^2/(2*k)"/ν^2))
+    real_coeff.matrix ./= factor
+    imag_coeff.matrix ./= factor
 end
 
 function write_to_blocks!(blocks, real_coeff, imag_coeff, lmax, mmax, α)
