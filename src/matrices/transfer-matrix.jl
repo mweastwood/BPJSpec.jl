@@ -230,8 +230,12 @@ end
 
 function getlmax(transfermatrix::HierarchicalTransferMatrix)
     # TODO: I'd like to have this stored as a field...
-    hierarchy = load(joinpath(transfermatrix.path, "HIERARCHY.jld2"), "hierarchy")
+    hierarchy = gethierarchy(transfermatrix)
     hierarchy.divisions[end]
+end
+
+function gethierarchy(transfermatrix::HierarchicalTransferMatrix)
+    load(joinpath(transfermatrix.path, "HIERARCHY.jld2"), "hierarchy") :: Hierarchy
 end
 
 "Get the baseline permutation vector for the given value of m."

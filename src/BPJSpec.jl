@@ -18,6 +18,7 @@
 module BPJSpec
 
 export HierarchicalTransferMatrix
+export NoiseMatrix
 export MModes
 
 using CasaCore.Measures
@@ -34,6 +35,7 @@ include("parallel.jl")
 include("cosmology.jl")
 include("spherical-harmonics.jl")
 include("metadata.jl")
+include("hierarchy.jl")
 
 abstract type SkyComponent end
 include("sky/foregrounds.jl")
@@ -56,7 +58,6 @@ include("vectors/white-noise-vector.jl")
 
 include("broadcasting.jl")
 
-include("hierarchy.jl")
 include("m-modes.jl")
 include("compress.jl")
 include("imaging.jl")

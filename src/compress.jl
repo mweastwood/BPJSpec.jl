@@ -21,21 +21,22 @@
 # disk space to store. Therefore we will compute the SVD, compress both the transfer matrix and the
 # m-modes before discarding the SVD.
 
-function full_rank_compress(transfermatrix::TransferMatrix, noise::NoiseMatrix)
+function full_rank_compress(transfermatrix::TransferMatrix, noisematrix::NoiseMatrix)
     path = dirname(transfermatrix.path)
-    lmax = getlmax(input)
+    lmax = getlmax(transfermatrix)
     mmax = lmax
     frequencies = transfermatrix.metadata.frequencies
 
-    output_transfermatrix = SpectralBlockDiagonalMatrix(joinpath(path, "transfermatrix-compressed"),
-                                                        mmax, transfermatrix.metadata.frequencies,
+    suffix = "-compressed"
+    file = joinpath(path, "transfer-matrix"*suffix)
+    output_transfermatrix = SpectralBlockDiagonalMatrix(file, mmax, frequencies,
                                                         progressbar=true, distribute=true)
+    file = joinpath(path, "noise-matrix"*suffix)
+    output_noisematrix = SpectralBlockDiagonalMatrix(file, mmax, frequencies,
+                                                     progressbar=true, distribute=true)
 
-    output_noise = SpectralBlockDiagonalMatrix(joinpath(path, "noisematrix-compressed"),
-                                               mmax, transfermatrix.metadata.frequencies,
-                                               progressbar=true, distribute=true)
-
-    multi_broadcast!(compress, (output_transfermatrix, output_noise), (transfermatrix, noise))
+    multi_broadcast!(compress, (output_transfermatrix, output_noisematrix),
+                     (transfermatrix, noisematrix))
 end
 
 function compress(B, N)
@@ -46,30 +47,39 @@ function compress(B, N)
 end
 
 function average_channels(transfermatrix::SpectralBlockDiagonalMatrix,
-                          noise::SpectralBlockDiagonalMatrix, Navg)
-    Nfreq  = length(input.frequencies)
+                          noisematrix::SpectralBlockDiagonalMatrix, Navg)
+    Nfreq  = length(transfermatrix.frequencies)
     Nfreq′ = Nfreq ÷ Navg + 1
-    mmax  = input.mmax
+    mmax   = transfermatrix.mmax
 
-    frequencies = zeros(eltype(input.frequencies), Nfreq′)
+    # Decide which channels to average down and the resulting average frequencies.
+    ranges = Array{UnitRange{Int}}(Nfreq′)
+    frequencies = Array{eltype(transfermatrix.frequencies)}(Nfreq′)
     for idx = 1:Nfreq′
         range = (1:Navg) + (idx-1)*Navg
         range = range[1]:min(range[end], Nfreq)
-        frequencies[idx] = mean(input.frequencies[range])
+        ranges[idx] = range
+        frequencies[idx] = mean(transfermatrix.frequencies[range])
     end
 
-    output = SpectralBlockDiagonalMatrix(path, mmax, frequencies)
+    suffix = "-averaged"
+    output_transfermatrix = SpectralBlockDiagonalMatrix(joinpath(path, "transfer-matrix"*suffix),
+                                                        mmax, transfermatrix.metadata.frequencies,
+                                                        progressbar=true, distribute=false)
+    output_noisematrix = SpectralBlockDiagonalMatrix(joinpath(path, "noise-matrix"*suffix),
+                                               mmax, transfermatrix.metadata.frequencies,
+                                               progressbar=true, distribute=false)
+
+    # Perform the averaging.
     prg = Progress(Nfreq′)
     for idx = 1:Nfreq′
-        range = (1:Navg) + (idx-1)*Navg
-        range = range[1]:min(range[end], Nfreq)
+        range = ranges[idx]
         for m = 0:mmax
-            block = input[m, range[1]]
-            for β in range[2:end]
-                block = [block; input[m, β]]
-            end
-            block = _lossless_compress_svd(block)
-            output[m, frequencies[idx]] = block
+            B = stack(transfermatrix, m, range)
+            N = noisematrix[m, range]
+            B′, N′ = compress(B, N)
+            output_transfermatrix[m, idx] = B′
+            output_noisematrix[m, idx] = B′
         end
         next!(prg)
     end

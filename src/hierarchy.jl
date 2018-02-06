@@ -110,3 +110,13 @@ function categorize_baselines(lmax, divisions)
     [find(divisions[idx] .≤ lmax .< divisions[idx+1]) for idx = 1:length(divisions)-1]
 end
 
+function Nbase(hierarchy::Hierarchy, l)
+    output = 0
+    for idx = 1:length(hierarchy.divisions)-1
+        lmax = hierarchy.divisions[idx+1]
+        l > lmax && continue
+        output += length(hierarchy.baselines[idx])
+    end
+    output
+end
+

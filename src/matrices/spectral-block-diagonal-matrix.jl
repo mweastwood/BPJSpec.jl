@@ -48,7 +48,7 @@ Base.show(io::IO, matrix::SpectralBlockDiagonalMatrix) =
 indices(matrix::SpectralBlockDiagonalMatrix) =
     [(m, β) for β = 1:length(matrix.frequencies) for m = 0:matrix.mmax]
 
-function Base.getindex(matrix::SpectralBlockDiagonalMatrix, m, β)
+function Base.getindex(matrix::SpectralBlockDiagonalMatrix, m, β::Integer)
     if matrix.cached[]
         return matrix.blocks[m+1, β]
     else
@@ -65,8 +65,8 @@ function Base.setindex!(matrix::SpectralBlockDiagonalMatrix, block, m, β)
     block
 end
 
-function Base.getindex(matrix::SpectralBlockDiagonalMatrix, m)
-    blocks = [matrix[m, β] for β = 1:length(matrix.frequencies)]
+function Base.getindex(matrix::SpectralBlockDiagonalMatrix, m, β::AbstractVector)
+    blocks = [matrix[m, β′] for β′ in β]
     X = sum(size.(blocks, 1))
     Y = sum(size.(blocks, 2))
     output = zeros(Complex128, X, Y)
@@ -75,6 +75,25 @@ function Base.getindex(matrix::SpectralBlockDiagonalMatrix, m)
         output[x:x+size(block, 1)-1, y:y+size(block, 2)-1] = block
         x += size(block, 1)
         y += size(block, 2)
+    end
+    output
+end
+
+Base.getindex(matrix::SpectralBlockDiagonalMatrix, m) = matrix[m, 1:length(matrix.frequencies)]
+
+"""
+Stack the given frequency blocks on top of each other (as opposed to diagonally). This is used when
+averaging frequency channels together.
+"""
+function stack(matrix::SpectralBlockDiagonalMatrix, m, β::AbstractVector)
+    blocks = [matrix[m, β′] for β′ in β]
+    X = sum(size.(blocks, 1))
+    Y = size.(blocks[1], 2)
+    output = zeros(Complex128, X, Y)
+    x = 1
+    for block in blocks
+        output[x:x+size(block, 1)-1, :] = block
+        x += size(block, 1)
     end
     output
 end
@@ -97,18 +116,19 @@ end
 
 function read_from_disk(matrix::SpectralBlockDiagonalMatrix, m, β)
     ν = matrix.frequencies[β]
-    filename   = @sprintf("%.3fMHz.jld2", ustrip(uconvert(u"MHz", ν)))
-    objectname = @sprintf("%04d", m)
-    load(joinpath(matrix.path, filename), objectname) :: Matrix{Complex128}
+    dirname    = @sprintf("%.3fMHz", ustrip(uconvert(u"MHz", ν)))
+    filename   = @sprintf("%04d.jld2", m)
+    objectname = "block"
+    load(joinpath(matrix.path, dirname, filename), objectname) :: Matrix{Complex128}
 end
 
 function write_to_disk(matrix::SpectralBlockDiagonalMatrix, block::Matrix{Complex128}, m, β)
     ν = matrix.frequencies[β]
-    filename   = @sprintf("%.3fMHz.jld2", ustrip(uconvert(u"MHz", ν)))
-    objectname = @sprintf("%04d", m)
-    jldopen(joinpath(matrix.path, filename), "a+") do file
-        file[objectname] = block
-    end
+    dirname    = @sprintf("%.3fMHz", ustrip(uconvert(u"MHz", ν)))
+    filename   = @sprintf("%04d.jld2", m)
+    objectname = "block"
+    isdir(joinpath(matrix.path, dirname)) || mkdir(joinpath(matrix.path, dirname))
+    save(joinpath(matrix.path, dirname, filename), objectname, block)
     block
 end
 

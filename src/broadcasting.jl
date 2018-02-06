@@ -70,7 +70,7 @@ function multi_broadcast!(f, outputs, args)
             progressbar(outputs[1]) && increment()
         end
     end
-    output
+    outputs
 end
 
 function just_do_it!(f, output, args, indices) # (c) Nike
@@ -78,9 +78,15 @@ function just_do_it!(f, output, args, indices) # (c) Nike
 end
 
 function just_do_it!(f, outputs::Tuple, args, indices) # (c) Nike
-    result = f(getindex.(args, indices...)...)
-    for idx = 1:length(result)
-        output[idx][indices...] = result[idx]
+    local results
+    try
+        results = f(getindex.(args, indices...)...)
+    catch exception
+        @show indices
+        rethrow(exception)
+    end
+    for idx = 1:length(results)
+        outputs[idx][indices...] = results[idx]
     end
 end
 

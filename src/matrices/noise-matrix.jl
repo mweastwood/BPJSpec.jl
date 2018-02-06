@@ -19,7 +19,7 @@ struct NoiseModel
     Δν    :: typeof(1.0*u"kHz") # bandwidth
     τ     :: typeof(1.0*u"s")   # integration time (for a single time slice)
     Nint  :: Int                # total number of integrations used in the dataset
-    Nbase :: Int                # number of baselines
+    hierarchy :: Hierarchy
 end
 
 struct NoiseMatrix <: BlockMatrix
@@ -36,9 +36,10 @@ struct NoiseMatrix <: BlockMatrix
                          progressbar=false, distribute=false, cached=false)
         if write
             isdir(path) || mkpath(path)
-            save(joinpath(path, "METADATA.jld2"), "mmax", mmax, "frequencies", frequencies)
+            save(joinpath(path, "METADATA.jld2"),
+                 "mmax", mmax, "frequencies", frequencies, "model", model)
         end
-        blocks = Array{Matrix{Complex128}}(mmax+1, length(frequencies))
+        blocks = fill(Diagonal(Float64[]), mmax+1, length(frequencies))
         output = new(path, progressbar, distribute, Ref(cached), mmax, frequencies, blocks, model)
         if write
             compute!(output)
@@ -50,8 +51,9 @@ struct NoiseMatrix <: BlockMatrix
 end
 
 function NoiseMatrix(path; kwargs...)
-    mmax, frequencies = load(joinpath(path, "METADATA.jld2"), "mmax", "frequencies")
-    NoiseMatrix(path, mmax, frequencies, false; kwargs...)
+    mmax, frequencies, model = load(joinpath(path, "METADATA.jld2"),
+                                    "mmax", "frequencies", "model")
+    NoiseMatrix(path, mmax, frequencies, model, false; kwargs...)
 end
 
 function compute!(matrix::NoiseMatrix)
@@ -62,8 +64,8 @@ function compute!(matrix::NoiseMatrix)
         σ = standard_error(model.Tsys, ν, model.Δν, model.τ, model.Nint)
         for m = 0:matrix.mmax
             σm = σ * time_smearing(m, model.τ)
-            Nm = σm^2 .* ones(two(m)*model.Nbase)
-            matrix[m, β] = Diagonal(Nm)
+            Nm = σm^2 .* ones(two(m)*Nbase(model.hierarchy, m))
+            matrix[m, β] = Nm
         end
     end
 end
@@ -127,10 +129,10 @@ function read_from_disk(matrix::NoiseMatrix, m, β)
     ν = matrix.frequencies[β]
     filename   = @sprintf("%.3fMHz.jld2", ustrip(uconvert(u"MHz", ν)))
     objectname = @sprintf("%04d", m)
-    load(joinpath(matrix.path, filename), objectname) :: Diagonal{Float64}
+    Diagonal(load(joinpath(matrix.path, filename), objectname)) :: Diagonal{Float64}
 end
 
-function write_to_disk(matrix::NoiseMatrix, block::Diagonal{Float64}, m, β)
+function write_to_disk(matrix::NoiseMatrix, block::Vector{Float64}, m, β)
     ν = matrix.frequencies[β]
     filename   = @sprintf("%.3fMHz.jld2", ustrip(uconvert(u"MHz", ν)))
     objectname = @sprintf("%04d", m)
