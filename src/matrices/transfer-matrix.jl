@@ -45,7 +45,7 @@ function compute!(transfermatrix::HierarchicalTransferMatrix, beam;
     println(hierarchy)
     save(joinpath(transfermatrix.path, "HIERARCHY.jld2"), "hierarchy", hierarchy)
 
-    for ν in transfermatrix.metadata.frequencies[11:end]
+    for ν in transfermatrix.metadata.frequencies
         @show ν
         @time compute_one_frequency!(transfermatrix, workers, hierarchy, beam, ν)
     end
