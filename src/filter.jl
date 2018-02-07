@@ -13,20 +13,46 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-function filter(transfermatrix, signal, foregrounds, noise)
-    # TODO check that ' is doing the conjugate transpose and not the regular transpose
-    # (@. might be rewriting ' as .' which is the regular transpose)
-    @. S = B*signal*B'
-    @. F = B*foreground*B'
-    # compute eig(S, F) -> R filter
-    # R'*S and R'*N
+function filter(transfermatrix, noisematrix)
+    path = dirname(transfermatrix.path)
+    lmax = mmax = transfermatrix.mmax
+    frequencies = transfermatrix.frequencies
 
+    point_sources = AngularCovarianceMatrix(joinpath(path, "covariance-point-sources"),
+                                            lmax, frequencies, extragalactic_point_sources())
+    galactic      = AngularCovarianceMatrix(joinpath(path, "covariance-galactic"),
+                                            lmax, frequencies, galactic_synchrotron())
+    signal        = AngularCovarianceMatrix(joinpath(path, "covariance-fiducial-signal"),
+                                            lmax, frequencies, fiducial_signal_model())
+
+    P = BlockDiagonalMatrix(joinpath(path, "covariance-point-sources-observed"), mmax,
+                            progressbar=true, distribute=true)
+    G = BlockDiagonalMatrix(joinpath(path, "covariance-galactic-observed"), mmax,
+                            progressbar=true, distribute=true)
+    S = BlockDiagonalMatrix(joinpath(path, "covariance-fiducial-signal-observed"), mmax,
+                            progressbar=true, distribute=true)
+
+    @. P = transfermatrix * point_sources * T(transfermatrix)
+    @. G = transfermatrix * galactic      * T(transfermatrix)
+    @. S = transfermatrix * signal        * T(transfermatrix)
+
+    F = BlockDiagonalMatrix(joinpath(path, "complete-foregrounds-observed"), mmax,
+                            progressbar=true, distribute=true)
+    @. F = P + G
+
+    # compute eig(F, S)
+    # (this seems to be more numerically stable when F is the first argument)
+    # apply the filter
+
+    # N = noisematrix + F
+    # compute eig(S, N)
+    # (not sure which one should go first here...)
 end
 
 
 
-
-
+function whiten(transfermatrix, signal, noise)
+end
 
 
 

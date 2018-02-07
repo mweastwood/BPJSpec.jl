@@ -88,7 +88,7 @@ averaging frequency channels together.
 function stack(matrix::SpectralBlockDiagonalMatrix, m, β::AbstractVector)
     blocks = [matrix[m, β′] for β′ in β]
     X = sum(size.(blocks, 1))
-    Y = size.(blocks[1], 2)
+    Y = size(blocks[1], 2)
     output = zeros(Complex128, X, Y)
     x = 1
     for block in blocks
@@ -127,7 +127,7 @@ function write_to_disk(matrix::SpectralBlockDiagonalMatrix, block::Matrix{Comple
     dirname    = @sprintf("%.3fMHz", ustrip(uconvert(u"MHz", ν)))
     filename   = @sprintf("%04d.jld2", m)
     objectname = "block"
-    isdir(joinpath(matrix.path, dirname)) || mkdir(joinpath(matrix.path, dirname))
+    isdir(joinpath(matrix.path, dirname)) || mkpath(joinpath(matrix.path, dirname))
     save(joinpath(matrix.path, dirname, filename), objectname, block)
     block
 end

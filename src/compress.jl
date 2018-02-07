@@ -48,6 +48,7 @@ end
 
 function average_channels(transfermatrix::SpectralBlockDiagonalMatrix,
                           noisematrix::SpectralBlockDiagonalMatrix, Navg)
+    path = dirname(transfermatrix.path)
     Nfreq  = length(transfermatrix.frequencies)
     Nfreq′ = Nfreq ÷ Navg + 1
     mmax   = transfermatrix.mmax
@@ -63,12 +64,12 @@ function average_channels(transfermatrix::SpectralBlockDiagonalMatrix,
     end
 
     suffix = "-averaged"
-    output_transfermatrix = SpectralBlockDiagonalMatrix(joinpath(path, "transfer-matrix"*suffix),
-                                                        mmax, transfermatrix.metadata.frequencies,
+    file = joinpath(path, "transfer-matrix"*suffix)
+    output_transfermatrix = SpectralBlockDiagonalMatrix(file, mmax, frequencies,
                                                         progressbar=true, distribute=false)
-    output_noisematrix = SpectralBlockDiagonalMatrix(joinpath(path, "noise-matrix"*suffix),
-                                               mmax, transfermatrix.metadata.frequencies,
-                                               progressbar=true, distribute=false)
+    file = joinpath(path, "noise-matrix"*suffix)
+    output_noisematrix = SpectralBlockDiagonalMatrix(file, mmax, frequencies,
+                                                     progressbar=true, distribute=false)
 
     # Perform the averaging.
     prg = Progress(Nfreq′)
@@ -83,5 +84,7 @@ function average_channels(transfermatrix::SpectralBlockDiagonalMatrix,
         end
         next!(prg)
     end
+
+    output_transfermatrix, output_noisematrix
 end
 

@@ -122,12 +122,12 @@ function (model::SignalModel)(l, ν1, ν2)
 end
 
 function fiducial_signal_model()
-    kpara = logspace(-4, +1, 10).*u"Mpc^-1"
-    kperp = logspace(-4, -1, 11).*u"Mpc^-1"
+    kpara = logspace(log10(0.01), log10(1.0), 200).*u"Mpc^-1"
+    kperp = logspace(log10(0.01), log10(1.0), 200).*u"Mpc^-1"
     unshift!(kpara, 0u"Mpc^-1")
     unshift!(kperp, 0u"Mpc^-1")
     k = sqrt.(kpara.^2 .+ kperp.'.^2)
-    power = 1.0u"K^2" ./ (k+1e-4u"Mpc^-1").^3
+    power = 1.0u"K^2" ./ (k+0.1u"Mpc^-1").^3
     SignalModel(kpara, kperp, power)
 end
 

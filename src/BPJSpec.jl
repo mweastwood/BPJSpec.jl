@@ -20,6 +20,7 @@ module BPJSpec
 export HierarchicalTransferMatrix
 export NoiseMatrix
 export MModes
+export SpectralBlockDiagonalMatrix
 
 using CasaCore.Measures
 using Cosmology
@@ -30,6 +31,7 @@ using StaticArrays
 using Unitful, UnitfulAstro
 
 two(m) = ifelse(m > 0, 2, 1)
+T(A) = ctranspose(A)
 
 include("parallel.jl")
 include("cosmology.jl")
@@ -60,6 +62,7 @@ include("broadcasting.jl")
 
 include("m-modes.jl")
 include("compress.jl")
+include("filter.jl")
 include("imaging.jl")
 include("fisher.jl")
 

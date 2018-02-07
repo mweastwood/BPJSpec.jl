@@ -22,7 +22,7 @@ struct BlockDiagonalMatrix <: BlockMatrix
     blocks      :: Vector{Matrix{Complex128}}
 
     function BlockDiagonalMatrix(path, mmax, write=true;
-                                 progressbar=false, distribute=false, cached=true)
+                                 progressbar=false, distribute=false, cached=false)
         if write
             isdir(path) || mkpath(path)
             save(joinpath(path, "METADATA.jld2"), "mmax", mmax)
@@ -44,7 +44,7 @@ end
 Base.show(io::IO, matrix::BlockDiagonalMatrix) =
     print(io, "BlockDiagonalMatrix: ", matrix.path)
 
-Base.indices(matrix::BlockDiagonalMatrix) = collect(0:matrix.mmax)
+indices(matrix::BlockDiagonalMatrix) = collect(0:matrix.mmax)
 
 function Base.getindex(matrix::BlockDiagonalMatrix, m)
     if matrix.cached[]
@@ -82,15 +82,15 @@ function flush!(matrix::BlockDiagonalMatrix)
 end
 
 function read_from_disk(matrix::BlockDiagonalMatrix, m)
-    filename   = @sprintf("m=%4d.jld2", m)
+    filename   = @sprintf("m=%04d.jld2", m)
     objectname = "block"
-    load(joinpath(transfermatrix.path, filename), objectname) :: Matrix{Complex128}
+    load(joinpath(matrix.path, filename), objectname) :: Matrix{Complex128}
 end
 
 function write_to_disk(matrix::BlockDiagonalMatrix, block::Matrix{Complex128}, m)
-    filename   = @sprintf("m=%4d.jld2", m)
+    filename   = @sprintf("m=%04d.jld2", m)
     objectname = "block"
-    save(joinpath(transfermatrix.path, filename), objectname, block)
+    save(joinpath(matrix.path, filename), objectname, block)
     block
 end
 

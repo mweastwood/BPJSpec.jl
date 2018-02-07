@@ -61,7 +61,7 @@ function compute!(matrix::AngularCovarianceMatrix)
                 block[β2, β1] = block[β1, β2]
             end
         end
-        matrix[l] = block
+        matrix[l, 0] = block
     end
 end
 
@@ -71,7 +71,7 @@ Base.show(io::IO, matrix::AngularCovarianceMatrix) =
 indices(matrix::AngularCovarianceMatrix) =
     [(l, m) for m = 0:matrix.mmax for l = m:matrix.lmax]
 
-function Base.getindex(matrix::AngularCovarianceMatrix, l::Integer)
+function Base.getindex(matrix::AngularCovarianceMatrix, l, m)
     if matrix.cached[]
         return matrix.blocks[l+1]
     else
@@ -79,7 +79,7 @@ function Base.getindex(matrix::AngularCovarianceMatrix, l::Integer)
     end
 end
 
-function Base.setindex!(matrix::AngularCovarianceMatrix, block, l::Integer)
+function Base.setindex!(matrix::AngularCovarianceMatrix, block, l, m)
     if matrix.cached[]
         matrix.blocks[l+1] = block
     else
@@ -88,8 +88,22 @@ function Base.setindex!(matrix::AngularCovarianceMatrix, block, l::Integer)
     block
 end
 
-Base.getindex(matrix::AngularCovarianceMatrix, l, m) = matrix[l]
-Base.setindex!(matrix::AngularCovarianceMatrix, block, l, m) = matrix[l] = block
+function Base.getindex(matrix::AngularCovarianceMatrix, m)
+    blocks = [matrix[l, m] for l = m:matrix.lmax]
+    Nfreq  = length(matrix.frequencies)
+    Nl     = matrix.lmax-m+1
+    Ntotal = Nfreq*Nl
+    output = zeros(Float64, Ntotal, Ntotal)
+    for l = m:matrix.lmax
+        block = blocks[l-m+1]
+        for β1 = 1:Nfreq, β2 = 1:Nfreq
+            idx1 = (β1-1)*Nl + l - m + 1
+            idx2 = (β2-1)*Nl + l - m + 1
+            output[idx1, idx2] = block[β1, β2]
+        end
+    end
+    output
+end
 
 function cache!(matrix::AngularCovarianceMatrix)
     matrix.cached[] = true
