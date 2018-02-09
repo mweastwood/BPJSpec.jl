@@ -25,34 +25,40 @@ function filter(transfermatrix, noisematrix)
     signal        = AngularCovarianceMatrix(joinpath(path, "covariance-fiducial-signal"),
                                             lmax, frequencies, fiducial_signal_model())
 
+    # Run the sky covariances through the interferometer's response.
     P = BlockDiagonalMatrix(joinpath(path, "covariance-point-sources-observed"), mmax,
                             progressbar=true, distribute=true)
     G = BlockDiagonalMatrix(joinpath(path, "covariance-galactic-observed"), mmax,
                             progressbar=true, distribute=true)
     S = BlockDiagonalMatrix(joinpath(path, "covariance-fiducial-signal-observed"), mmax,
                             progressbar=true, distribute=true)
-
-    @. P = transfermatrix * point_sources * T(transfermatrix)
-    @. G = transfermatrix * galactic      * T(transfermatrix)
-    @. S = transfermatrix * signal        * T(transfermatrix)
-
-    F = BlockDiagonalMatrix(joinpath(path, "complete-foregrounds-observed"), mmax,
+    F = BlockDiagonalMatrix(joinpath(path, "covariance-complete-foregrounds-observed"), mmax,
                             progressbar=true, distribute=true)
+    @. P = H(transfermatrix * point_sources * T(transfermatrix))
+    @. G = H(transfermatrix * galactic      * T(transfermatrix))
+    @. S = H(transfermatrix * signal        * T(transfermatrix))
     @. F = P + G
 
-    # compute eig(F, S)
-    # (this seems to be more numerically stable when F is the first argument)
-    # apply the filter
+    # Compute the foreground filter...
+    V = BlockDiagonalMatrix(joinpath(path, "foreground-filter"), mmax,
+                            progressbar=true, distribute=true)
+    @. V = construct_filter(F, S)
 
-    # N = noisematrix + F
-    # compute eig(S, N)
-    # (not sure which one should go first here...)
+    # ...and apply that filter.
+    S′ = BlockDiagonalMatrix(joinpath(path, "covariance-fiducial-signal-filtered"), mmax,
+                             progressbar=true, distribute=true)
+    N′ = BlockDiagonalMatrix(joinpath(path, "covariance-compelete-noise-filtered"), mmax,
+                             progressbar=true, distribute=true)
+    @. S′ = H(T(V) * S * V)
+    @. N′ = H(T(V) * N * V) + H(T(V) * F * V)
+
+    # Whiten the noise.
+    # ...
 end
 
-
-
-function whiten(transfermatrix, signal, noise)
+function construct_filter(F, S)
+    λ, V = eig(F, S) # Note: this seems to be more numerically stable than eig(S, F)
+    idx = searchsortedlast(λ, 0.1) # foreground-signal ratio < 0.1
+    V[:, 1:idx]
 end
-
-
 

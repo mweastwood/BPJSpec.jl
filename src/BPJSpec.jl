@@ -30,8 +30,9 @@ using ProgressMeter
 using StaticArrays
 using Unitful, UnitfulAstro
 
-two(m) = ifelse(m > 0, 2, 1)
 T(A) = ctranspose(A)
+H(A) = 0.5*(A+A') # guarantee Hermitian
+two(m) = ifelse(m > 0, 2, 1)
 
 include("parallel.jl")
 include("cosmology.jl")
