@@ -17,10 +17,8 @@
 
 module BPJSpec
 
-export HierarchicalTransferMatrix
-export NoiseMatrix
-export MModes
-export SpectralBlockDiagonalMatrix
+export HierarchicalTransferMatrix, NoiseMatrix, MModes
+export BlockDiagonalMatrix, SpectralBlockDiagonalMatrix
 
 using CasaCore.Measures
 using Cosmology
