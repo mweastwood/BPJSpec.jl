@@ -80,7 +80,7 @@ function average_channels(transfermatrix::SpectralBlockDiagonalMatrix,
             N = noisematrix[m, range]
             B′, N′ = compress(B, N)
             output_transfermatrix[m, idx] = B′
-            output_noisematrix[m, idx] = B′
+            output_noisematrix[m, idx] = N′
         end
         next!(prg)
     end
