@@ -30,6 +30,23 @@ using Unitful, UnitfulAstro
 
 T(A) = ctranspose(A)
 H(A) = 0.5*(A+A') # guarantee Hermitian
+
+"Try to make sure a matrix that should be positive definite is in fact positive definite."
+function fix(A)
+    N = size(A, 1)
+    N == 0 && return A
+    B = H(A)
+    λ = eigvals(B)
+    λmin = minimum(λ)
+    λmax = maximum(λ)
+    if λmin ≤ 0
+        factor = N * eps(Float64) * λmax
+        return B + factor*I
+    else
+        return B
+    end
+end
+
 two(m) = ifelse(m > 0, 2, 1)
 
 include("parallel.jl")
