@@ -39,8 +39,19 @@ function AngularBlockVector(input::SpectralBlockVector)
     output
 end
 
-function SpectralBlockVector(input::AngularBlockVector)
-
+function AngularBlockVector(input::BlockDiagonalVector)
+    lmax = mmax = input.mmax
+    Nfreq = length(input[0]) ÷ (lmax+1)
+    output = AngularBlockVector(lmax, mmax)
+    for m = 0:mmax, l = m:lmax
+        output_block = zeros(Complex128, Nfreq)
+        for β = 1:Nfreq
+            input_block = input[m]
+            output_block[β] = input_block[(lmax-m+1)*(β-1) + (l-m+1)]
+        end
+        output[l, m] = output_block
+    end
+    output
 end
 
 indices(matrix::AngularBlockVector) =

@@ -41,7 +41,7 @@ function fix(A)
     λmax = maximum(λ)
     if λmin ≤ 0
         factor = N * eps(Float64) * λmax
-        return B + factor*I
+        return B + factor * I
     else
         return B
     end
@@ -69,10 +69,12 @@ include("matrices/noise-matrix.jl")
 #include("matrices/cached-block-matrix.jl")
 
 abstract type BlockVector end
+include("vectors/block-diagonal-vector.jl")
 include("vectors/spectral-block-vector.jl")
 include("vectors/angular-block-vector.jl")
 include("vectors/random-angular-block-vector.jl")
 include("vectors/white-noise-vector.jl")
+include("vectors/random-vector.jl")
 
 include("broadcasting.jl")
 

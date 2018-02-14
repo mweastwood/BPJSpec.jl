@@ -13,22 +13,20 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-struct RandomAngularBlockVector <: BlockVector
-    lmax :: Int
+struct RandomVector <: BlockVector
     mmax :: Int
-    covariance :: AngularCovarianceMatrix
+    covariance :: BlockDiagonalMatrix
 end
 
-function RandomAngularBlockVector(covariance::AngularCovarianceMatrix)
-    lmax = mmax = covariance.lmax
-    RandomAngularBlockVector(lmax, mmax, covariance)
+function RandomVector(covariance::BlockDiagonalMatrix)
+    mmax = covariance.mmax
+    RandomVector(mmax, covariance)
 end
 
-indices(vector::RandomAngularBlockVector) =
-    [(l, m) for m = 0:vector.mmax for l = m:vector.lmax]
+indices(vector::RandomVector) = collect(0:vector.mmax)
 
-function Base.getindex(vector::RandomAngularBlockVector, l, m)
-    C = vector.covariance[l, m]
+function Base.getindex(vector::RandomVector, m)
+    C = vector.covariance[m]
     N = size(C, 1)
     U = chol(C)
     x = complex.(randn(N), randn(N)) ./ √2
