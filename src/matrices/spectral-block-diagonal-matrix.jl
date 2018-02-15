@@ -13,23 +13,27 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-struct SpectralBlockDiagonalMatrix <: BlockMatrix
+struct SpectralBlockDiagonalMatrix{B} <: BlockMatrix
     path        :: String
     progressbar :: Bool
     distribute  :: Bool
     cached      :: Ref{Bool}
     mmax        :: Int
     frequencies :: Vector{typeof(1.0*u"Hz")}
-    blocks      :: Matrix{Matrix{Complex128}}
+    bandwidth   :: Vector{typeof(1.0*u"Hz")}
+    blocks      :: Matrix{B}
 
-    function SpectralBlockDiagonalMatrix(path, mmax, frequencies, write=true;
-                                         progressbar=false, distribute=false, cached=false)
+    function SpectralBlockDiagonalMatrix{B}(path, mmax, frequencies, bandwidth, write=true;
+                                            progressbar=false, distribute=false,
+                                            cached=false) where B
         if write
             isdir(path) || mkpath(path)
-            save(joinpath(path, "METADATA.jld2"), "mmax", mmax, "frequencies", frequencies)
+            save(joinpath(path, "METADATA.jld2"), "mmax", mmax,
+                 "frequencies", frequencies, "bandwidth", bandwidth)
         end
-        blocks = Array{Matrix{Complex128}}(mmax+1, length(frequencies))
-        output = new(path, progressbar, distribute, Ref(cached), mmax, frequencies, blocks)
+        blocks = Array{B}(mmax+1, length(frequencies))
+        output = new(path, progressbar, distribute, Ref(cached), mmax,
+                     frequencies, bandwidth, blocks)
         if cached
             cache!(output)
         end
@@ -37,9 +41,10 @@ struct SpectralBlockDiagonalMatrix <: BlockMatrix
     end
 end
 
-function SpectralBlockDiagonalMatrix(path; kwargs...)
-    mmax, frequencies = load(joinpath(path, "METADATA.jld2"), "mmax", "frequencies")
-    SpectralBlockDiagonalMatrix(path, mmax, frequencies, false; kwargs...)
+function SpectralBlockDiagonalMatrix{B}(path; kwargs...) where B
+    mmax, frequencies, bandwidth = load(joinpath(path, "METADATA.jld2"),
+                                        "mmax", "frequencies", "bandwidth")
+    SpectralBlockDiagonalMatrix(path, mmax, frequencies, bandwidth, false; kwargs...)
 end
 
 Base.show(io::IO, matrix::SpectralBlockDiagonalMatrix) =
@@ -114,15 +119,15 @@ function flush!(matrix::SpectralBlockDiagonalMatrix)
     matrix
 end
 
-function read_from_disk(matrix::SpectralBlockDiagonalMatrix, m, β)
+function read_from_disk(matrix::SpectralBlockDiagonalMatrix{B}, m, β) where B
     ν = matrix.frequencies[β]
     dirname    = @sprintf("%.3fMHz", ustrip(uconvert(u"MHz", ν)))
     filename   = @sprintf("%04d.jld2", m)
     objectname = "block"
-    load(joinpath(matrix.path, dirname, filename), objectname) :: Matrix{Complex128}
+    load(joinpath(matrix.path, dirname, filename), objectname) :: B
 end
 
-function write_to_disk(matrix::SpectralBlockDiagonalMatrix, block::Matrix{Complex128}, m, β)
+function write_to_disk(matrix::SpectralBlockDiagonalMatrix{B}, block::B, m, β) where B
     ν = matrix.frequencies[β]
     dirname    = @sprintf("%.3fMHz", ustrip(uconvert(u"MHz", ν)))
     filename   = @sprintf("%04d.jld2", m)

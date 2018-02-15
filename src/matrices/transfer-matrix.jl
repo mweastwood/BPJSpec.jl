@@ -13,25 +13,41 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-abstract type TransferMatrix <: BlockMatrix end
+const TransferMatrix = SpectralBlockDiagonalMatrix{Matrix{Complex128}}
 
-struct HierarchicalTransferMatrix <: TransferMatrix
-    path     :: String
-    metadata :: Metadata
-    function HierarchicalTransferMatrix(path, metadata)
-        isdir(path) || mkpath(path)
-        save(joinpath(path, "METADATA.jld2"), "metadata", metadata)
-        new(path, metadata)
+struct HierarchicalTransferMatrix
+    path        :: String
+    metadata    :: Metadata
+    hierarchy   :: Hierarchy
+    frequencies :: Vector{typeof(1.0*u"Hz")}
+    bandwidth   :: Vector{typeof(1.0*u"Hz")}
+    lmax        :: Int
+    mmax        :: Int
+
+    function HierarchicalTransferMatrix(path, metadata, hierarchy, lmax, mmax, write=true)
+        if write
+            isdir(path) || mkpath(path)
+            save(joinpath(path, "METADATA.jld2"), "metadata", metadata,
+                 "hierarchy", hierarchy, "lmax", lmax, "mmax", mmax)
+        end
+        new(path, metadata, hierarchy, metadata.frequencies, metadata.bandwidth, lmax, mmax)
     end
 end
 
 function HierarchicalTransferMatrix(path)
-    metadata = load(joinpath(path, "METADATA.jld2"), "metadata")
-    HierarchicalTransferMatrix(path, metadata)
+    metadata, hierarchy, lmax, mmax = load(joinpath(path, "METADATA.jld2"),
+                                           "metadata", "hierarchy", "lmax", "mmax")
+    HierarchicalTransferMatrix(path, metadata, hierarchy, lmax, mmax, false)
 end
 
-function compute!(transfermatrix::HierarchicalTransferMatrix, beam;
-                  lmax=maximum(maximum_multipole_moment(transfermatrix.metadata)))
+function HierarchicalTransferMatrix(path, metadata;
+                                    lmax=maximum(maximum_multipole_moment(metadata)))
+    mmax = lmax
+    hierarchy = compute_baseline_hierarchy(transfermatrix.metadata, lmax)
+    HierarchicalTransferMatrix(path, metadata, hierarchy, lmax, mmax, true)
+end
+
+function compute!(transfermatrix::HierarchicalTransferMatrix, beam)
     println("")
     println("| Starting transfer matrix calculation")
     println("|---------")
@@ -40,20 +56,17 @@ function compute!(transfermatrix::HierarchicalTransferMatrix, beam;
 
     workers = categorize_workers()
     println(workers)
-
-    hierarchy = compute_baseline_hierarchy(transfermatrix.metadata, lmax)
-    println(hierarchy)
-    save(joinpath(transfermatrix.path, "HIERARCHY.jld2"), "hierarchy", hierarchy)
+    println(transfermatrix.hierarchy)
 
     for ν in transfermatrix.metadata.frequencies
         @show ν
-        @time compute_one_frequency!(transfermatrix, workers, hierarchy, beam, ν)
+        @time compute_one_frequency!(transfermatrix, workers, beam, ν)
     end
 end
 
-function compute_one_frequency!(transfermatrix::HierarchicalTransferMatrix,
-                                workers, hierarchy, beam, ν)
-    metadata = transfermatrix.metadata
+function compute_one_frequency!(transfermatrix::HierarchicalTransferMatrix, workers, beam, ν)
+    metadata  = transfermatrix.metadata
+    hierarchy = transfermatrix.hierarchy
 
     for idx = 1:length(hierarchy.divisions)-1
         @time begin
@@ -203,7 +216,7 @@ function Base.getindex(transfermatrix::HierarchicalTransferMatrix, m, β)
     ν = transfermatrix.metadata.frequencies[β]
 
     # load each hierarchical component of the transfer matrix
-    hierarchy = load(joinpath(transfermatrix.path, "HIERARCHY.jld2"), "hierarchy")
+    hierarchy = transfermatrix.hierarchy
     path = joinpath(transfermatrix.path, @sprintf("%.3fMHz", ustrip(uconvert(u"MHz", ν))))
     blocks = Matrix{Complex128}[]
     for idx = 1:length(hierarchy.divisions)-1
@@ -228,19 +241,9 @@ function Base.getindex(transfermatrix::HierarchicalTransferMatrix, m, β)
     output
 end
 
-function getlmax(transfermatrix::HierarchicalTransferMatrix)
-    # TODO: I'd like to have this stored as a field...
-    hierarchy = gethierarchy(transfermatrix)
-    hierarchy.divisions[end]
-end
-
-function gethierarchy(transfermatrix::HierarchicalTransferMatrix)
-    load(joinpath(transfermatrix.path, "HIERARCHY.jld2"), "hierarchy") :: Hierarchy
-end
-
 "Get the baseline permutation vector for the given value of m."
 function baseline_permutation(transfermatrix::HierarchicalTransferMatrix, m)
-    hierarchy = load(joinpath(transfermatrix.path, "HIERARCHY.jld2"), "hierarchy")
+    hierarchy = transfermatrix.hierarchy
     indices = Int[]
     for idx = 1:length(hierarchy.divisions)-1
         lmax = hierarchy.divisions[idx+1]

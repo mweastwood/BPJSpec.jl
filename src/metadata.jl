@@ -15,6 +15,7 @@
 
 struct Metadata
     frequencies  :: Vector{typeof(1.0*u"Hz")}
+    bandwidth    :: Vector{typeof(1.0*u"Hz")}
     position     :: Position         # ITRF
     baselines    :: Vector{Baseline} # ITRF
     phase_center :: Direction        # ITRF
@@ -24,10 +25,11 @@ end
 
 function from_ttcal(ttcal_metadata)
     frequencies  = ttcal_metadata.frequencies
+    bandwidth    = fill(24.0u"kHz", length(frequencies)) # default for OVRO-LWA
     position     = ttcal_position(ttcal_metadata)
     baselines    = ttcal_baselines(ttcal_metadata)
     phase_center = ttcal_metadata.phase_centers[1]
-    Metadata(frequencies, position, baselines, phase_center)
+    Metadata(frequencies, bandwidth, position, baselines, phase_center)
 end
 
 function ttcal_position(ttcal_metadata)

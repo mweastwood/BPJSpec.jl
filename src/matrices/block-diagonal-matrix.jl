@@ -13,21 +13,21 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-struct BlockDiagonalMatrix <: BlockMatrix
-    path :: String
+struct BlockDiagonalMatrix{B} <: BlockMatrix
+    path        :: String
     progressbar :: Bool
     distribute  :: Bool
     cached      :: Ref{Bool}
     mmax        :: Int
-    blocks      :: Vector{Matrix{Complex128}}
+    blocks      :: Vector{B}
 
-    function BlockDiagonalMatrix(path, mmax, write=true;
-                                 progressbar=false, distribute=false, cached=false)
+    function BlockDiagonalMatrix{B}(path, mmax, write=true;
+                                    progressbar=false, distribute=false, cached=false) where B
         if write
             isdir(path) || mkpath(path)
             save(joinpath(path, "METADATA.jld2"), "mmax", mmax)
         end
-        blocks = Matrix{Complex128}[]
+        blocks = B[]
         output = new(path, progressbar, distribute, Ref(cached), mmax, blocks)
         if cached
             cache!(output)
@@ -81,13 +81,13 @@ function flush!(matrix::BlockDiagonalMatrix)
     matrix
 end
 
-function read_from_disk(matrix::BlockDiagonalMatrix, m)
+function read_from_disk(matrix::BlockDiagonalMatrix{B}, m) where B
     filename   = @sprintf("m=%04d.jld2", m)
     objectname = "block"
-    load(joinpath(matrix.path, filename), objectname) :: Matrix{Complex128}
+    load(joinpath(matrix.path, filename), objectname) :: B
 end
 
-function write_to_disk(matrix::BlockDiagonalMatrix, block::Matrix{Complex128}, m)
+function write_to_disk(matrix::BlockDiagonalMatrix{B}, block::B, m) where B
     filename   = @sprintf("m=%04d.jld2", m)
     objectname = "block"
     save(joinpath(matrix.path, filename), objectname, block)

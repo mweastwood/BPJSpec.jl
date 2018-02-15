@@ -20,6 +20,7 @@ struct AngularCovarianceMatrix <: BlockMatrix
     cached      :: Ref{Bool}
     lmax        :: Int
     frequencies :: Vector{typeof(1.0*u"Hz")}
+    bandwidth   :: Vector{typeof(1.0*u"Hz")}
     component   :: SkyComponent
     blocks      :: Vector{Matrix{Float64}}
 
@@ -53,16 +54,28 @@ function compute!(matrix::AngularCovarianceMatrix)
     for l = 0:matrix.lmax
         block = zeros(Float64, Nfreq, Nfreq)
         for β1 = 1:Nfreq
-            ν1 = matrix.frequencies[β1]
+            ν1  = matrix.frequencies[β1]
+            Δν1 = matrix.bandwidth[β1]
             block[β1, β1] = matrix.component(l, ν1, ν1)
             for β2 = β1+1:Nfreq
                 ν2 = matrix.frequencies[β2]
-                block[β1, β2] = matrix.component(l, ν1, ν2)
+                Δν2 = matrix.bandwidth[β2]
+                block[β1, β2] = compute(matrix.component, l, ν1, Δν1, ν2, Δν2)
                 block[β2, β1] = block[β1, β2]
             end
         end
         matrix[l, 0] = block
     end
+end
+
+function compute(component, l, ν1, Δν1, ν2, Δν2)
+    function integrand(x, y)
+        component(l, x*u"Hz", y*u"Hz")
+    end
+    xmin = ustrip.(uconvert.(u"Hz", [ν1-Δν1/2, ν2-Δν2/2]))
+    xmax = ustrip.(uconvert.(u"Hz", [ν1+Δν1/2, ν2+Δν2/2]))
+    val, err = hcubature(integrand, xmin, xmax) # default tolerance (reltol=1e-8, abstol=0)
+    val
 end
 
 Base.show(io::IO, matrix::AngularCovarianceMatrix) =

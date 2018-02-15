@@ -17,11 +17,19 @@
 
 module BPJSpec
 
-export HierarchicalTransferMatrix, NoiseMatrix, MModes
-export BlockDiagonalMatrix, SpectralBlockDiagonalMatrix
+# Matrices
+export BlockDiagonalMatrix
+export SpectralBlockDiagonalMatrix
+export AngularCovarianceMatrix
+export NoiseCovarianceMatrix
+export HierarchicalTransferMatrix
+
+# Vectors
+export MModes
 
 using CasaCore.Measures
 using Cosmology
+using Cubature
 using FastTransforms
 using FileIO, JLD2
 using ProgressMeter
@@ -47,6 +55,7 @@ function fix(A)
     end
 end
 
+"Useful little function that helps account for grouping of positive and negative m."
 two(m) = ifelse(m > 0, 2, 1)
 
 include("parallel.jl")
@@ -64,9 +73,8 @@ abstract type BlockMatrix end
 include("matrices/block-diagonal-matrix.jl")
 include("matrices/spectral-block-diagonal-matrix.jl")
 include("matrices/angular-covariance-matrix.jl")
+include("matrices/noise-covariance-matrix.jl")
 include("matrices/transfer-matrix.jl")
-include("matrices/noise-matrix.jl")
-#include("matrices/cached-block-matrix.jl")
 
 abstract type BlockVector end
 include("vectors/block-diagonal-vector.jl")
@@ -79,37 +87,12 @@ include("vectors/random-vector.jl")
 include("broadcasting.jl")
 
 include("m-modes.jl")
-include("compress.jl")
-include("filter.jl")
-include("imaging.jl")
-include("fisher.jl")
+#include("filter.jl")
+#include("imaging.jl")
+#include("fisher.jl")
 
-#export GriddedVisibilities, grid!
-#export MModes, TransferMatrix
-#export tikhonov
-#
-#using CasaCore.Measures
-#using CasaCore.Tables
-#using LibHealpix
-#using TTCal
-#
-#importall Base.Operators
-#import Cosmology
-#import GSL
-#import LibHealpix: Alm, lmax, mmax
-#import TTCal: Nfreq
-
-#include("special.jl")     # special functions
-#include("physics.jl")     # physical constants and cosmology
-#include("parallel.jl")    # tools for parallel processing
-#include("definitions.jl") # defines all the types
-#include("visibilities.jl")
-#include("mmodes.jl")
-#include("transfermatrix.jl")
-#include("alm.jl")
-
-##include("noise.jl")
-#include("sky.jl")
+include("algorithms/average-frequency-channels.jl")
+include("algorithms/full-rank-compress.jl")
 
 end
 
