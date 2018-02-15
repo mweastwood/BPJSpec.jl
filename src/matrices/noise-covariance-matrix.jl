@@ -22,8 +22,8 @@ end
 
 const NoiseCovarianceMatrix = SpectralBlockDiagonalMatrix{Diagonal{Float64}}
 
-function NoiseCovarianceMatrix(path, mmax, metadata, hierarchy, noise::NoiseModel)
-    output = NoiseCovarianceMatrix(path, mmax, metadata.frequencies, metadata.bandwidth)
+function NoiseCovarianceMatrix(path, mmax, frequencies, bandwidth, hierarchy, noise::NoiseModel)
+    output = NoiseCovarianceMatrix(path, mmax, frequencies, bandwidth)
     compute!(output, hierarchy, noise)
     output
 end

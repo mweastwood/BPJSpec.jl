@@ -33,6 +33,7 @@ function local_broadcast!(f, output, args)
     end
     for indices in queue
         just_do_it!(f, output, args, indices)
+        progressbar(output) && next!(prg)
     end
     output
 end

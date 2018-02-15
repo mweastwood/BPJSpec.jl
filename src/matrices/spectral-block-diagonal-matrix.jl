@@ -44,7 +44,7 @@ end
 function SpectralBlockDiagonalMatrix{B}(path; kwargs...) where B
     mmax, frequencies, bandwidth = load(joinpath(path, "METADATA.jld2"),
                                         "mmax", "frequencies", "bandwidth")
-    SpectralBlockDiagonalMatrix(path, mmax, frequencies, bandwidth, false; kwargs...)
+    SpectralBlockDiagonalMatrix{B}(path, mmax, frequencies, bandwidth, false; kwargs...)
 end
 
 Base.show(io::IO, matrix::SpectralBlockDiagonalMatrix) =

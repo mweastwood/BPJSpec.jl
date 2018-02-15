@@ -24,16 +24,16 @@ struct AngularCovarianceMatrix <: BlockMatrix
     component   :: SkyComponent
     blocks      :: Vector{Matrix{Float64}}
 
-    function AngularCovarianceMatrix(path, lmax, frequencies, component, write=true;
+    function AngularCovarianceMatrix(path, lmax, frequencies, bandwidth, component, write=true;
                                      progressbar=false, distribute=false, cached=false)
         if write
             isdir(path) || mkpath(path)
             save(joinpath(path, "METADATA.jld2"), "lmax", lmax,
-                 "frequencies", frequencies, "component", component)
+                 "frequencies", frequencies, "bandwidth", bandwidth, "component", component)
         end
         blocks = Matrix{Float64}[]
         output = new(path, progressbar, distribute, Ref(cached),
-                     lmax, frequencies, component, blocks)
+                     lmax, frequencies, bandwidth, component, blocks)
         if write
             compute!(output)
         elseif cached
@@ -44,19 +44,22 @@ struct AngularCovarianceMatrix <: BlockMatrix
 end
 
 function AngularCovarianceMatrix(path; kwargs...)
-    lmax, frequencies, component = load(joinpath(path, "METADATA.jld2"),
-                                        "lmax", "frequencies", "component")
+    lmax, frequencies, bandwidth, component = load(joinpath(path, "METADATA.jld2"),
+                                                   "lmax", "frequencies", "bandwidth", "component")
     AngularCovarianceMatrix(path, lmax, frequencies, component, false; kwargs...)
 end
 
 function compute!(matrix::AngularCovarianceMatrix)
     Nfreq = length(matrix.frequencies)
+    if progressbar(matrix)
+        prg = Progress(matrix.lmax+1)
+    end
     for l = 0:matrix.lmax
         block = zeros(Float64, Nfreq, Nfreq)
         for β1 = 1:Nfreq
             ν1  = matrix.frequencies[β1]
             Δν1 = matrix.bandwidth[β1]
-            block[β1, β1] = matrix.component(l, ν1, ν1)
+            block[β1, β1] = compute(matrix.component, l, ν1, Δν1, ν1, Δν1)
             for β2 = β1+1:Nfreq
                 ν2 = matrix.frequencies[β2]
                 Δν2 = matrix.bandwidth[β2]
@@ -65,12 +68,13 @@ function compute!(matrix::AngularCovarianceMatrix)
             end
         end
         matrix[l, 0] = block
+        progressbar(matrix) && next!(prg)
     end
 end
 
 function compute(component, l, ν1, Δν1, ν2, Δν2)
-    function integrand(x, y)
-        component(l, x*u"Hz", y*u"Hz")
+    function integrand(x)
+        component(l, x[1]*u"Hz", x[2]*u"Hz")
     end
     xmin = ustrip.(uconvert.(u"Hz", [ν1-Δν1/2, ν2-Δν2/2]))
     xmax = ustrip.(uconvert.(u"Hz", [ν1+Δν1/2, ν2+Δν2/2]))
@@ -82,7 +86,7 @@ Base.show(io::IO, matrix::AngularCovarianceMatrix) =
     print(io, "AngularCovarianceMatrix: ", matrix.path)
 
 indices(matrix::AngularCovarianceMatrix) =
-    [(l, m) for m = 0:matrix.mmax for l = m:matrix.lmax]
+    [(l, m) for m = 0:matrix.lmax for l = m:matrix.lmax]
 
 function Base.getindex(matrix::AngularCovarianceMatrix, l, m)
     if matrix.cached[]

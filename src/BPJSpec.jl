@@ -18,11 +18,9 @@
 module BPJSpec
 
 # Matrices
-export BlockDiagonalMatrix
-export SpectralBlockDiagonalMatrix
-export AngularCovarianceMatrix
-export NoiseCovarianceMatrix
-export HierarchicalTransferMatrix
+export BlockDiagonalMatrix, SpectralBlockDiagonalMatrix
+export AngularCovarianceMatrix, NoiseCovarianceMatrix
+export TransferMatrix, HierarchicalTransferMatrix
 
 # Vectors
 export MModes
@@ -65,6 +63,7 @@ include("metadata.jl")
 include("hierarchy.jl")
 
 abstract type SkyComponent end
+struct NoComponent <: SkyComponent end
 include("sky/foregrounds.jl")
 include("sky/signal.jl")
 include("sky/noise.jl")
