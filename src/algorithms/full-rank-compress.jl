@@ -29,13 +29,14 @@ function full_rank_compress(transfermatrix, noisematrix)
 
     suffix = "-compressed"
     file = joinpath(path, "transfer-matrix"*suffix)
-    output_transfermatrix = SpectralBlockDiagonalMatrix(file, mmax, frequencies, bandwidth,
-                                                        progressbar=true, distribute=true)
-    file = joinpath(path, "noise-matrix"*suffix)
-    output_noisematrix = SpectralBlockDiagonalMatrix(file, mmax, frequencies, bandwidth,
-                                                     progressbar=true, distribute=true)
+    output_transfermatrix = TransferMatrix(file, mmax, frequencies, bandwidth,
+                                           progressbar=true, distribute=true)
 
-    multi_broadcast!(_full_rank_compress, compress,
+    file = joinpath(path, "covariance-matrix-noise"*suffix)
+    output_noisematrix = DenseSpectralBlockDiagonalMatrix(file, mmax, frequencies, bandwidth,
+                                                          progressbar=true, distribute=true)
+
+    multi_broadcast!(_full_rank_compress,
                      (output_transfermatrix, output_noisematrix),
                      (transfermatrix, noisematrix))
 end

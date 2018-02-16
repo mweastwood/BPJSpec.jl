@@ -25,6 +25,7 @@ export TransferMatrix, HierarchicalTransferMatrix
 # Vectors
 export MModes
 
+using ApproxFun
 using CasaCore.Measures
 using Cosmology
 using Cubature

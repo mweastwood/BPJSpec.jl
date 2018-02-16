@@ -41,6 +41,8 @@ struct SpectralBlockDiagonalMatrix{B} <: BlockMatrix
     end
 end
 
+const DenseSpectralBlockDiagonalMatrix = SpectralBlockDiagonalMatrix{Matrix{Complex128}}
+
 function SpectralBlockDiagonalMatrix{B}(path; kwargs...) where B
     mmax, frequencies, bandwidth = load(joinpath(path, "METADATA.jld2"),
                                         "mmax", "frequencies", "bandwidth")

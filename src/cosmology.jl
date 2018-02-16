@@ -23,6 +23,11 @@ Calculate the comoving distance (in units of Mpc) to the redshift `z`.
 """
 comoving_distance(z) = Cosmology.comoving_radial_dist_mpc(cosmology, z) * u"Mpc"
 
+function approximate(::typeof(comoving_distance), zmin, zmax)
+    f = Fun(z -> Cosmology.comoving_radial_dist_mpc(cosmology, z), zmin..zmax)
+    z -> f(z)*u"Mpc"
+end
+
 """
     age(z)
 
