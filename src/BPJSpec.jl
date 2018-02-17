@@ -18,7 +18,8 @@
 module BPJSpec
 
 # Matrices
-export BlockDiagonalMatrix, SpectralBlockDiagonalMatrix
+export BlockDiagonalMatrix, DenseBlockDiagonalMatrix
+export SpectralBlockDiagonalMatrix, DenseSpectralBlockDiagonalMatrix
 export AngularCovarianceMatrix, NoiseCovarianceMatrix
 export TransferMatrix, HierarchicalTransferMatrix
 
@@ -87,12 +88,12 @@ include("vectors/random-vector.jl")
 include("broadcasting.jl")
 
 include("m-modes.jl")
-#include("filter.jl")
 #include("imaging.jl")
 #include("fisher.jl")
 
 include("algorithms/average-frequency-channels.jl")
 include("algorithms/full-rank-compress.jl")
+include("algorithms/karhunen-loeve-transforms.jl")
 
 end
 

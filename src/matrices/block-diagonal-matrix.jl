@@ -27,7 +27,7 @@ struct BlockDiagonalMatrix{B} <: BlockMatrix
             isdir(path) || mkpath(path)
             save(joinpath(path, "METADATA.jld2"), "mmax", mmax)
         end
-        blocks = B[]
+        blocks = Array{B}(mmax+1)
         output = new(path, progressbar, distribute, Ref(cached), mmax, blocks)
         if cached
             cache!(output)
@@ -35,6 +35,8 @@ struct BlockDiagonalMatrix{B} <: BlockMatrix
         output
     end
 end
+
+const DenseBlockDiagonalMatrix = BlockDiagonalMatrix{Matrix{Complex128}}
 
 function BlockDiagonalMatrix(path; kwargs...)
     mmax = load(joinpath(path, "METADATA.jld2"), "mmax")
@@ -65,9 +67,8 @@ end
 
 function cache!(matrix::BlockDiagonalMatrix)
     matrix.cached[] = true
-    empty!(matrix.blocks)
     for m = 0:matrix.mmax
-        push!(matrix.blocks, read_from_disk(matrix, m))
+        matrix.blocks[m+1] = read_from_disk(matrix, m)
     end
     matrix
 end
@@ -76,7 +77,6 @@ function flush!(matrix::BlockDiagonalMatrix)
     for m = 0:matrix.mmax
         write_to_disk(matrix, matrix.blocks[m+1], m)
     end
-    empty!(matrix.blocks)
     matrix.cached[] = false
     matrix
 end

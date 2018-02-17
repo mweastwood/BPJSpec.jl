@@ -25,7 +25,7 @@ struct AngularCovarianceMatrix <: BlockMatrix
     blocks      :: Vector{Matrix{Float64}}
 
     function AngularCovarianceMatrix(path, lmax, frequencies, bandwidth, component, write=true;
-                                     progressbar=false, distribute=false, cached=false)
+                                     progressbar=false, distribute=false, cached=false, compute=true)
         if write
             isdir(path) || mkpath(path)
             save(joinpath(path, "METADATA.jld2"), "lmax", lmax,
@@ -34,7 +34,7 @@ struct AngularCovarianceMatrix <: BlockMatrix
         blocks = Matrix{Float64}[]
         output = new(path, progressbar, distribute, Ref(cached),
                      lmax, frequencies, bandwidth, component, blocks)
-        if write
+        if compute && write
             compute!(output)
         elseif cached
             cache!(output)
