@@ -38,9 +38,9 @@ end
 
 const DenseBlockDiagonalMatrix = BlockDiagonalMatrix{Matrix{Complex128}}
 
-function BlockDiagonalMatrix(path; kwargs...)
+function BlockDiagonalMatrix{B}(path; kwargs...) where B
     mmax = load(joinpath(path, "METADATA.jld2"), "mmax")
-    BlockDiagonalMatrix(path, mmax, false; kwargs...)
+    BlockDiagonalMatrix{B}(path, mmax, false; kwargs...)
 end
 
 Base.show(io::IO, matrix::BlockDiagonalMatrix) =

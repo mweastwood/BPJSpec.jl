@@ -28,6 +28,7 @@ struct AngularCovarianceMatrix <: BlockMatrix
                                      progressbar=false, distribute=false, cached=false, compute=true)
         if write
             isdir(path) || mkpath(path)
+            isfile(joinpath(path, "BLOCKS.jld2")) && rm(joinpath(path, "BLOCKS.jld2"))
             save(joinpath(path, "METADATA.jld2"), "lmax", lmax,
                  "frequencies", frequencies, "bandwidth", bandwidth, "component", component)
         end
@@ -140,8 +141,12 @@ end
 function cache!(matrix::AngularCovarianceMatrix)
     matrix.cached[] = true
     empty!(matrix.blocks)
-    for l = 0:matrix.lmax
-        push!(matrix.blocks, read_from_disk(matrix, l))
+    filename   = "BLOCKS.jld2"
+    jldopen(joinpath(matrix.path, filename), "r") do file
+        for l = 0:matrix.lmax
+            objectname = @sprintf("%04d", l)
+            push!(matrix.blocks, file[objectname])
+        end
     end
     matrix
 end
@@ -156,15 +161,17 @@ function flush!(matrix::AngularCovarianceMatrix)
 end
 
 function read_from_disk(matrix::AngularCovarianceMatrix, l::Integer)
-    filename   = @sprintf("l=%04d.jld2", l)
-    objectname = "block"
+    filename   = "BLOCKS.jld2"
+    objectname = @sprintf("%04d", l)
     load(joinpath(matrix.path, filename), objectname) :: Matrix{Float64}
 end
 
 function write_to_disk(matrix::AngularCovarianceMatrix, block::Matrix{Float64}, l::Integer)
-    filename   = @sprintf("l=%04d.jld2", l)
-    objectname = "block"
-    save(joinpath(matrix.path, filename), objectname, block)
+    filename   = "BLOCKS.jld2"
+    objectname = @sprintf("%04d", l)
+    jldopen(joinpath(matrix.path, filename), "a+") do file
+        file[objectname] = block
+    end
     block
 end
 

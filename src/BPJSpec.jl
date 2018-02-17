@@ -86,14 +86,13 @@ include("vectors/white-noise-vector.jl")
 include("vectors/random-vector.jl")
 
 include("broadcasting.jl")
-
-include("m-modes.jl")
-#include("imaging.jl")
-#include("fisher.jl")
-
 include("algorithms/average-frequency-channels.jl")
 include("algorithms/full-rank-compress.jl")
 include("algorithms/karhunen-loeve-transforms.jl")
+
+include("m-modes.jl")
+include("imaging.jl")
+include("fisher.jl")
 
 end
 
