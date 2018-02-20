@@ -13,18 +13,29 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-function fisher(transfermatrix, covariancematrix, basis)
-    @time cache!(transfermatrix)
-    @time cache!(covariancematrix)
-    @time foreach(cache!, basis)
-    save("/dev/shm/mweastwood/cache.jld2",
-         "B", transfermatrix, "C", covariancematrix, "Ca", basis)
-    #@time transfermatrix, covariancematrix, basis =
-    #    load("/dev/shm/mweastwood/cache.jld2", "B", "C", "Ca")
-    @time _fisher(transfermatrix, covariancematrix, basis)
+function fisher(transfermatrix, covariancematrix, basis; iterations=10)
+    N = length(basis)
+    M = length(workers())
+    F = zeros(N, N)
+    @sync for worker in workers()
+        @async begin
+            F′ = remotecall_fetch(_fisher, worker, transfermatrix, covariancematrix,
+                                  basis, cld(iterations, M))
+            F .+= F′
+        end
+    end
+    F ./= M
+    F
 end
 
-function _fisher(B, C, basis, iterations=10)
+function _fisher(transfermatrix, covariancematrix, basis, iterations)
+    cache!(transfermatrix)
+    cache!(covariancematrix)
+    foreach(cache!, basis)
+    compute_fisher(transfermatrix, covariancematrix, basis, iterations)
+end
+
+function compute_fisher(B, C, basis, iterations)
     N = length(basis)
     lmax = mmax = B.mmax
 
@@ -32,13 +43,18 @@ function _fisher(B, C, basis, iterations=10)
     Bv  = BlockDiagonalVector(mmax)
     CBv = AngularBlockVector(lmax, mmax)
 
-    prg = Progress(iterations)
-    q = zeros(N, iterations)
-    for iter in 1:iterations
-        fisher_iteration!(view(q, :, iter), B, C, basis, v, Bv, CBv)
-        next!(prg)
+    q  = zeros(N)
+    μ  = zeros(N)
+    σ² = zeros(N, N)
+
+    for iter = 1:iterations
+        fisher_iteration!(q, B, C, basis, v, Bv, CBv)
+        μ  .+= q
+        σ² .+= q*q'
     end
-    q
+    μ  ./= iterations
+    σ² ./= iterations
+    σ² .- μ*μ'
 end
 
 function fisher_iteration!(q, B, C, basis, v, Bv, CBv)

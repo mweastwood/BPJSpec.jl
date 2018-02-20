@@ -130,7 +130,7 @@ function fiducial_signal_model()
     unshift!(kpara, 0u"Mpc^-1")
     unshift!(kperp, 0u"Mpc^-1")
     k = sqrt.(kpara.^2 .+ kperp.'.^2)
-    power = 1.0u"K^2" ./ (k+0.1u"Mpc^-1").^3
+    power = 2π^2 * 1.0u"K^2" ./ (k+0.1u"Mpc^-1").^3
     SignalModel((10., 30.), kpara, kperp, power)
 end
 

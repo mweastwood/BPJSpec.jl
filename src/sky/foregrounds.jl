@@ -55,6 +55,6 @@ end
 
 function galactic_free_free()
     # http://adsabs.harvard.edu/abs/2005ApJ...625..575S
-    ForegroundComponent(130.0u"MHz", 0.088"mK^2", 3.0, 2.15, 35)
+    ForegroundComponent(130.0u"MHz", 0.088u"mK^2", 3.0, 2.15, 35)
 end
 
