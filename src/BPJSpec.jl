@@ -56,7 +56,7 @@ function fix(A)
 end
 
 "Useful little function that helps account for grouping of positive and negative m."
-two(m) = ifelse(m > 0, 2, 1)
+two(m) = ifelse(m != 0, 2, 1)
 
 include("parallel.jl")
 include("cosmology.jl")
