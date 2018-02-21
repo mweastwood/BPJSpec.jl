@@ -15,6 +15,32 @@
 
 const TransferMatrix = SpectralBlockDiagonalMatrix{Matrix{Complex128}}
 
+doc"""
+    struct HierarchicalTransferMatrix
+
+This type represents the transfer matrix of an interferometer. This matrix effectively describes how
+an interferometer responds to the sky, including the antenna primary beam, bandpass, and baseline
+distribution.
+
+"Hierarchical" refers to the fact that we save on some computational and storage requirements by
+separating long baselines from short baselines.
+
+# Fields
+
+* `path` points to the directory where the matrix is stored
+* `metadata` describes the properties of the interferometer
+* `hierarchy` describes how the baselines are grouped
+* `frequencies` is an alias for `metadata.frequencies`
+* `bandwidth` is an alias for `metadata.bandwidth`
+* `lmax` is the maximum value of the total angular momentum quantum number $l$
+* `mmax` is the maximum value of the azimuthal quantum number $m$
+
+# Implementation
+
+All of the data is stored on disk and only read into memory on-request. Generally, this approach is
+necessary because the entire transfer matrix is too large to entirely fit in memory, and because the
+matrix is block diagonal we can work with blocks individually.
+"""
 struct HierarchicalTransferMatrix
     path        :: String
     metadata    :: Metadata
