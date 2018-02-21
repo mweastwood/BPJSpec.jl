@@ -1,4 +1,4 @@
-# Copyright (c) 2015 Michael Eastwood
+# Copyright (c) 2015-2017 Michael Eastwood
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -13,37 +13,86 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-__precompile__()
+#__precompile__()
 
 module BPJSpec
 
-export GriddedVisibilities, grid!
-export MModes, TransferMatrix
-export tikhonov
+# Matrices
+export BlockDiagonalMatrix, DenseBlockDiagonalMatrix
+export SpectralBlockDiagonalMatrix, DenseSpectralBlockDiagonalMatrix
+export AngularCovarianceMatrix, NoiseCovarianceMatrix
+export TransferMatrix, HierarchicalTransferMatrix
 
+# Vectors
+export MModes
+
+using ApproxFun
 using CasaCore.Measures
-using CasaCore.Tables
-using LibHealpix
+using Cosmology
+using Cubature
+using FastTransforms
+using FileIO, JLD2
 using ProgressMeter
-using TTCal
+using StaticArrays
+using Unitful, UnitfulAstro
 
-importall Base.Operators
-import Cosmology
-import GSL
-import LibHealpix: Alm, lmax, mmax
-import TTCal: Nfreq
+T(A) = ctranspose(A)
+H(A) = 0.5*(A+A') # guarantee Hermitian
 
-include("special.jl")     # special functions
-include("physics.jl")     # physical constants and cosmology
-include("parallel.jl")    # tools for parallel processing
-include("definitions.jl") # defines all the types
-include("visibilities.jl")
-include("mmodes.jl")
-include("transfermatrix.jl")
-include("alm.jl")
+"Try to make sure a matrix that should be positive definite is in fact positive definite."
+function fix(A)
+    N = size(A, 1)
+    N == 0 && return A
+    B = H(A)
+    λ = eigvals(B)
+    λmin = minimum(λ)
+    λmax = maximum(λ)
+    if λmin ≤ 0
+        factor = N * eps(Float64) * λmax
+        return B + factor * I
+    else
+        return B
+    end
+end
 
-#include("noise.jl")
-include("sky.jl")
+"Useful little function that helps account for grouping of positive and negative m."
+two(m) = ifelse(m != 0, 2, 1)
+
+include("parallel.jl")
+include("cosmology.jl")
+include("spherical-harmonics.jl")
+include("metadata.jl")
+include("hierarchy.jl")
+
+abstract type SkyComponent end
+struct NoComponent <: SkyComponent end
+include("sky/foregrounds.jl")
+include("sky/signal.jl")
+include("sky/noise.jl")
+
+abstract type BlockMatrix end
+include("matrices/block-diagonal-matrix.jl")
+include("matrices/spectral-block-diagonal-matrix.jl")
+include("matrices/angular-covariance-matrix.jl")
+include("matrices/noise-covariance-matrix.jl")
+include("matrices/transfer-matrix.jl")
+
+abstract type BlockVector end
+include("vectors/block-diagonal-vector.jl")
+include("vectors/spectral-block-vector.jl")
+include("vectors/angular-block-vector.jl")
+include("vectors/random-angular-block-vector.jl")
+include("vectors/white-noise-vector.jl")
+include("vectors/random-vector.jl")
+
+include("broadcasting.jl")
+include("algorithms/average-frequency-channels.jl")
+include("algorithms/full-rank-compress.jl")
+include("algorithms/karhunen-loeve-transforms.jl")
+
+include("m-modes.jl")
+include("imaging.jl")
+include("fisher.jl")
 
 end
 

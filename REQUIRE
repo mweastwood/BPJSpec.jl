@@ -1,8 +1,13 @@
-julia 0.4
+julia 0.6
+ApproxFun
 CasaCore
 Cosmology
-GSL
-HDF5
-JLD
-LibHealpix
+Cubature
+FastTransforms
+FileIO
+JLD2
 ProgressMeter
+StaticArrays
+Unitful
+UnitfulAstro
+

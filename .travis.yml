@@ -1,23 +1,13 @@
 language: julia
 julia:
-    - 0.4
-#   - nightly
+    - 0.6
 notifications:
     email: false
 before_install:
-    - sudo apt-get install libcfitsio3-dev -y
     - sudo add-apt-repository ppa:radio-astro/main -y
     - sudo apt-get update -qq -y
     - sudo apt-get install libcasacore2-dev -y
     - sudo apt-get install casacore-data -y
-    - julia -e "Pkg.clone(\"LibHealpix\")"
-    - julia -e "Pkg.build(\"LibHealpix\")"
-    - julia -e "Pkg.clone(\"CasaCore\")"
-    - julia -e "Pkg.build(\"CasaCore\")"
-    - julia -e "Pkg.clone(\"https://github.com/mweastwood/TTCal.jl.git\")"
-script:
-    - if [[ -a .git/shallow ]]; then git fetch --unshallow; fi
-    - julia --check-bounds=yes -e "Pkg.clone(pwd()); Pkg.test(\"BPJSpec\"; coverage=true)"
 after_success:
-    - julia -e "cd(Pkg.dir(\"BPJSpec\")); Pkg.add(\"Coverage\"); using Coverage; Codecov.submit(process_folder())"
+    - julia -e 'cd(Pkg.dir("BPJSpec")); Pkg.add("Coverage"); using Coverage; Codecov.submit(process_folder())'
 
