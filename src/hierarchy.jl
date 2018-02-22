@@ -40,7 +40,8 @@ end
 
 function compute_baseline_hierarchy(metadata::Metadata, cutoff)
     lmax = maximum_multipole_moment(metadata)
-    divisions = identify_divisions(lmax, cutoff)
+    divisions = identify_divisions(lmax, cutoff+1)
+    divisions = remove_empty_intervals(divisions)
     baselines = categorize_baselines(lmax, divisions)
     Hierarchy(divisions, baselines)
 end
@@ -70,7 +71,8 @@ function identify_divisions(lmax, cutoff)
     end
     histogram = histogram[1:cutoff+1]
     cumulative_histogram = cumsum(histogram)
-    find_crossover_points(cumulative_histogram, 4)
+    depth = cutoff < 32 ? 2 : 4
+    find_crossover_points(cumulative_histogram, depth)
 end
 
 function find_crossover_points(cumulative_histogram, depth)
@@ -101,6 +103,10 @@ function find_crossover_point(cumulative_histogram, lmin, lmax)
         end
     end
     lmax
+end
+
+function remove_empty_intervals(divisions)
+    unique(divisions)
 end
 
 """

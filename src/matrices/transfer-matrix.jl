@@ -69,7 +69,7 @@ end
 function HierarchicalTransferMatrix(path, metadata;
                                     lmax=maximum(maximum_multipole_moment(metadata)))
     mmax = lmax
-    hierarchy = compute_baseline_hierarchy(transfermatrix.metadata, lmax)
+    hierarchy = compute_baseline_hierarchy(metadata, lmax)
     HierarchicalTransferMatrix(path, metadata, hierarchy, lmax, mmax, true)
 end
 

@@ -1,13 +1,7 @@
 using BPJSpec
 using Base.Test
 using Unitful, UnitfulAstro
-#using CasaCore.Measures
-#using CasaCore.Tables
-#using LibHealpix
-#using TTCal
-#using JLD
-
-#include("setup.jl")
+using CasaCore.Measures
 
 srand(123)
 @testset "BPJSpec Tests" begin
