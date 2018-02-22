@@ -79,9 +79,9 @@ precomputation(component) = nothing
 "Compute the covariance while accounting for bandwidth smearing."
 function compute(component, l, ν1, Δν1, ν2, Δν2, args = nothing)
     if args == nothing
-        integrand = x -> component(l, x[1]*u"Hz", x[2]*u"Hz")
+        integrand = x -> ustrip(uconvert(u"K^2", component(l, x[1]*u"Hz", x[2]*u"Hz")))
     else
-        integrand = x -> component(l, x[1]*u"Hz", x[2]*u"Hz", args)
+        integrand = x -> ustrip(uconvert(u"K^2", component(l, x[1]*u"Hz", x[2]*u"Hz", args)))
     end
     xmin = ustrip.(uconvert.(u"Hz", [ν1-Δν1/2, ν2-Δν2/2]))
     xmax = ustrip.(uconvert.(u"Hz", [ν1+Δν1/2, ν2+Δν2/2]))

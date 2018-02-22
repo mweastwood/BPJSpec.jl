@@ -32,12 +32,12 @@ srand(123)
     include("cosmology.jl")
     include("spherical-harmonics.jl")
 
-#    include("visibilities.jl")
-#    include("mmodes.jl")
-#    #include("transfermatrix.jl")
-#    #include("alm.jl")
-#
-#    #include("noise.jl")
-#    #include("sky.jl")
+    @testset "sky" begin
+        include("sky/foregrounds.jl")
+        include("sky/signal.jl")
+    end
+
+
+
 end
 

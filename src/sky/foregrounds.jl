@@ -20,10 +20,10 @@ Evaluate a model for the multifrequency angular power spectrum of a foreground c
 `ν0`, `A`, `α`, `β`, and `ζ` are all parameters of the model.
 """
 function Cforeground(l, ν1, ν2, ν0, A, α, β, ζ)
-    x = (l+1)/1000
+    x = (l+1)/1001
     y = uconvert(Unitful.NoUnits, ν1*ν2/ν0^2)
     z = log(ν1/ν2)
-    ustrip(uconvert(u"K^2", A * x^-α * y^-β * exp(-z^2/(2ζ^2))))
+    uconvert(u"K^2", A * x^-α * y^-β * exp(-z^2/(2ζ^2)))
 end
 
 struct ForegroundComponent <: SkyComponent

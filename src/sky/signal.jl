@@ -73,7 +73,7 @@ function Csignal_same_redshift(comoving_distance_func, l, ν, kpara, kperp, powe
         P_stop  = weight_left*power[i+1, j] + weight_right*power[i+1, j+1]
         out += 0.5*(P_start+P_stop)*(k_stop-k_start)
     end
-    ustrip(uconvert(u"K^2", out/(π*χ^2)))
+    uconvert(u"K^2", out/(π*χ^2))
 end
 
 function Csignal_different_redshift(comoving_distance_func, l, ν1, ν2, kpara, kperp, power)
@@ -99,7 +99,7 @@ function Csignal_different_redshift(comoving_distance_func, l, ν1, ν2, kpara, 
         out += (P_stop*sin(k_stop*Δχ) - P_start*sin(k_start*Δχ)) / Δχ
         out += (P_stop-P_start) * (cos(k_stop*Δχ)-cos(k_start*Δχ)) / (k_stop-k_start) / Δχ^2
     end
-    ustrip(uconvert(u"K^2", out/(π*χ1*χ2)))
+    uconvert(u"K^2", out/(π*χ1*χ2))
 end
 
 struct SignalModel <: SkyComponent
@@ -125,8 +125,8 @@ function (model::SignalModel)(l, ν1, ν2, comoving_distance_func)
 end
 
 function fiducial_signal_model()
-    kpara = logspace(log10(0.01), log10(1.0), 200).*u"Mpc^-1"
-    kperp = logspace(log10(0.01), log10(1.0), 200).*u"Mpc^-1"
+    kpara = logspace(log10(0.01), log10(1.0), 200) .* u"Mpc^-1"
+    kperp = logspace(log10(0.01), log10(1.0), 200) .* u"Mpc^-1"
     unshift!(kpara, 0u"Mpc^-1")
     unshift!(kperp, 0u"Mpc^-1")
     k = sqrt.(kpara.^2 .+ kperp.'.^2)
