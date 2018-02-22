@@ -34,6 +34,7 @@ srand(123)
 
     @testset "matrices" begin
         include("matrices/block-diagonal-matrix.jl")
+        include("matrices/spectral-block-diagonal-matrix.jl")
     end
 
     @testset "sky" begin
