@@ -40,8 +40,9 @@ end
 
 function compute_baseline_hierarchy(metadata::Metadata, cutoff)
     lmax = maximum_multipole_moment(metadata)
-    divisions = identify_divisions(lmax, cutoff+1)
+    divisions = identify_divisions(lmax, cutoff)
     divisions = remove_empty_intervals(divisions)
+    divisions = establish_minimum_lmax(divisions)
     baselines = categorize_baselines(lmax, divisions)
     Hierarchy(divisions, baselines)
 end
@@ -64,14 +65,14 @@ baselines into two groups where each group requires roughly the same amount of s
 transfer matrix).
 """
 function identify_divisions(lmax, cutoff)
-    lmax_range = 0:maximum(lmax)+1
+    lmax_range = 0:max(maximum(lmax), cutoff)+1
     histogram = zeros(length(lmax_range))
     for l in lmax
         histogram[l+1] += 1
     end
     histogram = histogram[1:cutoff+1]
     cumulative_histogram = cumsum(histogram)
-    depth = cutoff < 32 ? 2 : 4
+    depth = 4
     find_crossover_points(cumulative_histogram, depth)
 end
 
@@ -107,6 +108,17 @@ end
 
 function remove_empty_intervals(divisions)
     unique(divisions)
+end
+
+function establish_minimum_lmax(divisions)
+    # There are accuracy issues associated with computing spherical harmonics with a small lmax.
+    # This comes about because the resolution of the map scales with lmax and so the beam is poorly
+    # sampled when lmax is small. In the future we should apply some padding to ther spherical
+    # harmonic transform such that this is not so much of an issue any more, but for now we'll just
+    # increase lmax for the shortest baselines.
+    minimum_lmax = 32
+    idx = searchsortedlast(divisions, minimum_lmax)
+    [[0, 32]; divisions[idx+1:end]]
 end
 
 """

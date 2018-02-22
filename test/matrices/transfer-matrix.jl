@@ -1,6 +1,14 @@
+function simple_beam(azimuth, elevation)
+    if elevation > 0
+        return sin(elevation)
+    else
+        return 0.0
+    end
+end
+const simple_beam_solid_angle = π
+
 @testset "transfer-matrix.jl" begin
     path = tempname()
-    lmax = 2
     frequencies = [45u"MHz", 74u"MHz"]
     bandwidth   = [24u"kHz", 24u"kHz"]
 
@@ -18,10 +26,36 @@
     phase_center = up
     metadata = BPJSpec.Metadata(frequencies, bandwidth, position, baselines, phase_center)
 
-    B = HierarchicalTransferMatrix(path, metadata)
+    transfermatrix = HierarchicalTransferMatrix(path, metadata)
     try
-        @test B.hierarchy.divisions == [0, 2, 3]
-        @test B.hierarchy.baselines == [[1], [2, 3, 4]]
+        @test transfermatrix.hierarchy.divisions == [0, 32]
+        @test transfermatrix.hierarchy.baselines == [[1, 2, 3, 4]]
+
+        BPJSpec.compute!(transfermatrix, simple_beam)
+
+        # Construct a simple sky.
+        alm = SpectralBlockVector(transfermatrix.mmax, frequencies)
+        for β = 1:length(frequencies)
+            for m = 0:transfermatrix.mmax
+                block = zeros(Complex128, transfermatrix.lmax - m + 1)
+                if m == 0
+                    block[1] = sqrt(4π) # 1 K constant sky brightness
+                end
+                alm[m, β] = block
+            end
+        end
+
+        mmodes = SpectralBlockVector(transfermatrix.mmax, frequencies)
+        @. mmodes = transfermatrix * alm
+        for β = 1:length(frequencies)
+            block = mmodes[0, β]
+            expected = ustrip(uconvert(u"Jy", simple_beam_solid_angle
+                                       * 2u"k*K"*frequencies[β]^2/(u"c")^2))
+            # Note the tolerance here is set by the resolution of the map used for the spherical
+            # harmonic transform of the beam during transfer matrix generation.
+            @test abs(block[1] - expected) < 0.05
+        end
+
     finally
         rm(path, recursive=true)
     end

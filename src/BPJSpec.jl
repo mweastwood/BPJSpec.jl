@@ -30,6 +30,7 @@ export AngularCovarianceMatrix, NoiseCovarianceMatrix
 export TransferMatrix, HierarchicalTransferMatrix
 
 # Vectors
+export SpectralBlockVector
 export MModes
 
 using ApproxFun
