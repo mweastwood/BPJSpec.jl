@@ -35,14 +35,14 @@ srand(123)
     @testset "matrices" begin
         include("matrices/block-diagonal-matrix.jl")
         include("matrices/spectral-block-diagonal-matrix.jl")
+        include("matrices/angular-covariance-matrix.jl")
+        include("matrices/noise-covariance-matrix.jl")
+        include("matrices/transfer-matrix.jl")
     end
 
     @testset "sky" begin
         include("sky/foregrounds.jl")
         include("sky/signal.jl")
     end
-
-
-
 end
 
