@@ -33,7 +33,7 @@ function compute!(matrix::NoiseCovarianceMatrix, hierarchy, noise::NoiseModel)
     for β = 1:Nfreq
         ν  = matrix.frequencies[β]
         Δν = matrix.bandwidth[β]
-        σ  = standard_error(noise.Tsys, ν, Δν, noise.τ, noise.Nint)
+        σ  = ustrip(uconvert(u"Jy", standard_error(noise.Tsys, ν, Δν, noise.τ, noise.Nint)))
         for m = 0:matrix.mmax
             σm = σ * time_smearing(m, noise.τ)
             Nm = σm^2 .* ones(two(m)*Nbase(hierarchy, m))
@@ -44,11 +44,29 @@ end
 
 "Compute the standard error of a visibility from the system temperature."
 function standard_error(Tsys, ν, Δν, τ, Nint)
+    # A careful reading of Taylor, Carilli, Perley chapter 9 reveals that under the convention that
+    # Stokes I is 0.5*(xx + yy) we get the following expressions:
+    #
+    # Uncertainty on single polarization visibilities (in flux density units):
+    #     σₓₓ = sqrt(2) k T / A sqrt(Δν τ)
+    #
+    # Uncertainty on Stokes I visibilities (in flux density units):
+    #     σ = σₓₓ / sqrt(2) = k T / A sqrt(Δν τ)
+    #
+    # Where k = Boltzman constant
+    #       T = system temperature
+    #       A = effective collecting area
+    #       Δν = bandwidth
+    #       τ = total integration time
+    #
+    # There is a general theorem that says that the angle-averaged collecting area of an antenna is
+    # λ^2/(4π), so we'll make use of this as an approximation as well.
+
     λ  = uconvert(u"m", u"c"/ν)       # wavelength
     Ae = uconvert(u"m^2", λ^2/(4π))   # effective collecting area (0th order approximation)
     N  = uconvert(NoUnits, Δν*τ*Nint) # number of independent samples
     σ  = u"k"*Tsys/(Ae*√N)            # standard error of a visibility
-    ustrip(uconvert(u"Jy", σ))
+    uconvert(u"Jy", σ)
 end
 
 "Compute the effect of time smearing on the noise covariance of m-modes (Shaw 2015)."
