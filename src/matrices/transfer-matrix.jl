@@ -93,12 +93,13 @@ end
 function compute_one_frequency!(transfermatrix::HierarchicalTransferMatrix, workers, beam, ν)
     metadata  = transfermatrix.metadata
     hierarchy = transfermatrix.hierarchy
+    me = chomp(readstring(`hostname`))
 
     for idx = 1:length(hierarchy.divisions)-1
         @time begin
             lmax = hierarchy.divisions[idx+1]
             baselines = transfermatrix.metadata.baselines[hierarchy.baselines[idx]]
-            blocks = compute_baseline_group_one_frequency!(transfermatrix, workers.dict["astm11"],
+            blocks = compute_baseline_group_one_frequency!(transfermatrix, workers.dict[me],
                                                            beam, baselines, lmax, ν)
             resize!(blocks, 0)
             finalize(blocks)
