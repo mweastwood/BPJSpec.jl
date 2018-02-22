@@ -32,6 +32,10 @@ srand(123)
     include("cosmology.jl")
     include("spherical-harmonics.jl")
 
+    @testset "matrices" begin
+        include("matrices/block-diagonal-matrix.jl")
+    end
+
     @testset "sky" begin
         include("sky/foregrounds.jl")
         include("sky/signal.jl")
