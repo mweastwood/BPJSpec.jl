@@ -44,7 +44,7 @@ end
 function _full_rank_compress(B, N)
     F = svdfact(B)
     B′ = F[:U]'*B
-    N′ = F[:U]'*N*F[:U]
+    N′ = fix(F[:U]'*N*F[:U])
     B′, N′
 end
 
