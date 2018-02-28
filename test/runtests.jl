@@ -26,6 +26,11 @@ srand(123)
     include("cosmology.jl")
     include("spherical-harmonics.jl")
 
+    @testset "sky" begin
+        include("sky/foregrounds.jl")
+        include("sky/signal.jl")
+    end
+
     @testset "matrices" begin
         include("matrices/block-diagonal-matrix.jl")
         include("matrices/spectral-block-diagonal-matrix.jl")
@@ -34,9 +39,9 @@ srand(123)
         include("matrices/transfer-matrix.jl")
     end
 
-    @testset "sky" begin
-        include("sky/foregrounds.jl")
-        include("sky/signal.jl")
+    @testset "algorithms" begin
+        include("algorithms/average-frequency-channels.jl")
+        #include("algorithms/full-rank-compress.jl")
     end
 end
 

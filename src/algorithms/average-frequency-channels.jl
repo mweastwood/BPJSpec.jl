@@ -13,10 +13,10 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-function average_frequency_channels(transfermatrix, Navg)
+function average_frequency_channels(transfermatrix, Navg; output="")
     path = dirname(transfermatrix.path)
     Nfreq  = length(transfermatrix.frequencies)
-    Nfreq′ = Nfreq ÷ Navg + 1
+    Nfreq′ = cld(Nfreq, Navg)
     mmax   = transfermatrix.mmax
 
     # Decide which channels to average down and the resulting average frequencies.
@@ -31,25 +31,39 @@ function average_frequency_channels(transfermatrix, Navg)
         bandwidth[idx]   =  sum(transfermatrix.bandwidth[range])
     end
 
-    suffix = "-averaged"
-    file = joinpath(path, "transfer-matrix"*suffix)
+    if output == ""
+        suffix = "-averaged"
+        file = joinpath(path, "transfer-matrix"*suffix)
+    else
+        file = output
+    end
     output_transfermatrix = TransferMatrix(file, mmax, frequencies, bandwidth,
-                                           progressbar=true, distribute=false)
+                                           progressbar=true, distribute=true)
 
     # Perform the averaging.
-    prg = Progress(Nfreq′*(mmax+1))
-    for idx = 1:Nfreq′
-        range = ranges[idx]
-        for m = 0:mmax
-            B = transfermatrix[m, range[1]]
-            for β in range[2:end]
-                B .+= transfermatrix[m, β]
-            end
-            output_transfermatrix[m, idx] = B
-            next!(prg)
+    queue = [(m, β) for β = 1:Nfreq′ for m = 0:mmax]
+    pool  = CachingPool(workers())
+    lck = ReentrantLock()
+    prg = Progress(length(queue))
+    increment() = (lock(lck); next!(prg); unlock(lck))
+    @sync for worker in workers()
+        @async while length(queue) > 0
+            m, β = shift!(queue)
+            remotecall_fetch(_average_frequency_channels, pool,
+                             transfermatrix, output_transfermatrix, m, β, ranges[β])
+            increment()
         end
     end
 
     output_transfermatrix
+end
+
+function _average_frequency_channels(input, output, m, β, range)
+    B = input[m, range[1]]
+    for β′ in range[2:end]
+        B .+= input[m, β′]
+    end
+    B ./= length(range)
+    output[m, β] = B
 end
 
