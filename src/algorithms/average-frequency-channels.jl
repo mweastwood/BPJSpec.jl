@@ -59,11 +59,15 @@ function average_frequency_channels(transfermatrix, Navg; output="")
 end
 
 function _average_frequency_channels(input, output, m, β, range)
-    B = input[m, range[1]]
+    β′ = range[1]
+    weight = uconvert(NoUnits, input.bandwidth[β′]/output.bandwidth[β])
+    B = input[m, β′] .* weight
+
     for β′ in range[2:end]
-        B .+= input[m, β′]
+        weight = uconvert(NoUnits, input.bandwidth[β′]/output.bandwidth[β])
+        B .+= input[m, β′] .* weight
     end
-    B ./= length(range)
+
     output[m, β] = B
 end
 

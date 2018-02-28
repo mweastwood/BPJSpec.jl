@@ -16,7 +16,7 @@
             @test output.bandwidth   == [  48u"kHz", 1.002u"MHz"]
             for m = 0:mmax
                 @test output[m, 1] == fill(1.5+1.0im, 1, 1)
-                @test output[m, 2] == fill(3.5+1.0im, 1, 1)
+                @test output[m, 2] ≈ fill(3008/1002+1.0im, 1, 1)
             end
         finally
             rm(path2, recursive=true)
