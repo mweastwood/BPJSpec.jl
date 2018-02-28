@@ -5,7 +5,9 @@
     τ  = 13u"s"
     N  = 1000 # number of integrations
     λ  = u"c" / ν
-    A  = λ^2 / (4π)
-    @test BPJSpec.standard_error(Tsys, ν, Δν, τ, N) ≈ u"k"*Tsys / (A * sqrt(Δν * τ * N))
+    Ω  = 2π*u"sr"
+    A  = λ^2 / Ω
+    @test BPJSpec.standard_error(Tsys, ν, Δν, τ, N, Ω) ≈
+            u"k"*Tsys / (A * sqrt(Δν * τ * N))
 end
 

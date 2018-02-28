@@ -15,9 +15,10 @@
 
 struct NoiseModel
     # TODO: the system temperature should increase at lower frequencies
-    Tsys  :: typeof(1.0*u"K") # system temperature
-    τ     :: typeof(1.0*u"s") # integration time (for a single time slice)
-    Nint  :: Int              # total number of integrations used in the dataset
+    Tsys  :: typeof(1.0*u"K")  # system temperature
+    τ     :: typeof(1.0*u"s")  # integration time (for a single time slice)
+    Nint  :: Int               # total number of integrations used in the dataset
+    Ω     :: typeof(1.0*u"sr") # the solid angle of the primary beam
 end
 
 const NoiseCovarianceMatrix = SpectralBlockDiagonalMatrix{Diagonal{Float64}}
@@ -33,7 +34,8 @@ function compute!(matrix::NoiseCovarianceMatrix, hierarchy, noise::NoiseModel)
     for β = 1:Nfreq
         ν  = matrix.frequencies[β]
         Δν = matrix.bandwidth[β]
-        σ  = ustrip(uconvert(u"Jy", standard_error(noise.Tsys, ν, Δν, noise.τ, noise.Nint)))
+        σ  = ustrip(uconvert(u"Jy", standard_error(noise.Tsys, ν, Δν, noise.τ,
+                                                   noise.Nint, noise.Ω)))
         for m = 0:matrix.mmax
             σm = σ * time_smearing(m, noise.τ)
             Nm = σm^2 .* ones(two(m)*Nbase(hierarchy, m))
@@ -43,7 +45,7 @@ function compute!(matrix::NoiseCovarianceMatrix, hierarchy, noise::NoiseModel)
 end
 
 "Compute the standard error of a visibility from the system temperature."
-function standard_error(Tsys, ν, Δν, τ, Nint)
+function standard_error(Tsys, ν, Δν, τ, Nint, Ω)
     # A careful reading of Taylor, Carilli, Perley chapter 9 reveals that under the convention that
     # Stokes I is 0.5*(xx + yy) we get the following expressions:
     #
@@ -59,11 +61,15 @@ function standard_error(Tsys, ν, Δν, τ, Nint)
     #       Δν = bandwidth
     #       τ = total integration time
     #
-    # There is a general theorem that says that the angle-averaged collecting area of an antenna is
-    # λ^2/(4π), so we'll make use of this as an approximation as well.
-
+    # Now there's still a question of what do we mean by "effective collecting area"? There are two
+    # possibilities here:
+    # 1. The angle averaged effective collecting area = λ^2/(4π)
+    # 2. The peak effective collecting area = λ^2/Ω where Ω is the beam solid angle
+    #
+    # I am of the opinion that we actually want option 2 here, but this is something I should
+    # revisit and get a couple of other opinions (TODO!)
     λ  = uconvert(u"m", u"c"/ν)       # wavelength
-    Ae = uconvert(u"m^2", λ^2/(4π))   # effective collecting area (0th order approximation)
+    Ae = uconvert(u"m^2", λ^2/Ω)      # effective collecting area
     N  = uconvert(NoUnits, Δν*τ*Nint) # number of independent samples
     σ  = u"k"*Tsys/(Ae*√N)            # standard error of a visibility
     uconvert(u"Jy", σ)
