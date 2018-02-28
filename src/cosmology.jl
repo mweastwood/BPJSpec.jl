@@ -22,6 +22,7 @@ const cosmology = Cosmology.cosmology()
 Calculate the comoving distance (in units of Mpc) to the redshift `z`.
 """
 comoving_distance(z) = Cosmology.comoving_radial_dist_mpc(cosmology, z) * u"Mpc"
+comoving_distance(ν::Unitful.Frequency) = comoving_distance(redshift(ν))
 
 function approximate(::typeof(comoving_distance), zmin, zmax)
     f = Fun(z -> Cosmology.comoving_radial_dist_mpc(cosmology, z), zmin..zmax)
