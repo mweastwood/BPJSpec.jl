@@ -84,37 +84,45 @@ function compute!(transfermatrix::HierarchicalTransferMatrix, beam)
     println(workers)
     println(transfermatrix.hierarchy)
 
-    for ν in transfermatrix.metadata.frequencies
-        @show ν
-        @time compute_one_frequency!(transfermatrix, workers, beam, ν)
+    queue = copy(transfermatrix.metadata.frequencies)
+    lck = ReentrantLock()
+    prg = Progress(length(queue))
+    increment() = (lock(lck); next!(prg); unlock(lck))
+
+    @sync for worker in leaders(workers)
+        @async while length(queue) > 0
+            ν = shift!(queue)
+            remotecall_fetch(compute_one_frequency!, worker, transfermatrix, workers, beam, ν)
+            increment()
+        end
     end
 end
 
 function compute_one_frequency!(transfermatrix::HierarchicalTransferMatrix, workers, beam, ν)
     metadata  = transfermatrix.metadata
     hierarchy = transfermatrix.hierarchy
-    me = chomp(readstring(`hostname`))
+
+    my_machine   = chomp(readstring(`hostname`))
+    subordinates = copy(workers.dict[my_machine])
+    if length(subordinates) > 1
+        # make sure this process isn't in the worker pool
+        deleteat!(subordinates, subordinates .== myid())
+    end
 
     for idx = 1:length(hierarchy.divisions)-1
-        @time begin
-            lmax = hierarchy.divisions[idx+1]
-            baselines = transfermatrix.metadata.baselines[hierarchy.baselines[idx]]
-            blocks = compute_baseline_group_one_frequency!(transfermatrix, workers.dict[me],
-                                                           beam, baselines, lmax, ν)
-            resize!(blocks, 0)
-            finalize(blocks)
-            gc(); gc() # please please please garbage collect `blocks`
-        end
+        lmax = hierarchy.divisions[idx+1]
+        baselines = transfermatrix.metadata.baselines[hierarchy.baselines[idx]]
+        blocks = compute_baseline_group_one_frequency!(transfermatrix, subordinates,
+                                                       beam, baselines, lmax, ν)
+        resize!(blocks, 0)
+        finalize(blocks)
+        gc(); gc() # please please please garbage collect `blocks`
     end
 end
 
 function compute_baseline_group_one_frequency!(transfermatrix::HierarchicalTransferMatrix,
-                                               workers, beam, baselines, lmax, ν)
-    if length(workers) > 1
-        # make sure this process isn't in the worker pool
-        deleteat!(workers, workers .== myid())
-    end
-    pool = CachingPool(workers)
+                                               subordinates, beam, baselines, lmax, ν)
+    pool = CachingPool(subordinates)
 
     # "... but in this world nothing can be said to be certain, except death
     #  and taxes and lmax=mmax"
@@ -132,31 +140,23 @@ function compute_baseline_group_one_frequency!(transfermatrix::HierarchicalTrans
         real_coeff, imag_coeff = fringe_pattern(baselines[α], phase_center, beam_map, rhat, plan, ν)
     end
 
-    lck = ReentrantLock()
-    prg = Progress(length(queue))
-    increment() = (lock(lck); next!(prg); unlock(lck))
-
-    @sync for worker in workers
+    @sync for subordinate in subordinates
         @async while length(queue) > 0
             α = pop!(queue)
             real_coeff, imag_coeff = remotecall_fetch(just_do_it, pool, α)
             fix_scaling!(real_coeff, imag_coeff, ν)
             write_to_blocks!(blocks, real_coeff, imag_coeff, lmax, mmax, α)
-            increment()
         end
     end
 
     path = joinpath(transfermatrix.path, @sprintf("%.3fMHz", ustrip(uconvert(u"MHz", ν))))
     isdir(path) || mkdir(path)
-
-    prg = Progress(mmax+1)
+    # TODO: disable JLD2's mmap usage here?
     jldopen(joinpath(path, @sprintf("lmax=%04d.jld2", lmax)), "w") do file
         for m = 0:mmax
             file[@sprintf("%04d", m)] = blocks[m+1]
-            next!(prg)
         end
     end
-
     blocks
 end
 

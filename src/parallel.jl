@@ -42,3 +42,6 @@ function Base.show(io::IO, workers::Workers)
     end
 end
 
+"Return a list of one worker per machine."
+leaders(workers::Workers) = first.(collect(values(workers.dict)))
+
