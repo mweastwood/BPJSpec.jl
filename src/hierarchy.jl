@@ -16,6 +16,7 @@
 struct Hierarchy
     divisions :: Vector{Int}
     baselines :: Vector{Vector{Int}}
+    Nfreq     :: Int
 end
 
 function Base.show(io::IO, hierarchy::Hierarchy)
@@ -28,7 +29,7 @@ function Base.show(io::IO, hierarchy::Hierarchy)
         lmin = hierarchy.divisions[idx]
         lmax = hierarchy.divisions[idx+1]
         Nbase = length(hierarchy.baselines[idx])
-        space = Nbase*lmax*lmax*128/(8*1024^3)
+        space = Nbase*lmax*lmax*128/(8*1024^3)*hierarchy.Nfreq
         @printf("| %4d to %4d |     %5d | %8.3f GB |\n", lmin, lmax, Nbase, space)
         total_space += space
         total_baselines += Nbase
@@ -44,7 +45,7 @@ function compute_baseline_hierarchy(metadata::Metadata, cutoff)
     divisions = remove_empty_intervals(divisions)
     divisions = establish_minimum_lmax(divisions)
     baselines = categorize_baselines(lmax, divisions)
-    Hierarchy(divisions, baselines)
+    Hierarchy(divisions, baselines, length(metadata.frequencies))
 end
 
 """
