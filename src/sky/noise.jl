@@ -13,45 +13,55 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-#doc"""
-#    Cnoise(Tsys0,α,ν,ν0,Δν,τ_total,τ_int,m) -> Float64
-#
-#Compute the expected variance of the $m$-modes due to thermal noise.
-#
-#The system temperature is modeled as
-#\\[
-#    T_{sys} = T_{sys,0} \left(\frac{\nu}{\nu_0}\right)^{-\alpha},
-#\\]
-#$\Delta\nu$ gives the bandwidth, $\tau_{total}$ gives the total integration
-#time (in seconds), and $\tau_{int}$ gives the integration time corresponding
-#to a single integration (also in seconds).
-#"""
-#function Cnoise(Tsys0,α,ν,ν0,Δν,τ_total,τ_int,m)
-#    Tsys = Tsys0 * (ν/ν0)^(-α)
-#    tsid = 86164.09054 # sidereal day in seconds
-#    Tsys*Tsys / (τ_total*Δν) * sinc(m*τ_int/tsid)^2
-#end
-#
-#immutable NoiseModel
-#    Tsys0::Float64
-#    α::Float64
-#    ν0::Float64
-#    Δν::Float64
-#    τ_total::Float64
-#    τ_int::Float64
-#end
+struct NoiseModel
+    # TODO: the system temperature should increase at lower frequencies
+    Tsys  :: typeof(1.0*u"K")  # system temperature
+    τ     :: typeof(1.0*u"s")  # integration time (for a single time slice)
+    Nint  :: Int               # total number of integrations used in the dataset
+    Ω     :: typeof(1.0*u"sr") # the solid angle of the primary beam
+end
 
-#function covariance_matrix(noise::NoiseModel, v::MModes)
-#    is_single_frequency(v) || error("Expected single-frequency m-modes.")
-#    ν = v.meta.ν[1]
-#    Nbase = length(v[1])
-#    N = DiagonalNoiseMatrix(Nbase,mmax(v),ν)
-#    for m = 0:mmax(v)
-#        amplitude = noise(m,ν)
-#        for α = 1:size(N[m+1])[1]
-#            N[m+1][α] = amplitude
-#        end
-#    end
-#    N
-#end
+"Compute the standard error of a visibility from the system temperature."
+function standard_error(Tsys, ν, Δν, τ, Nint, Ω)
+    # A careful reading of Taylor, Carilli, Perley chapter 9 reveals that under the convention that
+    # Stokes I is 0.5*(xx + yy) we get the following expressions:
+    #
+    # Uncertainty on single polarization visibilities (in flux density units):
+    #     σₓₓ = sqrt(2) k T / A sqrt(Δν τ)
+    #
+    # Uncertainty on Stokes I visibilities (in flux density units):
+    #     σ = σₓₓ / sqrt(2) = k T / A sqrt(Δν τ)
+    #
+    # Where k = Boltzman constant
+    #       T = system temperature
+    #       A = effective collecting area
+    #       Δν = bandwidth
+    #       τ = total integration time
+    #
+    # Now there's still a question of what do we mean by "effective collecting area"? There are two
+    # possibilities here:
+    # 1. The angle averaged effective collecting area = λ^2/(4π)
+    # 2. The peak effective collecting area = λ^2/Ω where Ω is the beam solid angle
+    #
+    # I am of the opinion that we actually want option 2 here, but this is something I should
+    # revisit and get a couple of other opinions (TODO!)
+    λ  = uconvert(u"m", u"c"/ν)       # wavelength
+    Ae = uconvert(u"m^2", λ^2/Ω)      # effective collecting area
+    N  = uconvert(NoUnits, Δν*τ*Nint) # number of independent samples
+    σ  = u"k"*Tsys/(Ae*√N)            # standard error of a visibility
+    uconvert(u"Jy", σ)
+end
+
+"Compute the effect of time smearing on the noise covariance of m-modes (Shaw 2015)."
+function time_smearing(m, τ)
+    t_sidereal = 86164.09054u"s" # one sidereal day
+    x = uconvert(NoUnits, m*τ/t_sidereal)
+    # N.B. Julia defines sinc(x) = sin(πx)/(πx)
+    sinc(x)
+end
+
+function (model::NoiseModel)(m, ν, Δν)
+    σ = standard_error(model.Tsys, ν, Δν, model.τ, model.Nint, model.Ω)
+    uconvert(u"Jy", σ * time_smearing(m, model.τ))
+end
 
