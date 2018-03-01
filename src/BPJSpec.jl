@@ -48,7 +48,7 @@ export TransferMatrix, HierarchicalTransferMatrix
 export SpectralBlockVector
 export MModes
 
-using Unitful, UnitfulAstro
+using Unitful, UnitfulAstro # Travis CI fails with "invalid age range update" unless this is first
 
 using ApproxFun
 using CasaCore.Measures
