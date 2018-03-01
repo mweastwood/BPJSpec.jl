@@ -8,8 +8,13 @@ before_install:
     - sudo apt-get update -qq -y
     - sudo apt-get install libcasacore2-dev -y
     - sudo apt-get install casacore-data -y
+script:
+    - git fetch --unshallow
+    - julia --color=yes -e 'Pkg.clone(pwd())'
+    - julia --color=yes -e "Pkg.build(\"${JL_PKG}\")"
     - julia -e 'using FastTransforms'
     - julia -e 'using Unitful, UnitfulAstro'
+    - julia --check-bounds=yes --color=yes -e "Pkg.test(\"${JL_PKG}\", coverage=true)"
 after_success:
     - julia -e 'cd(Pkg.dir("BPJSpec")); Pkg.add("Coverage"); using Coverage; Codecov.submit(process_folder())'
     - julia -e 'cd(Pkg.dir("BPJSpec")); Pkg.add("Documenter"); include(joinpath("docs", "make.jl"))'
