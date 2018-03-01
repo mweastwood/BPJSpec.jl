@@ -106,15 +106,16 @@ include("vectors/angular-block-vector.jl")
 include("vectors/random-angular-block-vector.jl")
 include("vectors/white-noise-vector.jl")
 include("vectors/random-vector.jl")
+include("m-modes.jl")
 
 include("broadcasting.jl")
 include("algorithms/average-frequency-channels.jl")
 include("algorithms/full-rank-compress.jl")
 include("algorithms/karhunen-loeve-transforms.jl")
-
-include("m-modes.jl")
 include("imaging.jl")
-include("fisher.jl")
+
+include("quadratic-estimator/fisher-information.jl")
+include("quadratic-estimator/mixing-matrix.jl")
 
 end
 

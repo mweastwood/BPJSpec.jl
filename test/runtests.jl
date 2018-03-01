@@ -44,5 +44,9 @@ srand(123)
         include("algorithms/average-frequency-channels.jl")
         #include("algorithms/full-rank-compress.jl")
     end
+
+    @testset "quadratic-estimator" begin
+        include("quadratic-estimator/mixing-matrix.jl")
+    end
 end
 

@@ -13,7 +13,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-function fisher(transfermatrix, covariancematrix, basis; iterations=10)
+function fisher_information(transfermatrix, covariancematrix, basis; iterations=10)
     N = length(basis)
     M = length(workers())
     F = zeros(N, N)
