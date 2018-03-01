@@ -48,6 +48,8 @@ export TransferMatrix, HierarchicalTransferMatrix
 export SpectralBlockVector
 export MModes
 
+using Unitful, UnitfulAstro # Travis CI fails with "invalid age range update" unless this is first
+
 using ApproxFun
 using CasaCore.Measures
 using Cosmology
@@ -56,7 +58,6 @@ using FastTransforms
 using FileIO, JLD2
 using ProgressMeter
 using StaticArrays
-using Unitful, UnitfulAstro
 
 T(A) = ctranspose(A)
 H(A) = 0.5*(A+A') # guarantee Hermitian
