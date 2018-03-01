@@ -13,7 +13,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-function kltransforms(transfermatrix, noisematrix, foregroundmatrix, signalmatrix)
+function kltransforms(transfermatrix, noisematrix, foregroundmatrix, signalmatrix; threshold=0.1)
     mmax = transfermatrix.mmax
 
     # Run the sky covariances through the interferometer's response.
@@ -27,7 +27,8 @@ function kltransforms(transfermatrix, noisematrix, foregroundmatrix, signalmatri
     # Compute the foreground filter...
     file = joinpath(dirname(transfermatrix.path), "foreground-filter")
     V = DenseBlockDiagonalMatrix(file, mmax, progressbar=true, distribute=true)
-    @. V = construct_filter(F, S)
+    construct_filter′(F, S) = construct_filter(F, S, threshold)
+    @. V = construct_filter′(F, S)
 
     # ...and apply that filter.
     file = joinpath(dirname(signalmatrix.path), "covariance-matrix-fiducial-signal-filtered")
@@ -53,13 +54,13 @@ function kltransforms(transfermatrix, noisematrix, foregroundmatrix, signalmatri
     B, C
 end
 
-function construct_filter(F, S)
+function construct_filter(F, S, threshold)
     # We want to make sure that we're hitting the correct branch in `eig` for Hermitian, positive
     # definite matrices. So let's verify that here and make a noisy error if it's not true.
     isposdef(F) || error("F is not positive definite")
     isposdef(S) || error("S is not positive definite")
     λ, V = eig(F, S) # Note: this seems to be more numerically stable than eig(S, F)
-    idx = searchsortedlast(λ, 0.1) # foreground-signal ratio < 0.1
+    idx = searchsortedlast(λ, threshold) # foreground-signal ratio < threshold
     V[:, 1:idx]
 end
 
