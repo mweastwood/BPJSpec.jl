@@ -20,6 +20,21 @@ doc"""
 
 BPJSpec is a 21-cm power spectrum code developed for the OVRO-LWA based on the $m$-mode analysis
 formalism.
+
+## $m$-Mode Analysis
+
+$m$-mode analysis is a relatively new technique that has been developed for drift-scanning
+telescopes. This technique begins by applying a Fourier transform over sidereal time to the measured
+visibilities. This transformation introduces block-diagonal structure into the transfer matrix,
+which describes how the interferometer responds to the sky. The additional sparsity in the transfer
+matrix facilitates a matrix-algebra approach to interferometric imaging and power spectrum
+estimation.
+
+## References
+
+* https://arxiv.org/abs/1302.0327
+* https://arxiv.org/abs/1401.2095
+* https://arxiv.org/abs/1711.00466
 """
 module BPJSpec
 
