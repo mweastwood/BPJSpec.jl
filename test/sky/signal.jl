@@ -1,8 +1,7 @@
 @testset "signal.jl" begin
     kpara = collect(linspace(0.0, 1.0, 1001)) .* u"Mpc^-1"
     kperp = collect(linspace(0.0, 0.1, 1000)) .* u"Mpc^-1"
-    power = ones(length(kpara), length(kperp)) .* u"mK^2*Mpc^3"
-    signal = BPJSpec.SignalModel((10, 30), kpara, kperp, power)
+    k     = collect(linspace(0.0, 1.1, 2000)) .* u"Mpc^-1"
     units = u"mK^2*Mpc^3"
 
     ν = 45u"MHz"
@@ -17,20 +16,34 @@
     χ2 = BPJSpec.comoving_distance(z2)
     Δχ = χ2 - χ1
 
+    # constant spectrum
+    power = ones(length(kpara), length(kperp)) .* u"mK^2*Mpc^3"
+    signal = BPJSpec.CylindricalPS((10, 30), kpara, kperp, power)
     for l in (0, 50, 100)
         @test signal(l, ν, ν) ≈ (kpara[end]-kpara[1]) / (π*χ^2) * units
         @test signal(l, ν1, ν2) ≈ (sin(kpara[end]*Δχ) - sin(kpara[1]*Δχ)) / (π*χ1*χ2*Δχ) * units
-        # test that the ν1 ≠ ν2 branch approaches the ν1 = ν2 branch
-        # in the limit that ν2 → ν1
-        @test signal(l, ν, ν) ≈ signal(l, ν, ν+1u"Hz")
+        # test that the ν1 ≠ ν2 branch approaches the ν1 = ν2 branch in the limit that ν2 → ν1
+        @test signal(l, ν, ν) ≈ signal(l, ν, ν+10u"Hz")
     end
 
-    # ok, now let's try with a power spectrum that is evolving with k
+    power = ones(length(k)) .* u"mK^2*Mpc^3"
+    signal = BPJSpec.SphericalPS((10, 30), k, power)
+    for l in (0, 50, 100)
+        kpara_end = sqrt(k[end]^2-(l/χ)^2)
+        @test signal(l, ν, ν) ≈ kpara_end / (π*χ^2) * units
+        kpara_end = sqrt(k[end]^2-(2l/(χ1+χ2))^2)
+        @test signal(l, ν1, ν2) ≈ sin(kpara_end*Δχ) / (π*χ1*χ2*Δχ) * units
+        # test that the ν1 ≠ ν2 branch approaches the ν1 = ν2 branch in the limit that ν2 → ν1
+        @test signal(l, ν, ν) ≈ signal(l, ν, ν+10u"Hz")
+    end
+
+
+    # linear spectrum
+    power = ones(length(kpara), length(kperp)) .* u"mK^2*Mpc^3"
     for j = 1:length(kperp), i = 1:length(kpara)
         power[i, j] = ustrip(kpara[i] + kperp[j])*units
     end
-    signal = BPJSpec.SignalModel((10, 30), kpara, kperp, power)
-
+    signal = BPJSpec.CylindricalPS((10, 30), kpara, kperp, power)
     for l in (0, 50, 100)
         P1 = ustrip(kpara[  1] + l/χ)*units
         P2 = ustrip(kpara[end] + l/χ)*units
@@ -42,3 +55,4 @@
                                     / (π*χ1*χ2))
     end
 end
+

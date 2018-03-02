@@ -13,15 +13,46 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-function Csignal(l, ν1, ν2, kpara, kperp, power)
-    Csignal(comoving_distance, l, ν1, ν2, kpara, kperp, power)
+abstract type PowerSpectrum <: SkyComponent end
+
+struct CylindricalPS <: PowerSpectrum
+    zrange :: Tuple{Float64, Float64} # redshift range for this power spectrum
+    kpara  :: Vector{typeof(1.0u"Mpc^-1")}
+    kperp  :: Vector{typeof(1.0u"Mpc^-1")}
+    power  :: Matrix{typeof(1.0u"K^2*Mpc^3")}
 end
 
-function Csignal(comoving_distance_func, l, ν1, ν2, kpara, kperp, power)
+struct SphericalPS <: PowerSpectrum
+    zrange :: Tuple{Float64, Float64} # redshift range for this power spectrum
+    k      :: Vector{typeof(1.0u"Mpc^-1")}
+    power  :: Vector{typeof(1.0u"K^2*Mpc^3")}
+end
+
+# It turns out that one of the slowest steps in calculating Cl(ν1, ν2) for a given power spectrum is
+# simply computing the comoving radial distance to a given redshift. This function is actually
+# pretty smooth so it can be well approximated by polynomials that can be rapidly evaluated.
+function precomputation(model::PowerSpectrum)
+    approximate(comoving_distance, model.zrange[1], model.zrange[2])
+end
+
+(model::CylindricalPS)(l, ν1, ν2) = Csignal(l, ν1, ν2, model)
+(model::CylindricalPS)(l, ν1, ν2, comoving_distance_func) =
+    Csignal(comoving_distance_func, l, ν1, ν2, model)
+
+(model::SphericalPS)(l, ν1, ν2) = Csignal(l, ν1, ν2, model)
+(model::SphericalPS)(l, ν1, ν2, comoving_distance_func) =
+    Csignal(comoving_distance_func, l, ν1, ν2, model)
+
+
+function Csignal(l, ν1, ν2, model)
+    Csignal(comoving_distance, l, ν1, ν2, model)
+end
+
+function Csignal(comoving_distance_func, l, ν1, ν2, model)
     if ν1 == ν2
-        return Csignal_same_redshift(comoving_distance_func, l, ν1, kpara, kperp, power)
+        return Csignal_same_redshift(comoving_distance_func, l, ν1, model)
     else
-        return Csignal_different_redshift(comoving_distance_func, l, ν1, ν2, kpara, kperp, power)
+        return Csignal_different_redshift(comoving_distance_func, l, ν1, ν2, model)
     end
 end
 
@@ -55,73 +86,83 @@ end
 # spectrum as a piecewise linear interpolation of this grid (although we may want to look into a
 # quadratic interpolation at some point).
 
-function Csignal_same_redshift(comoving_distance_func, l, ν, kpara, kperp, power)
-    z = redshift(ν)
-    χ = comoving_distance_func(z)
-
-    # calculate weights for interpolating the value of the power spectrum at kperp = l/χ
-    j = searchsortedlast(kperp, l/χ)
-    weight_left  = 1 - (l/χ  -  kperp[j]) / (kperp[j+1] - kperp[j])
-    weight_right = 1 - (kperp[j+1] - l/χ) / (kperp[j+1] - kperp[j])
-
-    # integrate over kpara assuming that the power spectrum is linear between the grid points
+function trapezoidal_rule_same_redshift(getx, gety, range, χ)
     out = 0.0u"K^2*Mpc^2"
-    for i = 1:length(kpara)-1
-        k_start = kpara[i]
-        k_stop  = kpara[i+1]
-        P_start = weight_left*power[i,   j] + weight_right*power[i,   j+1]
-        P_stop  = weight_left*power[i+1, j] + weight_right*power[i+1, j+1]
-        out += 0.5*(P_start+P_stop)*(k_stop-k_start)
+    for i in range
+        x1 = getx(i); x2 = getx(i+1)
+        y1 = gety(i); y2 = gety(i+1)
+        out += 0.5*(y1+y2)*(x2-x1)
     end
     uconvert(u"K^2", out/(π*χ^2))
 end
 
-function Csignal_different_redshift(comoving_distance_func, l, ν1, ν2, kpara, kperp, power)
-    z1 = redshift(ν1)
-    z2 = redshift(ν2)
-    χ1 = comoving_distance_func(z1)
-    χ2 = comoving_distance_func(z2)
+function trapezoidal_rule_different_redshift(getx, gety, range, χ1, χ2)
     Δχ = χ2-χ1
-    χ  = 0.5*(χ1+χ2)
-
-    # calculate weights for interpolating the value of the power spectrum at kperp = l/χ
-    j = searchsortedlast(kperp, l/χ)
-    weight_left  = 1 - (l/χ  -  kperp[j]) / (kperp[j+1] - kperp[j])
-    weight_right = 1 - (kperp[j+1] - l/χ) / (kperp[j+1] - kperp[j])
-
-    # integrate over kpara assuming that the power spectrum is linear between the grid points
     out = 0.0u"K^2*Mpc^2"
-    for i = 1:length(kpara)-1
-        k_start = kpara[i]
-        k_stop  = kpara[i+1]
-        P_start = weight_left*power[i,  j] + weight_right*power[i,  j+1]
-        P_stop  = weight_left*power[i+1,j] + weight_right*power[i+1,j+1]
-        out += (P_stop*sin(k_stop*Δχ) - P_start*sin(k_start*Δχ)) / Δχ
-        out += (P_stop-P_start) * (cos(k_stop*Δχ)-cos(k_start*Δχ)) / (k_stop-k_start) / Δχ^2
+    for i in range
+        x1 = getx(i); x2 = getx(i+1)
+        y1 = gety(i); y2 = gety(i+1)
+        out += (y2*sin(x2*Δχ) - y1*sin(x1*Δχ)) / Δχ
+        out += (y2-y1) * (cos(x2*Δχ)-cos(x1*Δχ)) / (x2-x1) / Δχ^2
     end
     uconvert(u"K^2", out/(π*χ1*χ2))
 end
 
-struct SignalModel <: SkyComponent
-    zrange :: Tuple{Float64, Float64} # redshift range for this power spectrum
-    kpara  :: Vector{typeof(1.0u"Mpc^-1")}
-    kperp  :: Vector{typeof(1.0u"Mpc^-1")}
-    power  :: Matrix{typeof(1.0u"K^2*Mpc^3")}
+function Csignal_same_redshift(comoving_distance_func, l, ν, model::CylindricalPS)
+    z = redshift(ν)
+    χ = comoving_distance_func(z)
+    j, w1, w2 = interpolation_index_and_weights(model.kperp, l/χ)
+    range   = 1:length(model.kpara)-1
+    getx(i) = model.kpara[i]
+    gety(i) = w1*model.power[i, j] + w2*model.power[i, j+1]
+    trapezoidal_rule_same_redshift(getx, gety, range, χ)
 end
 
-# It turns out that one of the slowest steps in calculating Cl(ν1, ν2) for a given power spectrum is
-# simply computing the comoving radial distance to a given redshift. This function is actually
-# pretty smooth so it can be well approximated by polynomials that can be rapidly evaluated.
-function precomputation(model::SignalModel)
-    approximate(comoving_distance, model.zrange[1], model.zrange[2])
+function Csignal_different_redshift(comoving_distance_func, l, ν1, ν2, model::CylindricalPS)
+    z1 = redshift(ν1)
+    z2 = redshift(ν2)
+    χ1 = comoving_distance_func(z1)
+    χ2 = comoving_distance_func(z2)
+    χ  = 0.5*(χ1+χ2)
+    j, w1, w2 = interpolation_index_and_weights(model.kperp, l/χ)
+    range   = 1:length(model.kpara)-1
+    getx(i) = model.kpara[i]
+    gety(i) = w1*model.power[i, j] + w2*model.power[i, j+1]
+    trapezoidal_rule_different_redshift(getx, gety, range, χ1, χ2)
 end
 
-function (model::SignalModel)(l, ν1, ν2)
-    Csignal(l, ν1, ν2, model.kpara, model.kperp, model.power)
+function Csignal_same_redshift(comoving_distance_func, l, ν, model::SphericalPS)
+    z = redshift(ν)
+    χ = comoving_distance_func(z)
+    kperp = l/χ
+    j, w1, w2 = interpolation_index_and_weights(model.k, kperp)
+    start_power = w1*model.power[j] + w2*model.power[j+1]
+    range   = j:length(model.k)-1
+    getx(i) = i == j ? 0.0u"Mpc^-1" : sqrt(model.k[i]^2 - kperp^2)
+    gety(i) = i == j ? start_power  : model.power[i]
+    trapezoidal_rule_same_redshift(getx, gety, range, χ)
 end
 
-function (model::SignalModel)(l, ν1, ν2, comoving_distance_func)
-    Csignal(comoving_distance_func, l, ν1, ν2, model.kpara, model.kperp, model.power)
+function Csignal_different_redshift(comoving_distance_func, l, ν1, ν2, model::SphericalPS)
+    z1 = redshift(ν1)
+    z2 = redshift(ν2)
+    χ1 = comoving_distance_func(z1)
+    χ2 = comoving_distance_func(z2)
+    χ  = 0.5*(χ1+χ2)
+    kperp = l/χ
+    j, w1, w2 = interpolation_index_and_weights(model.k, kperp)
+    start_power = w1*model.power[j] + w2*model.power[j+1]
+    range   = j:length(model.k)-1
+    getx(i) = i == j ? 0.0u"Mpc^-1" : sqrt(model.k[i]^2 - kperp^2)
+    gety(i) = i == j ? start_power  : model.power[i]
+    trapezoidal_rule_different_redshift(getx, gety, range, χ1, χ2)
+end
+
+function interpolation_index_and_weights(list, value)
+    index = searchsortedlast(list, value)
+    weight1 = (list[index+1]-value) / (list[index+1]-list[index])
+    weight2 = 1 - weight1
+    index, weight1, weight2
 end
 
 function fiducial_signal_model()
@@ -133,17 +174,4 @@ function fiducial_signal_model()
     power = 2π^2 * 1000u"mK^2" ./ (k+0.1u"Mpc^-1").^3
     SignalModel((10., 30.), kpara, kperp, power)
 end
-
-#function dimensionful_powerspectrum(kpara,kperp,Δ²)
-#    out = similar(Δ²)
-#    for j = 1:length(kperp), i = 1:length(kpara)
-#        k = hypot(kpara[i],kperp[j])
-#        if k < eps(Float64)
-#            out[i,j] = 0
-#        else
-#            out[i,j] = 2π^2 * Δ²[i,j] / k^3
-#        end
-#    end
-#    out
-#end
 
