@@ -151,8 +151,14 @@ function compute_baseline_group_one_frequency!(transfermatrix::HierarchicalTrans
 
     path = joinpath(transfermatrix.path, @sprintf("%.3fMHz", ustrip(uconvert(u"MHz", ν))))
     isdir(path) || mkdir(path)
-    # TODO: disable JLD2's mmap usage here?
-    jldopen(joinpath(path, @sprintf("lmax=%04d.jld2", lmax)), "w") do file
+    # There seems to be some insinuation that mmap is causing problems. In particular, occasionally
+    # I see objects that should have been written to disk, but are instead all zeroes. This results
+    # in an InvalidDataException() when we try to read it again. The following line apparently tells
+    # JLD2 not to use mmap, but it's an undocumented interface.
+    #
+    #     jldopen(file, true, true, true)
+    #
+    jldopen(joinpath(path, @sprintf("lmax=%04d.jld2", lmax)), true, true, true, IOStream) do file
         for m = 0:mmax
             file[@sprintf("%04d", m)] = blocks[m+1]
         end
