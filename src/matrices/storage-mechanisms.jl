@@ -128,6 +128,10 @@ function Cache{T}(x::Int, y::Int) where T
     Cache{T, 2}(Ref(false), Matrix{T}(x, y))
 end
 
+function Cache{T}(tuple::Tuple) where T
+    Cache{T}(tuple...)
+end
+
 Base.getindex(cache::Cache, idx) = cache.cache[idx]
 Base.setindex!(cache::Cache, X, idx) = cache.cache[idx] = X
 Base.getindex(cache::Cache, idx, jdx) = cache.cache[idx, jdx]

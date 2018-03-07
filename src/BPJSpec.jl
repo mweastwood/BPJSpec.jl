@@ -89,26 +89,26 @@ include("spherical-harmonics.jl")
 include("physics/cosmology.jl")
 include("physics/recombination-lines.jl")
 
-abstract type SkyComponent end
-struct NoComponent <: SkyComponent end
-include("sky/foregrounds.jl")
-include("sky/signal.jl")
-include("sky/noise.jl")
-
-include("interferometer/metadata.jl")
-include("interferometer/baseline-hierarchy.jl")
-
 abstract type AbstractBlockMatrix end
 abstract type AbstractBlockVector end
 abstract type MatrixMetadata end
 include("matrices/storage-mechanisms.jl")
 include("matrices/block-matrix.jl")
 include("matrices/wrapper-matrices.jl")
-
-
-
-
 #include("matrices/broadcasting.jl")
+
+include("interferometer/metadata.jl")
+include("interferometer/baseline-hierarchy.jl")
+
+abstract type SkyComponent end
+struct NoComponent <: SkyComponent end
+include("sky/foregrounds.jl")
+include("sky/signal.jl")
+include("sky/noise.jl")
+
+
+
+
 
 
 

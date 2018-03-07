@@ -39,6 +39,7 @@ srand(123)
     @testset "matrices" begin
         include("matrices/storage-mechanisms.jl")
         include("matrices/block-matrix.jl")
+        include("matrices/wrapper-matrices.jl")
     #    include("matrices/block-diagonal-matrix.jl")
     #    include("matrices/spectral-block-diagonal-matrix.jl")
     #    include("matrices/angular-covariance-matrix.jl")

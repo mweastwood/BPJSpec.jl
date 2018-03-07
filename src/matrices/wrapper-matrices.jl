@@ -15,6 +15,8 @@
 
 indices(matrix::AbstractBlockMatrix) = indices(matrix.matrix.metadata)
 Base.show(io::IO, matrix::AbstractBlockMatrix) = show(io, matrix.matrix)
+cache!(matrix::AbstractBlockMatrix) = cache!(matrix.matrix)
+flush!(matrix::AbstractBlockMatrix) = flush!(matrix.matrix)
 
 "Metadata for matrices that will be split into blocks of m."
 struct MMax <: MatrixMetadata
@@ -74,7 +76,7 @@ Base.getindex(matrix::MBlockMatrix, m) = matrix.matrix[m+1]
 Base.setindex!(matrix::MBlockMatrix, block, m) = matrix.matrix[m+1] = block
 
 struct MFBlockMatrix{S} <: AbstractBlockMatrix
-    matrix :: BlockMatrix{Matrix{Complex128}, 2, MMax, S}
+    matrix :: BlockMatrix{Matrix{Complex128}, 2, MMaxFrequencies, S}
 end
 function MFBlockMatrix(args...)
     MFBlockMatrix(BlockMatrix{Matrix{Complex128}, 2}(args...))
@@ -83,7 +85,7 @@ Base.getindex(matrix::MFBlockMatrix, m, β) = matrix.matrix[m+1, β]
 Base.setindex!(matrix::MFBlockMatrix, block, m, β) = matrix.matrix[m+1, β] = block
 
 struct NoiseCovarianceMatrix{S} <: AbstractBlockMatrix
-    matrix :: BlockMatrix{Diagonal{Float64}, 2, MMax, S}
+    matrix :: BlockMatrix{Diagonal{Float64}, 2, MMaxFrequencies, S}
 end
 function NoiseCovarianceMatrix(args...)
     NoiseCovarianceMatrix(BlockMatrix{Matrix{Complex128}, 2}(args...))
