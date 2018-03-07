@@ -23,8 +23,12 @@ srand(123)
         @test BPJSpec.two(-1) == 2
     end
 
-    include("cosmology.jl")
     include("spherical-harmonics.jl")
+
+    @testset "physics" begin
+        include("physics/cosmology.jl")
+        include("physics/recombination-lines.jl")
+    end
 
     @testset "sky" begin
         include("sky/foregrounds.jl")
@@ -33,20 +37,22 @@ srand(123)
     end
 
     @testset "matrices" begin
-        include("matrices/block-diagonal-matrix.jl")
-        include("matrices/spectral-block-diagonal-matrix.jl")
-        include("matrices/angular-covariance-matrix.jl")
-        include("matrices/noise-covariance-matrix.jl")
-        include("matrices/transfer-matrix.jl")
+        include("matrices/storage-mechanisms.jl")
+        include("matrices/block-matrix.jl")
+    #    include("matrices/block-diagonal-matrix.jl")
+    #    include("matrices/spectral-block-diagonal-matrix.jl")
+    #    include("matrices/angular-covariance-matrix.jl")
+    #    include("matrices/noise-covariance-matrix.jl")
+    #    include("matrices/transfer-matrix.jl")
     end
 
-    @testset "algorithms" begin
-        include("algorithms/average-frequency-channels.jl")
-        #include("algorithms/full-rank-compress.jl")
-    end
+    #@testset "algorithms" begin
+    #    include("algorithms/average-frequency-channels.jl")
+    #    #include("algorithms/full-rank-compress.jl")
+    #end
 
-    @testset "quadratic-estimator" begin
-        include("quadratic-estimator/mixing-matrix.jl")
-    end
+    #@testset "quadratic-estimator" begin
+    #    include("quadratic-estimator/mixing-matrix.jl")
+    #end
 end
 

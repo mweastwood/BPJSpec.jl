@@ -39,14 +39,16 @@ estimation.
 module BPJSpec
 
 # Matrices
-export BlockDiagonalMatrix, DenseBlockDiagonalMatrix
-export SpectralBlockDiagonalMatrix, DenseSpectralBlockDiagonalMatrix
+export NoFile, SingleFile, MultipleFiles
+export MBlockMatrix, MFBlockMatrix
+export MBlockVector, MFBlockVector
 export AngularCovarianceMatrix, NoiseCovarianceMatrix
-export TransferMatrix, HierarchicalTransferMatrix
+export TransferMatrix
+export cache!, flush!
 
 # Vectors
-export SpectralBlockVector
-export MModes
+#export SpectralBlockVector
+#export MModes
 
 using Unitful, UnitfulAstro # Travis CI fails with "invalid age range update" unless this is first
 
@@ -82,10 +84,10 @@ end
 two(m) = ifelse(m != 0, 2, 1)
 
 include("parallel.jl")
-include("cosmology.jl")
 include("spherical-harmonics.jl")
-include("metadata.jl")
-include("hierarchy.jl")
+
+include("physics/cosmology.jl")
+include("physics/recombination-lines.jl")
 
 abstract type SkyComponent end
 struct NoComponent <: SkyComponent end
@@ -93,30 +95,48 @@ include("sky/foregrounds.jl")
 include("sky/signal.jl")
 include("sky/noise.jl")
 
-abstract type BlockMatrix end
-include("matrices/block-diagonal-matrix.jl")
-include("matrices/spectral-block-diagonal-matrix.jl")
-include("matrices/angular-covariance-matrix.jl")
-include("matrices/noise-covariance-matrix.jl")
-include("matrices/transfer-matrix.jl")
+include("interferometer/metadata.jl")
+include("interferometer/baseline-hierarchy.jl")
 
-abstract type BlockVector end
-include("vectors/block-diagonal-vector.jl")
-include("vectors/spectral-block-vector.jl")
-include("vectors/angular-block-vector.jl")
-include("vectors/random-angular-block-vector.jl")
-include("vectors/white-noise-vector.jl")
-include("vectors/random-vector.jl")
-include("m-modes.jl")
+abstract type AbstractBlockMatrix end
+abstract type AbstractBlockVector end
+abstract type MatrixMetadata end
+include("matrices/storage-mechanisms.jl")
+include("matrices/block-matrix.jl")
+include("matrices/wrapper-matrices.jl")
 
-include("broadcasting.jl")
-include("algorithms/average-frequency-channels.jl")
-include("algorithms/full-rank-compress.jl")
-include("algorithms/karhunen-loeve-transforms.jl")
-include("imaging.jl")
 
-include("quadratic-estimator/fisher-information.jl")
-include("quadratic-estimator/mixing-matrix.jl")
+
+
+#include("matrices/broadcasting.jl")
+
+
+
+
+
+#include("matrices/spectral-block-diagonal-matrix.jl")
+#include("matrices/angular-covariance-matrix.jl")
+#include("matrices/noise-covariance-matrix.jl")
+#include("matrices/transfer-matrix.jl")
+
+#invlude("vectors/block-vector.jl")
+#include("vectors/block-diagonal-vector.jl")
+#include("vectors/wrapper-vectors.jl")
+
+#include("vectors/spectral-block-vector.jl")
+#include("vectors/angular-block-vector.jl")
+#include("vectors/random-angular-block-vector.jl")
+#include("vectors/white-noise-vector.jl")
+#include("vectors/random-vector.jl")
+#include("m-modes.jl")
+
+#include("algorithms/average-frequency-channels.jl")
+#include("algorithms/full-rank-compress.jl")
+#include("algorithms/karhunen-loeve-transforms.jl")
+#include("imaging.jl")
+#
+#include("quadratic-estimator/fisher-information.jl")
+#include("quadratic-estimator/mixing-matrix.jl")
 
 end
 

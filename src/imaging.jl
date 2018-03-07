@@ -14,8 +14,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 function tikhonov(transfermatrix::HierarchicalTransferMatrix, mmodes::MModes, tolerance)
-    lmax = getlmax(transfermatrix)
-    mmax = lmax
+    lmax = mmax = transfermatrix.lmax
     alm  = Alm(lmax, mmax)
 
     pool  = CachingPool(workers())
@@ -44,8 +43,8 @@ function _tikhonov(transfermatrix, mmodes, tolerance, lmax, m)
     BB = zeros(Complex128, lmax-m+1, lmax-m+1)
     Bv = zeros(Complex128, lmax-m+1)
     permutation = baseline_permutation(transfermatrix, m)
-    for ν in mmodes.metadata.frequencies
-        _tikhonov_accumulate!(BB, Bv, transfermatrix[m, ν], mmodes[m, ν], permutation)
+    for β = 1:length(mmodes.metadata.frequencies)
+        _tikhonov_accumulate!(BB, Bv, transfermatrix[m, β], mmodes[m, β], permutation)
     end
     _tikhonov_inversion(BB, Bv, tolerance)
 end

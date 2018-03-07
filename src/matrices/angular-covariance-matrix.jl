@@ -160,12 +160,6 @@ function flush!(matrix::AngularCovarianceMatrix)
     matrix
 end
 
-function read_from_disk(matrix::AngularCovarianceMatrix, l::Integer)
-    filename   = "BLOCKS.jld2"
-    objectname = @sprintf("%04d", l)
-    load(joinpath(matrix.path, filename), objectname) :: Matrix{Float64}
-end
-
 function write_to_disk(matrix::AngularCovarianceMatrix, block::Matrix{Float64}, l::Integer)
     filename   = "BLOCKS.jld2"
     objectname = @sprintf("%04d", l)
