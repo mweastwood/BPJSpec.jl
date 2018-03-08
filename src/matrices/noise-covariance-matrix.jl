@@ -13,27 +13,31 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-const NoiseCovarianceMatrix = SpectralBlockDiagonalMatrix{Diagonal{Float64}}
-
-function NoiseCovarianceMatrix(path, mmax, frequencies, bandwidth, hierarchy, model::NoiseModel)
-    output = NoiseCovarianceMatrix(path, mmax, frequencies, bandwidth)
-    compute!(output, hierarchy, model)
-    output
+struct NoiseCovarianceMatrix{S} <: AbstractBlockMatrix
+    matrix :: BlockMatrix{Diagonal{Float64}, 2, MMaxFrequencies, S}
+end
+function NoiseCovarianceMatrix(storage::Mechanism, mmax, frequencies, bandwidth)
+    metadata = MMaxFrequencies(mmax, frequencies, bandwidth)
+    matrix = BlockMatrix{Diagonal{Float64}, 2}(storage, metadata)
+    NoiseCovarianceMatrix(matrix)
+end
+function NoiseCovarianceMatrix(path::String)
+    NoiseCovarianceMatrix(BlockMatrix{Diagonal{Float64}, 2}(path))
 end
 
-function compute!(matrix::NoiseCovarianceMatrix, hierarchy, model::NoiseModel)
-    Nfreq = length(matrix.frequencies)
+Base.getindex(matrix::NoiseCovarianceMatrix, m, β) = matrix.matrix[m+1, β]
+Base.setindex!(matrix::NoiseCovarianceMatrix, block, m, β) = matrix.matrix[m+1, β] = block
+
+function compute!(matrix::NoiseCovarianceMatrix, hierarchy::Hierarchy, model::NoiseModel)
+    Nfreq = length(frequencies(matrix))
     for β = 1:Nfreq
-        ν  = matrix.frequencies[β]
-        Δν = matrix.bandwidth[β]
-        for m = 0:matrix.mmax
+        ν  = frequencies(matrix)[β]
+        Δν = bandwidth(matrix)[β]
+        for m = 0:mmax(matrix)
             σ = ustrip(uconvert(u"Jy", model(m, ν, Δν)))
             N = σ^2 .* ones(two(m)*Nbase(hierarchy, m))
             matrix[m, β] = Diagonal(N)
         end
     end
 end
-
-Base.show(io::IO, matrix::NoiseCovarianceMatrix) =
-    print(io, "NoiseCovarianceMatrix: ", matrix.path)
 

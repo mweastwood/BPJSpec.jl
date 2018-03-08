@@ -83,18 +83,6 @@ MFBlockMatrix(path::String) = MFBlockMatrix(BlockMatrix{Matrix{Complex128}, 2}(p
 Base.getindex(matrix::MFBlockMatrix, m, β) = matrix.matrix[m+1, β]
 Base.setindex!(matrix::MFBlockMatrix, block, m, β) = matrix.matrix[m+1, β] = block
 
-#struct NoiseCovarianceMatrix{S} <: AbstractBlockMatrix
-#    matrix :: BlockMatrix{Diagonal{Float64}, 2, MMaxFrequencies, S}
-#end
-#function NoiseCovarianceMatrix(storage::Mechanism, mmax, frequencies, bandwidth)
-#    metadata = MMaxFrequencies(mmax, frequencies, bandwidth)
-#    matrix = BlockMatrix{Diagonal{Float64}, 2}(storage, metadata)
-#    NoiseCovarianceMatrix(matrix)
-#end
-#NoiseCovarianceMatrix(path::String) = NoiseCovarianceMatrix(BlockMatrix{Diagonal{Float64}, 2}(path))
-#Base.getindex(matrix::NoiseCovarianceMatrix, m, β) = matrix.matrix[m+1, β]
-#Base.setindex!(matrix::NoiseCovarianceMatrix, block, m, β) = matrix.matrix[m+1, β] = block
-
 #struct MBlockDiagonalVector <: AbstractBlockVector
 #    matrix :: BlockDiagonalMatrix{Vector{Complex128}, MMax}
 #end

@@ -35,8 +35,8 @@ srand(123)
         include("matrices/block-matrix.jl")
         include("matrices/wrapper-matrices.jl")
         include("matrices/broadcasting.jl")
-    #    include("matrices/noise-covariance-matrix.jl")
     #    include("matrices/transfer-matrix.jl")
+        include("matrices/noise-covariance-matrix.jl")
         include("matrices/angular-covariance-matrix.jl")
     end
 
