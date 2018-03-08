@@ -42,9 +42,8 @@ module BPJSpec
 export NoFile, SingleFile, MultipleFiles
 export MBlockMatrix, MFBlockMatrix
 export MBlockVector, MFBlockVector
-export AngularCovarianceMatrix, NoiseCovarianceMatrix
-export TransferMatrix
-export cache!, flush!
+export TransferMatrix, NoiseCovarianceMatrix, AngularCovarianceMatrix
+export compute!, cache!, flush!
 
 # Vectors
 #export SpectralBlockVector
@@ -89,6 +88,15 @@ include("spherical-harmonics.jl")
 include("physics/cosmology.jl")
 include("physics/recombination-lines.jl")
 
+abstract type SkyComponent end
+struct NoComponent <: SkyComponent end
+include("sky/foregrounds.jl")
+include("sky/signal.jl")
+include("sky/noise.jl")
+
+include("interferometer/metadata.jl")
+include("interferometer/baseline-hierarchy.jl")
+
 abstract type AbstractBlockMatrix end
 abstract type AbstractBlockVector end
 abstract type MatrixMetadata end
@@ -96,28 +104,11 @@ include("matrices/storage-mechanisms.jl")
 include("matrices/block-matrix.jl")
 include("matrices/wrapper-matrices.jl")
 include("matrices/broadcasting.jl")
-
-include("interferometer/metadata.jl")
-include("interferometer/baseline-hierarchy.jl")
-
-abstract type SkyComponent end
-struct NoComponent <: SkyComponent end
-include("sky/foregrounds.jl")
-include("sky/signal.jl")
-include("sky/noise.jl")
-
-
-
-
-
-
-
-
-
-#include("matrices/spectral-block-diagonal-matrix.jl")
-#include("matrices/angular-covariance-matrix.jl")
-#include("matrices/noise-covariance-matrix.jl")
 #include("matrices/transfer-matrix.jl")
+#include("matrices/noise-covariance-matrix.jl")
+include("matrices/angular-covariance-matrix.jl")
+
+
 
 #invlude("vectors/block-vector.jl")
 #include("vectors/block-diagonal-vector.jl")
