@@ -13,58 +13,51 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-function average_frequency_channels(transfermatrix, Navg; output="")
-    path = dirname(transfermatrix.path)
-    Nfreq  = length(transfermatrix.frequencies)
-    Nfreq′ = cld(Nfreq, Navg)
-    mmax   = transfermatrix.mmax
+function average_frequency_channels(input_matrix, Navg; output=NoFile(), progress=false)
+    ν = frequencies(input_matrix)
+    Δν = bandwidth(input_matrix)
+    Nfreq = length(ν)
 
-    # Decide which channels to average down and the resulting average frequencies.
-    ranges = Array{UnitRange{Int}}(Nfreq′)
-    frequencies = Array{eltype(transfermatrix.frequencies)}(Nfreq′)
-    bandwidth   = Array{eltype(transfermatrix.bandwidth)}(Nfreq′)
-    for idx = 1:Nfreq′
-        range = (1:Navg) + (idx-1)*Navg
-        range = range[1]:min(range[end], Nfreq)
-        ranges[idx] = range
-        frequencies[idx] = mean(transfermatrix.frequencies[range])
-        bandwidth[idx]   =  sum(transfermatrix.bandwidth[range])
-    end
+    partition = collect(Iterators.partition(1:Nfreq, Navg))
+    weights   = u.(u"Hz", Δν)
 
-    if output == ""
-        suffix = "-averaged"
-        file = joinpath(path, "transfer-matrix"*suffix)
-    else
-        file = output
+    Nfreq′ = length(partition)
+    ν′  = similar(ν,  Nfreq′)
+    Δν′ = similar(Δν, Nfreq′)
+    for β = 1:length(partition)
+        channels = partition[β]
+        ν′[β]  = sum(weights[channels].*ν[channels]) / sum(weights[channels])
+        Δν′[β] = sum(Δν[channels])
     end
-    output_transfermatrix = TransferMatrix(file, mmax, frequencies, bandwidth,
-                                           progressbar=true, distribute=true)
 
     # Perform the averaging.
-    queue = [(m, β) for β = 1:Nfreq′ for m = 0:mmax]
+    output_matrix = MFBlockMatrix(output, mmax(input_matrix), ν′, Δν′)
+    queue = collect(indices(output_matrix))
     pool  = CachingPool(workers())
-    lck = ReentrantLock()
-    prg = Progress(length(queue))
-    increment() = (lock(lck); next!(prg); unlock(lck))
+    if progress
+        lck = ReentrantLock()
+        prg = Progress(length(queue))
+        increment() = (lock(lck); next!(prg); unlock(lck))
+    end
     @sync for worker in workers()
         @async while length(queue) > 0
             m, β = shift!(queue)
             remotecall_fetch(_average_frequency_channels, pool,
-                             transfermatrix, output_transfermatrix, m, β, ranges[β])
-            increment()
+                             input_matrix, output_matrix, m, β, partition[β])
+            progress && increment()
         end
     end
 
-    output_transfermatrix
+    output_matrix
 end
 
-function _average_frequency_channels(input, output, m, β, range)
-    β′ = range[1]
-    weight = uconvert(NoUnits, input.bandwidth[β′]/output.bandwidth[β])
+function _average_frequency_channels(input, output, m, β, channels)
+    β′ = channels[1]
+    weight = u(NoUnits, bandwidth(input)[β′]/bandwidth(output)[β])
     B = input[m, β′] .* weight
 
-    for β′ in range[2:end]
-        weight = uconvert(NoUnits, input.bandwidth[β′]/output.bandwidth[β])
+    for β′ in channels[2:end]
+        weight = u(NoUnits, bandwidth(input)[β′]/bandwidth(output)[β])
         B .+= input[m, β′] .* weight
     end
 

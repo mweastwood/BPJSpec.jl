@@ -21,16 +21,16 @@ doc"""
 BPJSpec is a 21-cm power spectrum code developed for the OVRO-LWA based on the $m$-mode analysis
 formalism.
 
-## $m$-Mode Analysis
+# m-Mode Analysis
 
-$m$-mode analysis is a relatively new technique that has been developed for drift-scanning
-telescopes. This technique begins by applying a Fourier transform over sidereal time to the measured
+m-mode analysis is a relatively new technique that has been developed for drift-scanning telescopes.
+This technique begins by applying a Fourier transform over sidereal time to the measured
 visibilities. This transformation introduces block-diagonal structure into the transfer matrix,
 which describes how the interferometer responds to the sky. The additional sparsity in the transfer
 matrix facilitates a matrix-algebra approach to interferometric imaging and power spectrum
 estimation.
 
-## References
+# References
 
 * https://arxiv.org/abs/1302.0327
 * https://arxiv.org/abs/1401.2095
@@ -39,14 +39,16 @@ estimation.
 module BPJSpec
 
 # Matrices
-export BlockDiagonalMatrix, DenseBlockDiagonalMatrix
-export SpectralBlockDiagonalMatrix, DenseSpectralBlockDiagonalMatrix
-export AngularCovarianceMatrix, NoiseCovarianceMatrix
-export TransferMatrix, HierarchicalTransferMatrix
+export NoFile, SingleFile, MultipleFiles
+export MBlockMatrix, FBlockMatrix, MFBlockMatrix
+export MBlockVector, FBlockVector, MFBlockVector
+export TransferMatrix, NoiseCovarianceMatrix, AngularCovarianceMatrix
+export MModes
+export compute!, cache!, flush!
 
 # Vectors
-export SpectralBlockVector
-export MModes
+#export SpectralBlockVector
+#export MModes
 
 using Unitful, UnitfulAstro # Travis CI fails with "invalid age range update" unless this is first
 
@@ -81,11 +83,14 @@ end
 "Useful little function that helps account for grouping of positive and negative m."
 two(m) = ifelse(m != 0, 2, 1)
 
+"Convert and strip units from the given quantity."
+u(units, quantity) = ustrip(uconvert(units, quantity))
+
 include("parallel.jl")
-include("cosmology.jl")
 include("spherical-harmonics.jl")
-include("metadata.jl")
-include("hierarchy.jl")
+
+include("physics/cosmology.jl")
+include("physics/recombination-lines.jl")
 
 abstract type SkyComponent end
 struct NoComponent <: SkyComponent end
@@ -93,27 +98,28 @@ include("sky/foregrounds.jl")
 include("sky/signal.jl")
 include("sky/noise.jl")
 
-abstract type BlockMatrix end
-include("matrices/block-diagonal-matrix.jl")
-include("matrices/spectral-block-diagonal-matrix.jl")
-include("matrices/angular-covariance-matrix.jl")
-include("matrices/noise-covariance-matrix.jl")
+include("interferometer/metadata.jl")
+include("interferometer/baseline-hierarchy.jl")
+
+abstract type AbstractBlockMatrix end
+abstract type MatrixMetadata end
+include("matrices/storage-mechanisms.jl")
+include("matrices/block-matrix.jl")
+include("matrices/wrapper-matrices.jl")
+include("matrices/broadcasting.jl")
 include("matrices/transfer-matrix.jl")
+include("matrices/noise-covariance-matrix.jl")
+include("matrices/angular-covariance-matrix.jl")
+include("matrices/m-modes.jl")
 
-abstract type BlockVector end
-include("vectors/block-diagonal-vector.jl")
-include("vectors/spectral-block-vector.jl")
-include("vectors/angular-block-vector.jl")
-include("vectors/random-angular-block-vector.jl")
-include("vectors/white-noise-vector.jl")
-include("vectors/random-vector.jl")
-include("m-modes.jl")
+#include("vectors/angular-block-vector.jl")
+#include("vectors/random-angular-block-vector.jl")
+#include("vectors/white-noise-vector.jl")
 
-include("broadcasting.jl")
 include("algorithms/average-frequency-channels.jl")
 include("algorithms/full-rank-compress.jl")
 include("algorithms/karhunen-loeve-transforms.jl")
-include("imaging.jl")
+include("algorithms/tikhonov-regularization.jl")
 
 include("quadratic-estimator/fisher-information.jl")
 include("quadratic-estimator/mixing-matrix.jl")

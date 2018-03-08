@@ -13,64 +13,92 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-struct AngularCovarianceMatrix <: BlockMatrix
-    path        :: String
-    progressbar :: Bool
-    distribute  :: Bool
-    cached      :: Ref{Bool}
+struct AngularCovarianceMetadata <: MatrixMetadata
     lmax        :: Int
     frequencies :: Vector{typeof(1.0*u"Hz")}
     bandwidth   :: Vector{typeof(1.0*u"Hz")}
-    component   :: SkyComponent
-    blocks      :: Vector{Matrix{Float64}}
+end
+function Base.show(io::IO, metadata::AngularCovarianceMetadata)
+    @printf(io, "{lmax: %d, ν: %.3f MHz..%.3f MHz, Δν: %.3f MHz total}",
+            metadata.lmax,
+            ustrip(uconvert(u"MHz", metadata.frequencies[1])),
+            ustrip(uconvert(u"MHz", metadata.frequencies[end])),
+            ustrip(uconvert(u"MHz", sum(metadata.bandwidth))))
+end
+indices(metadata::AngularCovarianceMetadata) = L(0):L(metadata.lmax)
+number_of_blocks(metadata::AngularCovarianceMetadata) = metadata.lmax+1
 
-    function AngularCovarianceMatrix(path, lmax, frequencies, bandwidth, component, write=true;
-                                     progressbar=false, distribute=false, cached=false, compute=true)
-        if write
-            isdir(path) || mkpath(path)
-            isfile(joinpath(path, "BLOCKS.jld2")) && rm(joinpath(path, "BLOCKS.jld2"))
-            save(joinpath(path, "METADATA.jld2"), "lmax", lmax,
-                 "frequencies", frequencies, "bandwidth", bandwidth, "component", component)
-        end
-        blocks = Matrix{Float64}[]
-        output = new(path, progressbar, distribute, Ref(cached),
-                     lmax, frequencies, bandwidth, component, blocks)
-        if compute && write
-            compute!(output)
-        elseif cached
-            cache!(output)
-        end
-        output
-    end
+"""
+Generally speaking we want to index all of our matrices by the integer m. However, our angular
+covariance matrices are block-diagonal in l, which is also an integer. We will therefore use this
+type to indicate that we'd like to index with l and indexing with an integer will continue to mean
+indexing with m.
+"""
+struct L <: Integer
+    l :: Int
+end
+Base.convert(::Type{L}, l::Int) = L(l)
+Base.convert(::Type{Int}, l::L) = l.l
+Base.promote_rule(::Type{L}, ::Type{Int}) = L
+Base.oneunit(::L) = L(1)
+Base.:≤(lhs::L, rhs::L) = lhs.l ≤ rhs.l
+Base.:+(lhs::L, rhs::L) = L(lhs.l + rhs.l)
+Base.:-(lhs::L, rhs::L) = L(lhs.l - rhs.l)
+
+struct AngularCovarianceMatrix{S} <: AbstractBlockMatrix
+    matrix :: BlockMatrix{Matrix{Float64}, 1, AngularCovarianceMetadata, S}
+end
+function AngularCovarianceMatrix(storage::Mechanism, mmax, frequencies, bandwidth)
+    metadata = AngularCovarianceMetadata(mmax, frequencies, bandwidth)
+    matrix = BlockMatrix{Matrix{Float64}, 1}(storage, metadata)
+    AngularCovarianceMatrix(matrix)
+end
+function AngularCovarianceMatrix(path::String)
+    AngularCovarianceMatrix(BlockMatrix{Matrix{Float64}, 1}(path))
 end
 
-function AngularCovarianceMatrix(path; kwargs...)
-    lmax, frequencies, bandwidth, component = load(joinpath(path, "METADATA.jld2"),
-                                                   "lmax", "frequencies", "bandwidth", "component")
-    AngularCovarianceMatrix(path, lmax, frequencies, bandwidth, component, false; kwargs...)
+Base.getindex(matrix::AngularCovarianceMatrix, l::L) = matrix.matrix[l+1]
+Base.getindex(matrix::AngularCovarianceMatrix, l, m) = matrix.matrix[l+1]
+Base.setindex!(matrix::AngularCovarianceMatrix, block, l) = matrix.matrix[l+1] = block
+
+function Base.getindex(matrix::AngularCovarianceMatrix, m)
+    blocks = [matrix[l, m] for l = m:lmax(matrix)]
+    Nfreq  = length(frequencies(matrix))
+    Nl     = lmax(matrix)-m+1
+    Ntotal = Nfreq*Nl
+    output = zeros(Float64, Ntotal, Ntotal)
+    for l = m:lmax(matrix)
+        block = blocks[l-m+1]
+        for β1 = 1:Nfreq, β2 = 1:Nfreq
+            idx1 = (β1-1)*Nl + l - m + 1
+            idx2 = (β2-1)*Nl + l - m + 1
+            output[idx1, idx2] = block[β1, β2]
+        end
+    end
+    output
 end
 
-function compute!(matrix::AngularCovarianceMatrix)
-    Nfreq = length(matrix.frequencies)
-    if progressbar(matrix)
-        prg = Progress(matrix.lmax+1)
-    end
-    args = precomputation(matrix.component)
-    for l = 0:matrix.lmax
+function compute!(matrix::AngularCovarianceMatrix, component::SkyComponent; progress=false)
+    ν  = frequencies(matrix)
+    Δν =   bandwidth(matrix)
+    Nfreq = length(ν)
+    args  = precomputation(component)
+    progress && (prg = Progress(lmax(matrix)+1))
+    for l = 0:lmax(matrix)
         block = zeros(Float64, Nfreq, Nfreq)
         for β1 = 1:Nfreq
-            ν1  = matrix.frequencies[β1]
-            Δν1 = matrix.bandwidth[β1]
-            block[β1, β1] = compute(matrix.component, l, ν1, Δν1, ν1, Δν1, args)
+            ν1  =  ν[β1]
+            Δν1 = Δν[β1]
+            block[β1, β1] = compute(component, l, ν1, Δν1, ν1, Δν1, args)
             for β2 = β1+1:Nfreq
-                ν2 = matrix.frequencies[β2]
-                Δν2 = matrix.bandwidth[β2]
-                block[β1, β2] = compute(matrix.component, l, ν1, Δν1, ν2, Δν2, args)
+                ν2  =  ν[β2]
+                Δν2 = Δν[β2]
+                block[β1, β2] = compute(component, l, ν1, Δν1, ν2, Δν2, args)
                 block[β2, β1] = block[β1, β2]
             end
         end
-        matrix[l, 0] = block
-        progressbar(matrix) && next!(prg)
+        matrix[l] = block
+        progress && next!(prg)
     end
 end
 
@@ -96,82 +124,5 @@ function compute(component, l, ν1, Δν1, ν2, Δν2, args = nothing)
 
     val, err = pcubature(integrand, xmin, xmax, reltol=1e-8, maxevals=100_000)
     val / ustrip(uconvert(u"Hz^2", Δν1*Δν2))
-end
-
-Base.show(io::IO, matrix::AngularCovarianceMatrix) =
-    print(io, "AngularCovarianceMatrix: ", matrix.path)
-
-indices(matrix::AngularCovarianceMatrix) =
-    [(l, m) for m = 0:matrix.lmax for l = m:matrix.lmax]
-
-function Base.getindex(matrix::AngularCovarianceMatrix, l, m)
-    if matrix.cached[]
-        return matrix.blocks[l+1]
-    else
-        return read_from_disk(matrix, l)
-    end
-end
-
-function Base.setindex!(matrix::AngularCovarianceMatrix, block, l, m)
-    if matrix.cached[]
-        matrix.blocks[l+1] = block
-    else
-        write_to_disk(matrix, block, l)
-    end
-    block
-end
-
-function Base.getindex(matrix::AngularCovarianceMatrix, m)
-    blocks = [matrix[l, m] for l = m:matrix.lmax]
-    Nfreq  = length(matrix.frequencies)
-    Nl     = matrix.lmax-m+1
-    Ntotal = Nfreq*Nl
-    output = zeros(Float64, Ntotal, Ntotal)
-    for l = m:matrix.lmax
-        block = blocks[l-m+1]
-        for β1 = 1:Nfreq, β2 = 1:Nfreq
-            idx1 = (β1-1)*Nl + l - m + 1
-            idx2 = (β2-1)*Nl + l - m + 1
-            output[idx1, idx2] = block[β1, β2]
-        end
-    end
-    output
-end
-
-function cache!(matrix::AngularCovarianceMatrix)
-    matrix.cached[] = true
-    empty!(matrix.blocks)
-    filename   = "BLOCKS.jld2"
-    jldopen(joinpath(matrix.path, filename), "r") do file
-        for l = 0:matrix.lmax
-            objectname = @sprintf("%04d", l)
-            push!(matrix.blocks, file[objectname])
-        end
-    end
-    matrix
-end
-
-function flush!(matrix::AngularCovarianceMatrix)
-    for l = 0:matrix.lmax
-        write_to_disk(matrix, matrix.blocks[l+1], l)
-    end
-    empty!(matrix.blocks)
-    matrix.cached[] = false
-    matrix
-end
-
-function read_from_disk(matrix::AngularCovarianceMatrix, l::Integer)
-    filename   = "BLOCKS.jld2"
-    objectname = @sprintf("%04d", l)
-    load(joinpath(matrix.path, filename), objectname) :: Matrix{Float64}
-end
-
-function write_to_disk(matrix::AngularCovarianceMatrix, block::Matrix{Float64}, l::Integer)
-    filename   = "BLOCKS.jld2"
-    objectname = @sprintf("%04d", l)
-    jldopen(joinpath(matrix.path, filename), "a+") do file
-        file[objectname] = block
-    end
-    block
 end
 

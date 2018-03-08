@@ -13,94 +13,181 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-const TransferMatrix = SpectralBlockDiagonalMatrix{Matrix{Complex128}}
+struct HierarchicalStorage <: Mechanism
+    path :: String
+    hierarchy :: Hierarchy
+end
+Base.show(io::IO, storage::HierarchicalStorage) = print(io, storage.path)
+distribute_write(::HierarchicalStorage) = false
+distribute_read(::HierarchicalStorage) = true
+
+# IMPORTANT
+# =========
+# The HierarchicalStorage mechanism works differently to the other storage mechanisms, which take
+# one or two indices that range from 1 to some maximum value. This allows those other mechanisms to
+# be generally useful as backends for a variety of matrix types.
+#
+# For the transfer matrix, however, the user is forced to use the HierarchicalStorage mechanism,
+# which is specialized for reducing the storage space required for storing short baselines within
+# the transfer matrix. However, in order to make this hierarchical storage work, we need to know the
+# value of m relative to lmax, so we need to index with m and β directly.
+#
+# One consequence of this is that the caching mechanism for AbstractBlockMatrices doesn't currently
+# work for TransferMatrices, but this can be fixed by making the caching mechanism slightly more
+# general (TODO).
+
+function Base.getindex(storage::HierarchicalStorage, m, β)
+    hierarchy = storage.hierarchy
+
+    # load each hierarchical component of the transfer matrix
+    blocks = Matrix{Complex128}[]
+    dirname  = @sprintf("%04d",      β)
+    filename = @sprintf("%04d.jld2", m)
+    jldopen(joinpath(storage.path, dirname, filename), "r") do file
+        for idx = 1:length(hierarchy.divisions)-1
+            lmax = hierarchy.divisions[idx+1]
+            lmax ≥ m || continue
+            objectname = @sprintf("%04d", lmax)
+            push!(blocks, file[objectname])
+        end
+    end
+
+    # stitch the components together into a single matrix
+    output = zeros(Complex128,
+                   sum(    size(block, 1) for block in blocks),
+                   maximum(size(block, 2) for block in blocks))
+    offset = 1
+    for block in blocks
+        range1 = offset:offset+size(block, 1)-1
+        range2 = 1:size(block, 2)
+        output_view = @view output[range1, range2]
+        copy!(output_view, block)
+        offset += size(block, 1)
+    end
+    output
+end
+
+function Base.setindex!(storage::HierarchicalStorage, block, lmax, m, β)
+    # There seems to be some insinuation that mmap is causing problems. In particular, occasionally
+    # I see objects that should have been written to disk, but are instead all zeroes. This results
+    # in an InvalidDataException() when we try to read it again. The following line apparently tells
+    # JLD2 not to use mmap, but it's an undocumented interface.
+    #
+    #     jldopen(file, true, true, false, IOStream)
+    #
+    # Note also that (true, true, false) corresponds to the "a+" mode.
+    dirname    = @sprintf("%04d",      β)
+    filename   = @sprintf("%04d.jld2", m)
+    objectname = @sprintf("%04d",   lmax)
+    isdir(joinpath(storage.path, dirname)) || mkpath(joinpath(storage.path, dirname))
+    jldopen(joinpath(storage.path, dirname, filename), true, true, false, IOStream) do file
+        file[objectname] = block
+    end
+    block
+end
+
+function rm_old_blocks!(storage::HierarchicalStorage, mmax, Nfreq)
+    for β = 1:Nfreq, m = 0:mmax
+        dirname    = @sprintf("%04d",      β)
+        filename   = @sprintf("%04d.jld2", m)
+        path = joinpath(storage.path, dirname, filename)
+        isfile(path) && rm(path)
+    end
+end
+
+function write_metadata(storage::HierarchicalStorage, metadata, lmax, mmax)
+    isdir(storage.path) || mkpath(storage.path)
+    save(joinpath(storage.path, "METADATA.jld2"),
+         "storage", storage, "metadata", metadata, "lmax", lmax, "mmax", mmax)
+end
+
+function read_transfer_matrix_metadata(path::String)
+    load(joinpath(path, "METADATA.jld2"), "storage", "metadata", "lmax", "mmax")
+end
 
 doc"""
-    struct HierarchicalTransferMatrix
+    struct TransferMatrix <: AbstractBlockMatrix
 
 This type represents the transfer matrix of an interferometer. This matrix effectively describes how
 an interferometer responds to the sky, including the antenna primary beam, bandpass, and baseline
 distribution.
 
-"Hierarchical" refers to the fact that we save on some computational and storage requirements by
-separating long baselines from short baselines.
+This matrix is hierarchical in the sense that we save on some computational and storage requirements
+by separating long baselines from short baselines.
 
 # Fields
 
-* `path` points to the directory where the matrix is stored
-* `metadata` describes the properties of the interferometer
-* `hierarchy` describes how the baselines are grouped
-* `frequencies` is an alias for `metadata.frequencies`
-* `bandwidth` is an alias for `metadata.bandwidth`
-* `lmax` is the maximum value of the total angular momentum quantum number $l$
-* `mmax` is the maximum value of the azimuthal quantum number $m$
-
-# Implementation
-
-All of the data is stored on disk and only read into memory on-request. Generally, this approach is
-necessary because the entire transfer matrix is too large to entirely fit in memory, and because the
-matrix is block diagonal we can work with blocks individually.
+* `metadata` stores the interferometer's metadata
+* `storage` contains instructions on how to read the matrix from disk
+* `lmax` is the largest value of the $l$ quantum number used by the matrix
+* `mmax` is the largest value of the $m$ quantum number used by the matrix
 """
-struct HierarchicalTransferMatrix
-    path        :: String
-    metadata    :: Metadata
-    hierarchy   :: Hierarchy
-    frequencies :: Vector{typeof(1.0*u"Hz")}
-    bandwidth   :: Vector{typeof(1.0*u"Hz")}
-    lmax        :: Int
-    mmax        :: Int
-
-    function HierarchicalTransferMatrix(path, metadata, hierarchy, lmax, mmax, write=true)
-        if write
-            isdir(path) || mkpath(path)
-            save(joinpath(path, "METADATA.jld2"), "metadata", metadata,
-                 "hierarchy", hierarchy, "lmax", lmax, "mmax", mmax)
-        end
-        new(path, metadata, hierarchy, metadata.frequencies, metadata.bandwidth, lmax, mmax)
-    end
+struct TransferMatrix <: AbstractBlockMatrix
+    metadata :: Metadata
+    storage  :: HierarchicalStorage
+    lmax :: Int
+    mmax :: Int
 end
 
-function HierarchicalTransferMatrix(path)
-    metadata, hierarchy, lmax, mmax = load(joinpath(path, "METADATA.jld2"),
-                                           "metadata", "hierarchy", "lmax", "mmax")
-    HierarchicalTransferMatrix(path, metadata, hierarchy, lmax, mmax, false)
-end
-
-function HierarchicalTransferMatrix(path, metadata;
-                                    lmax=maximum(maximum_multipole_moment(metadata))+1)
+function TransferMatrix(path::String, metadata::Metadata, write=true;
+                        lmax=maximum(maximum_multipole_moment(metadata))+1)
     hierarchy = compute_baseline_hierarchy(metadata, lmax)
+    storage   = HierarchicalStorage(path, hierarchy)
     mmax = lmax = maximum(hierarchy.divisions)
-    HierarchicalTransferMatrix(path, metadata, hierarchy, lmax, mmax, true)
+    rm_old_blocks!(storage, mmax, length(metadata.frequencies))
+    write && write_metadata(storage, metadata, lmax, mmax)
+    TransferMatrix(metadata, storage, lmax, mmax)
 end
 
-function compute!(transfermatrix::HierarchicalTransferMatrix, beam)
-    println("")
-    println("| Starting transfer matrix calculation")
-    println("|---------")
-    println("| ($(now()))")
-    println("")
+function TransferMatrix(path)
+    storage, metadata, lmax, mmax = read_transfer_matrix_metadata(path)
+    TransferMatrix(metadata, storage, lmax, mmax)
+end
+
+Base.getindex(transfermatrix::TransferMatrix, m, β) = transfermatrix.storage[m, β]
+function indices(transfermatrix::TransferMatrix)
+    ((m, β) for β = 1:length(transfermatrix.metadata.frequencies) for m = 0:transfermatrix.mmax)
+end
+
+function Base.show(io::IO, transfermatrix::TransferMatrix)
+    @printf(io, "TransferMatrix(%s)", transfermatrix.storage)
+end
+
+function compute!(transfermatrix::TransferMatrix, beam; progress=false)
+    if progress
+        println("")
+        println("| Starting transfer matrix calculation")
+        println("|---------")
+        println("| ($(now()))")
+        println("")
+    end
 
     workers = categorize_workers()
-    println(workers)
-    println(transfermatrix.hierarchy)
 
-    queue = copy(transfermatrix.metadata.frequencies)
-    lck = ReentrantLock()
-    prg = Progress(length(queue))
-    increment() = (lock(lck); next!(prg); unlock(lck))
+    if progress
+        println(workers)
+        println(transfermatrix.storage.hierarchy)
+    end
+
+    queue = collect(1:length(transfermatrix.metadata.frequencies))
+    if progress
+        lck = ReentrantLock()
+        prg = Progress(length(queue))
+        increment() = (lock(lck); next!(prg); unlock(lck))
+    end
 
     @sync for worker in leaders(workers)
         @async while length(queue) > 0
-            ν = shift!(queue)
-            remotecall_fetch(compute_one_frequency!, worker, transfermatrix, workers, beam, ν)
-            increment()
+            β = shift!(queue)
+            remotecall_fetch(compute_one_frequency!, worker, transfermatrix, workers, beam, β)
+            progress && increment()
         end
     end
 end
 
-function compute_one_frequency!(transfermatrix::HierarchicalTransferMatrix, workers, beam, ν)
+function compute_one_frequency!(transfermatrix::TransferMatrix, workers, beam, β)
     metadata  = transfermatrix.metadata
-    hierarchy = transfermatrix.hierarchy
+    hierarchy = transfermatrix.storage.hierarchy
 
     my_machine   = chomp(readstring(`hostname`))
     subordinates = copy(workers.dict[my_machine])
@@ -113,21 +200,22 @@ function compute_one_frequency!(transfermatrix::HierarchicalTransferMatrix, work
         lmax = hierarchy.divisions[idx+1]
         baselines = transfermatrix.metadata.baselines[hierarchy.baselines[idx]]
         blocks = compute_baseline_group_one_frequency!(transfermatrix, subordinates,
-                                                       beam, baselines, lmax, ν)
+                                                       beam, baselines, lmax, β)
         resize!(blocks, 0)
         finalize(blocks)
         gc(); gc() # please please please garbage collect `blocks`
     end
 end
 
-function compute_baseline_group_one_frequency!(transfermatrix::HierarchicalTransferMatrix,
-                                               subordinates, beam, baselines, lmax, ν)
+function compute_baseline_group_one_frequency!(transfermatrix::TransferMatrix,
+                                               subordinates, beam, baselines, lmax, β)
     pool = CachingPool(subordinates)
 
     # "... but in this world nothing can be said to be certain, except death
     #  and taxes and lmax=mmax"
     #   - Benjamin Franklin, 1789
     mmax = lmax
+    ν = transfermatrix.metadata.frequencies[β]
     phase_center = transfermatrix.metadata.phase_center
     beam_map = create_beam_map(beam, transfermatrix.metadata, (lmax+1, 2mmax+1))
     rhat = unit_vectors(beam_map)
@@ -149,19 +237,8 @@ function compute_baseline_group_one_frequency!(transfermatrix::HierarchicalTrans
         end
     end
 
-    path = joinpath(transfermatrix.path, @sprintf("%.3fMHz", ustrip(uconvert(u"MHz", ν))))
-    isdir(path) || mkdir(path)
-    # There seems to be some insinuation that mmap is causing problems. In particular, occasionally
-    # I see objects that should have been written to disk, but are instead all zeroes. This results
-    # in an InvalidDataException() when we try to read it again. The following line apparently tells
-    # JLD2 not to use mmap, but it's an undocumented interface.
-    #
-    #     jldopen(file, true, true, true)
-    #
-    jldopen(joinpath(path, @sprintf("lmax=%04d.jld2", lmax)), true, true, true, IOStream) do file
-        for m = 0:mmax
-            file[@sprintf("%04d", m)] = blocks[m+1]
-        end
+    for m = 0:mmax
+        transfermatrix.storage[lmax, m, β] = blocks[m+1]
     end
     blocks
 end
@@ -245,38 +322,9 @@ function create_beam_map(f, metadata, size)
     map
 end
 
-function Base.getindex(transfermatrix::HierarchicalTransferMatrix, m, β)
-    ν = transfermatrix.metadata.frequencies[β]
-
-    # load each hierarchical component of the transfer matrix
-    hierarchy = transfermatrix.hierarchy
-    path = joinpath(transfermatrix.path, @sprintf("%.3fMHz", ustrip(uconvert(u"MHz", ν))))
-    blocks = Matrix{Complex128}[]
-    for idx = 1:length(hierarchy.divisions)-1
-        lmax = hierarchy.divisions[idx+1]
-        m > lmax && continue
-        filename   = @sprintf("lmax=%04d.jld2", lmax)
-        objectname = @sprintf("%04d", m)
-        push!(blocks, load(joinpath(path, filename), objectname))
-    end
-
-    # stitch the components together into a single matrix
-    output = zeros(Complex128, sum(size(block, 1) for block in blocks),
-                   maximum(size(block, 2) for block in blocks))
-    offset = 1
-    for block in blocks
-        range1 = offset:offset+size(block, 1)-1
-        range2 = 1:size(block, 2)
-        output_view = @view output[range1, range2]
-        copy!(output_view, block)
-        offset += size(block, 1)
-    end
-    output
-end
-
 "Get the baseline permutation vector for the given value of m."
-function baseline_permutation(transfermatrix::HierarchicalTransferMatrix, m)
-    hierarchy = transfermatrix.hierarchy
+function baseline_permutation(transfermatrix::TransferMatrix, m)
+    hierarchy = transfermatrix.storage.hierarchy
     indices = Int[]
     for idx = 1:length(hierarchy.divisions)-1
         lmax = hierarchy.divisions[idx+1]
