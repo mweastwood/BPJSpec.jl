@@ -16,6 +16,11 @@ function (::CoolSkyComponent)(l, ν1, ν2)
 end
 
 @testset "angular-covariance-matrix.jl" begin
+    @testset "L" begin
+        @test BPJSpec.L(1) + BPJSpec.L(2) == BPJSpec.L(3)
+        @test collect(BPJSpec.L(1):BPJSpec.L(3)) = [BPJSpec.L(1), BPJSpec.L(2), BPJSpec.L(3)]
+    end
+
     lmax = 2
     frequencies = [45u"MHz", 74u"MHz"]
     bandwidth   = [ 1u"Hz",   2u"Hz" ]
