@@ -53,7 +53,7 @@ function read_metadata(path::String)
     end
 end
 
-function Base.setindex!(storage::SingleFile, block, idx)
+function Base.setindex!(storage::SingleFile, block, idx::Int)
     filename   = "BLOCKS.jld2"
     objectname = @sprintf("%04d", idx)
     jldopen(joinpath(storage.path, filename), "a+") do file
@@ -62,13 +62,13 @@ function Base.setindex!(storage::SingleFile, block, idx)
     block
 end
 
-function Base.getindex(storage::SingleFile, idx)
+function Base.getindex(storage::SingleFile, idx::Int)
     filename   = "BLOCKS.jld2"
     objectname = @sprintf("%04d", idx)
     load(joinpath(storage.path, filename), objectname)
 end
 
-function Base.setindex!(storage::SingleFile, block, idx, jdx)
+function Base.setindex!(storage::SingleFile, block, idx::Int, jdx::Int)
     filename   = "BLOCKS.jld2"
     objectname = @sprintf("%04d/%04d", jdx, idx)
     jldopen(joinpath(storage.path, filename), "a+") do file
@@ -77,26 +77,26 @@ function Base.setindex!(storage::SingleFile, block, idx, jdx)
     block
 end
 
-function Base.getindex(storage::SingleFile, idx, jdx)
+function Base.getindex(storage::SingleFile, idx::Int, jdx::Int)
     filename   = "BLOCKS.jld2"
     objectname = @sprintf("%04d/%04d", jdx, idx)
     load(joinpath(storage.path, filename), objectname)
 end
 
-function Base.setindex!(storage::MultipleFiles, block, idx)
+function Base.setindex!(storage::MultipleFiles, block, idx::Int)
     filename   = @sprintf("%04d.jld2", idx)
     objectname = "block"
     save(joinpath(storage.path, filename), objectname, block)
     block
 end
 
-function Base.getindex(storage::MultipleFiles, idx)
+function Base.getindex(storage::MultipleFiles, idx::Int)
     filename   = @sprintf("%04d.jld2", idx)
     objectname = "block"
     load(joinpath(storage.path, filename), objectname)
 end
 
-function Base.setindex!(storage::MultipleFiles, block, idx, jdx)
+function Base.setindex!(storage::MultipleFiles, block, idx::Int, jdx::Int)
     dirname    = @sprintf("%04d",      jdx)
     filename   = @sprintf("%04d.jld2", idx)
     objectname = "block"
@@ -105,7 +105,7 @@ function Base.setindex!(storage::MultipleFiles, block, idx, jdx)
     block
 end
 
-function Base.getindex(storage::MultipleFiles, idx, jdx)
+function Base.getindex(storage::MultipleFiles, idx::Int, jdx::Int)
     dirname    = @sprintf("%04d",      jdx)
     filename   = @sprintf("%04d.jld2", idx)
     objectname = "block"

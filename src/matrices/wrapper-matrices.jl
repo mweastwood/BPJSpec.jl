@@ -42,7 +42,7 @@ function Base.show(io::IO, mmaxfrequencies::MMaxFrequencies)
             ustrip(uconvert(u"MHz", sum(mmaxfrequencies.bandwidth))))
 end
 function indices(mmaxfrequencies::MMaxFrequencies)
-    ((m, β) for β = 1:length(matrix.frequencies) for m = 0:matrix.mmax)
+    ((m, β) for β = 1:length(mmaxfrequencies.frequencies) for m = 0:mmaxfrequencies.mmax)
 end
 function number_of_blocks(mmaxfrequencies::MMaxFrequencies)
     (mmaxfrequencies.mmax+1, length(mmaxfrequencies.frequencies))
