@@ -38,6 +38,7 @@ srand(123)
         include("matrices/transfer-matrix.jl")
         include("matrices/noise-covariance-matrix.jl")
         include("matrices/angular-covariance-matrix.jl")
+        include("matrices/m-modes.jl")
     end
 
     @testset "sky" begin

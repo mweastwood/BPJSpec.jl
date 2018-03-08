@@ -13,7 +13,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-function tikhonov(transfermatrix, mmodes; tolerance=1e-2)
+function tikhonov(transfermatrix, mmodes; regularization=1e-2)
     lmax = mmax = transfermatrix.lmax
     alm  = Alm(lmax, mmax)
 
@@ -28,7 +28,7 @@ function tikhonov(transfermatrix, mmodes; tolerance=1e-2)
         @async while length(queue) > 0
             m = pop!(queue)
             _alm = remotecall_fetch(_tikhonov, pool, transfermatrix, mmodes,
-                                    tolerance, lmax, m)
+                                    regularization, lmax, m)
             for l = m:lmax
                 alm[l, m] = _alm[l-m+1]
             end
@@ -38,15 +38,15 @@ function tikhonov(transfermatrix, mmodes; tolerance=1e-2)
     alm
 end
 
-function _tikhonov(transfermatrix, mmodes, tolerance, lmax, m)
+function _tikhonov(transfermatrix, mmodes, regularization, lmax, m)
     BLAS.set_num_threads(16)
     BB = zeros(Complex128, lmax-m+1, lmax-m+1)
     Bv = zeros(Complex128, lmax-m+1)
     permutation = baseline_permutation(transfermatrix, m)
-    for β = 1:length(mmodes.metadata.frequencies)
+    for β = 1:length(frequencies(mmodes))
         _tikhonov_accumulate!(BB, Bv, transfermatrix[m, β], mmodes[m, β], permutation)
     end
-    _tikhonov_inversion(BB, Bv, tolerance)
+    _tikhonov_inversion(BB, Bv, regularization)
 end
 
 function _tikhonov_accumulate!(BB, Bv, B, v, permutation)
@@ -59,7 +59,7 @@ function _tikhonov_accumulate!(BB, Bv, B, v, permutation)
     Bv .+= B′*v
 end
 
-function _tikhonov_inversion(BB, Bv, tolerance)
-    (BB + tolerance*I) \ Bv
+function _tikhonov_inversion(BB, Bv, regularization)
+    (BB + regularization*I) \ Bv
 end
 

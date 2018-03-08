@@ -14,11 +14,16 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 doc"""
-    struct BlockMatrix{B, M, S, N}
+    struct BlockMatrix{B, M, S, N} <: AbstractBlockMatrix
 
 This type represents a (potentially enormous) block-diagonal matrix. This type is designed to be
 general enough to handle large matrices that fit in memory as well as enormous matrices that do not
-fit in memory.
+fit in memory. In principle this type can also be used to store small matrices, but it would be
+relatively inefficient compared to the standard `Array{T, N}`.
+
+!!! note
+    Generally speaking the user should not use this type directly, but rather one of the numerous
+    wrappers around this type.
 
 # Type Parameters
 
@@ -29,9 +34,13 @@ fit in memory.
 
 # Fields
 
-
+* `metadata` stores any extra information we want associated with the matrix (eg. frequency
+    channels or antenna positions).
+* `storage` contains instructions on how to read matrix blocks
+* `cache` is used if we want to read the matrix from disk and then keep it in memory for faster
+    access.
 """
-struct BlockMatrix{B, N, M, S}
+struct BlockMatrix{B, N, M, S} <: AbstractBlockMatrix
     metadata :: M
     storage  :: S
     cache    :: Cache{B, N}

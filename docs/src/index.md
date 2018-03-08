@@ -11,6 +11,13 @@ end
 ```
 
 ```@docs
-HierarchicalTransferMatrix
+TransferMatrix
+MModes
+```
+
+## Internals
+
+```@docs
+BlockMatrix
 ```
 

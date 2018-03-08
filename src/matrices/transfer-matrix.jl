@@ -86,6 +86,15 @@ function Base.setindex!(storage::HierarchicalStorage, block, lmax, m, β)
     block
 end
 
+function rm_old_blocks!(storage::HierarchicalStorage, mmax, Nfreq)
+    for β = 1:Nfreq, m = 0:mmax
+        dirname    = @sprintf("%04d",      β)
+        filename   = @sprintf("%04d.jld2", m)
+        path = joinpath(storage.path, dirname, filename)
+        isfile(path) && rm(path)
+    end
+end
+
 function write_metadata(storage::HierarchicalStorage, metadata, lmax, mmax)
     isdir(storage.path) || mkpath(storage.path)
     save(joinpath(storage.path, "METADATA.jld2"),
@@ -96,6 +105,23 @@ function read_transfer_matrix_metadata(path::String)
     load(joinpath(path, "METADATA.jld2"), "storage", "metadata", "lmax", "mmax")
 end
 
+doc"""
+    struct TransferMatrix <: AbstractBlockMatrix
+
+This type represents the transfer matrix of an interferometer. This matrix effectively describes how
+an interferometer responds to the sky, including the antenna primary beam, bandpass, and baseline
+distribution.
+
+This matrix is hierarchical in the sense that we save on some computational and storage requirements
+by separating long baselines from short baselines.
+
+# Fields
+
+* `metadata` stores the interferometer's metadata
+* `storage` contains instructions on how to read the matrix from disk
+* `lmax` is the largest value of the $l$ quantum number used by the matrix
+* `mmax` is the largest value of the $m$ quantum number used by the matrix
+"""
 struct TransferMatrix <: AbstractBlockMatrix
     metadata :: Metadata
     storage  :: HierarchicalStorage
@@ -108,6 +134,7 @@ function TransferMatrix(path::String, metadata::Metadata, write=true;
     hierarchy = compute_baseline_hierarchy(metadata, lmax)
     storage   = HierarchicalStorage(path, hierarchy)
     mmax = lmax = maximum(hierarchy.divisions)
+    rm_old_blocks!(storage, mmax, length(metadata.frequencies))
     write && write_metadata(storage, metadata, lmax, mmax)
     TransferMatrix(metadata, storage, lmax, mmax)
 end
@@ -122,34 +149,11 @@ function indices(transfermatrix::TransferMatrix)
     ((m, β) for β = 1:length(transfermatrix.metadata.frequencies) for m = 0:transfermatrix.mmax)
 end
 
-#doc"""
-#    struct HierarchicalTransferMatrix
-#
-#This type represents the transfer matrix of an interferometer. This matrix effectively describes how
-#an interferometer responds to the sky, including the antenna primary beam, bandpass, and baseline
-#distribution.
-#
-#"Hierarchical" refers to the fact that we save on some computational and storage requirements by
-#separating long baselines from short baselines.
-#
-## Fields
-#
-#* `path` points to the directory where the matrix is stored
-#* `metadata` describes the properties of the interferometer
-#* `hierarchy` describes how the baselines are grouped
-#* `frequencies` is an alias for `metadata.frequencies`
-#* `bandwidth` is an alias for `metadata.bandwidth`
-#* `lmax` is the maximum value of the total angular momentum quantum number $l$
-#* `mmax` is the maximum value of the azimuthal quantum number $m$
-#
-## Implementation
-#
-#All of the data is stored on disk and only read into memory on-request. Generally, this approach is
-#necessary because the entire transfer matrix is too large to entirely fit in memory, and because the
-#matrix is block diagonal we can work with blocks individually.
-#"""
+function Base.show(io::IO, transfermatrix::TransferMatrix)
+    @printf(io, "TransferMatrix(%s)", transfermatrix.storage)
+end
 
-function compute!(transfermatrix::TransferMatrix, beam, progress=false)
+function compute!(transfermatrix::TransferMatrix, beam; progress=false)
     if progress
         println("")
         println("| Starting transfer matrix calculation")
@@ -162,7 +166,7 @@ function compute!(transfermatrix::TransferMatrix, beam, progress=false)
 
     if progress
         println(workers)
-        println(transfermatrix.hierarchy)
+        println(transfermatrix.storage.hierarchy)
     end
 
     queue = collect(1:length(transfermatrix.metadata.frequencies))
@@ -318,22 +322,22 @@ function create_beam_map(f, metadata, size)
     map
 end
 
-#"Get the baseline permutation vector for the given value of m."
-#function baseline_permutation(transfermatrix::HierarchicalTransferMatrix, m)
-#    hierarchy = transfermatrix.hierarchy
-#    indices = Int[]
-#    for idx = 1:length(hierarchy.divisions)-1
-#        lmax = hierarchy.divisions[idx+1]
-#        m > lmax && continue
-#        if m == 0
-#            append!(indices, hierarchy.baselines[idx])
-#        else
-#            for baseline in hierarchy.baselines[idx]
-#                push!(indices, 2*baseline-1) # positive m
-#                push!(indices, 2*baseline-0) # negative m
-#            end
-#        end
-#    end
-#    indices
-#end
+"Get the baseline permutation vector for the given value of m."
+function baseline_permutation(transfermatrix::TransferMatrix, m)
+    hierarchy = transfermatrix.storage.hierarchy
+    indices = Int[]
+    for idx = 1:length(hierarchy.divisions)-1
+        lmax = hierarchy.divisions[idx+1]
+        m > lmax && continue
+        if m == 0
+            append!(indices, hierarchy.baselines[idx])
+        else
+            for baseline in hierarchy.baselines[idx]
+                push!(indices, 2*baseline-1) # positive m
+                push!(indices, 2*baseline-0) # negative m
+            end
+        end
+    end
+    indices
+end
 

@@ -123,9 +123,9 @@ function Cache{T}(tuple::Tuple) where T
 end
 
 Base.getindex(cache::Cache, idx) = cache.cache[idx]
-Base.setindex!(cache::Cache, X, idx) = cache.cache[idx] = X
+Base.setindex!(cache::Cache, X, idx) = cache.cache[idx] = copy(X)
 Base.getindex(cache::Cache, idx, jdx) = cache.cache[idx, jdx]
-Base.setindex!(cache::Cache, X, idx, jdx) = cache.cache[idx, jdx] = X
+Base.setindex!(cache::Cache, X, idx, jdx) = cache.cache[idx, jdx] = copy(X)
 @inline Base.getindex(cache::Cache, idx::Tuple) = cache[idx...]
 @inline Base.setindex!(cache::Cache, X, idx::Tuple) = cache[idx...] = X
 used(cache::Cache) = cache.used[]
