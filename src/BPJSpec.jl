@@ -82,6 +82,9 @@ end
 "Useful little function that helps account for grouping of positive and negative m."
 two(m) = ifelse(m != 0, 2, 1)
 
+"Convert and strip units from the given quantity."
+u(units, quantity) = ustip(uconvert(units, quantity))
+
 include("parallel.jl")
 include("spherical-harmonics.jl")
 
@@ -98,13 +101,12 @@ include("interferometer/metadata.jl")
 include("interferometer/baseline-hierarchy.jl")
 
 abstract type AbstractBlockMatrix end
-abstract type AbstractBlockVector end
 abstract type MatrixMetadata end
 include("matrices/storage-mechanisms.jl")
 include("matrices/block-matrix.jl")
 include("matrices/wrapper-matrices.jl")
 include("matrices/broadcasting.jl")
-#include("matrices/transfer-matrix.jl")
+include("matrices/transfer-matrix.jl")
 include("matrices/noise-covariance-matrix.jl")
 include("matrices/angular-covariance-matrix.jl")
 

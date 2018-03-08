@@ -26,15 +26,15 @@ const simple_beam_solid_angle = π
     phase_center = up
     metadata = BPJSpec.Metadata(frequencies, bandwidth, position, baselines, phase_center)
 
-    transfermatrix = HierarchicalTransferMatrix(path, metadata)
+    transfermatrix = TransferMatrix(path, metadata)
     try
-        @test transfermatrix.hierarchy.divisions == [0, 32]
-        @test transfermatrix.hierarchy.baselines == [[1, 2, 3, 4]]
-
+        @test transfermatrix.storage.hierarchy.divisions == [0, 32]
+        @test transfermatrix.storage.hierarchy.baselines == [[1, 2, 3, 4]]
         BPJSpec.compute!(transfermatrix, simple_beam)
 
-        # Construct a simple sky.
-        alm = SpectralBlockVector(transfermatrix.mmax, frequencies)
+        ############################################################################################
+        # Construct a uniform sky and verify that the auto-correlation gets the correct amplitude.
+        alm = MFBlockVector(NoFile(), transfermatrix.mmax, frequencies, bandwidth)
         for β = 1:length(frequencies)
             for m = 0:transfermatrix.mmax
                 block = zeros(Complex128, transfermatrix.lmax - m + 1)
@@ -45,7 +45,7 @@ const simple_beam_solid_angle = π
             end
         end
 
-        mmodes = SpectralBlockVector(transfermatrix.mmax, frequencies)
+        mmodes = MFBlockVector(NoFile(), transfermatrix.mmax, frequencies, bandwidth)
         @. mmodes = transfermatrix * alm
         for β = 1:length(frequencies)
             block = mmodes[0, β]

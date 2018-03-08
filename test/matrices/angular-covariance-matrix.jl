@@ -18,7 +18,7 @@ end
 @testset "angular-covariance-matrix.jl" begin
     @testset "L" begin
         @test BPJSpec.L(1) + BPJSpec.L(2) == BPJSpec.L(3)
-        @test collect(BPJSpec.L(1):BPJSpec.L(3)) = [BPJSpec.L(1), BPJSpec.L(2), BPJSpec.L(3)]
+        @test collect(BPJSpec.L(1):BPJSpec.L(3)) == [BPJSpec.L(1), BPJSpec.L(2), BPJSpec.L(3)]
     end
 
     lmax = 2

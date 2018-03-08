@@ -23,7 +23,7 @@ end
 
 # compatibility with TTCal
 
-function from_ttcal(ttcal_metadata)
+function from_ttcal(ttcal_metadata; lmax=0)
     frequencies  = ttcal_metadata.frequencies
     bandwidth    = fill(24.0u"kHz", length(frequencies)) # default for OVRO-LWA
     position     = ttcal_position(ttcal_metadata)

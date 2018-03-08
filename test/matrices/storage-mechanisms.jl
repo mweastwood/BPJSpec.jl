@@ -16,7 +16,7 @@
         metadata = randn()
         BPJSpec.write_metadata(storage, metadata)
         storage′, metadata′ = BPJSpec.read_metadata(path)
-        @test storage == storage′
+        @test storage.path == storage′.path
         @test metadata == metadata′
 
         X = randn(10, 10)
@@ -39,7 +39,7 @@
         metadata = randn()
         BPJSpec.write_metadata(storage, metadata)
         storage′, metadata′ = BPJSpec.read_metadata(path)
-        @test storage == storage′
+        @test storage.path == storage′.path
         @test metadata == metadata′
 
         X = randn(10, 10)

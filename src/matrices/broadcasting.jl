@@ -21,7 +21,7 @@ end
 unwrap(x::ProgressBar) = x.data
 unwrap(x) = x
 
-const BroadcastTypes = Union{ProgressBar, AbstractBlockVector, AbstractBlockMatrix}
+const BroadcastTypes = Union{ProgressBar, AbstractBlockMatrix}
 
 function Base.broadcast!(f, output::BroadcastTypes, args...)
     internal_broadcast!(f, output, unwrap.(args))

@@ -24,7 +24,6 @@ struct SingleFile <: Mechanism
     path :: String
 end
 Base.show(io::IO, storage::SingleFile) = print(io, storage.path)
-magic(::Type{SingleFile}) = 0x0e85f27ea04cbee8 # rand(UInt64)
 distribute_write(::SingleFile) = false
 distribute_read(::SingleFile) = true
 
@@ -32,25 +31,16 @@ struct MultipleFiles <: Mechanism
     path :: String
 end
 Base.show(io::IO, storage::MultipleFiles) = print(io, storage.path)
-magic(::Type{MultipleFiles}) = 0x24ef18b394f51d71 # rand(UInt64)
 distribute_write(::MultipleFiles) = true
 distribute_read(::MultipleFiles) = true
 
 function write_metadata(storage::Mechanism, metadata)
     isdir(storage.path) || mkpath(storage.path)
-    save(joinpath(storage.path, "METADATA.jld2"),
-         "magic", magic(typeof(storage)), "metadata", metadata)
+    save(joinpath(storage.path, "METADATA.jld2"), "storage", storage, "metadata", metadata)
 end
 
 function read_metadata(path::String)
-    magic′, metadata = load(joinpath(path, "METADATA.jld2"), "magic", "metadata")
-    if     magic′ == magic(SingleFile)
-        return SingleFile(path), metadata
-    elseif magic′ == magic(MultipleFiles)
-        return MultipleFiles(path), metadata
-    else
-        error("unknown magic number")
-    end
+    load(joinpath(path, "METADATA.jld2"), "storage", "metadata")
 end
 
 function Base.setindex!(storage::SingleFile, block, idx::Int)
