@@ -26,38 +26,38 @@ const simple_beam_solid_angle = π
     phase_center = up
     metadata = BPJSpec.Metadata(frequencies, bandwidth, position, baselines, phase_center)
 
-    transfermatrix = TransferMatrix(path, metadata)
-    try
-        @test transfermatrix.storage.hierarchy.divisions == [0, 32]
-        @test transfermatrix.storage.hierarchy.baselines == [[1, 2, 3, 4]]
-        BPJSpec.compute!(transfermatrix, simple_beam)
+    # Construct a uniform sky and verify that the auto-correlation gets the correct amplitude.
+    @testset "uniform sky" begin
+        transfermatrix = TransferMatrix(path, metadata)
+        try
+            @test transfermatrix.storage.hierarchy.divisions == [0, 32]
+            @test transfermatrix.storage.hierarchy.baselines == [[1, 2, 3, 4]]
+            BPJSpec.compute!(transfermatrix, simple_beam)
 
-        ############################################################################################
-        # Construct a uniform sky and verify that the auto-correlation gets the correct amplitude.
-        alm = MFBlockVector(NoFile(), transfermatrix.mmax, frequencies, bandwidth)
-        for β = 1:length(frequencies)
-            for m = 0:transfermatrix.mmax
-                block = zeros(Complex128, transfermatrix.lmax - m + 1)
-                if m == 0
-                    block[1] = sqrt(4π) # 1 K constant sky brightness
+            alm = MFBlockVector(NoFile(), transfermatrix.mmax, frequencies, bandwidth)
+            for β = 1:length(frequencies)
+                for m = 0:transfermatrix.mmax
+                    block = zeros(Complex128, transfermatrix.lmax - m + 1)
+                    if m == 0
+                        block[1] = sqrt(4π) # 1 K constant sky brightness
+                    end
+                    alm[m, β] = block
                 end
-                alm[m, β] = block
             end
-        end
 
-        mmodes = MFBlockVector(NoFile(), transfermatrix.mmax, frequencies, bandwidth)
-        @. mmodes = transfermatrix * alm
-        for β = 1:length(frequencies)
-            block = mmodes[0, β]
-            expected = ustrip(uconvert(u"Jy", simple_beam_solid_angle
-                                       * 2u"k*K"*frequencies[β]^2/(u"c")^2))
-            # Note the tolerance here is set by the resolution of the map used for the spherical
-            # harmonic transform of the beam during transfer matrix generation.
-            @test abs(block[1] - expected) < 0.05
+            mmodes = MFBlockVector(NoFile(), transfermatrix.mmax, frequencies, bandwidth)
+            @. mmodes = transfermatrix * alm
+            for β = 1:length(frequencies)
+                block = mmodes[0, β]
+                expected = ustrip(uconvert(u"Jy", simple_beam_solid_angle
+                                        * 2u"k*K"*frequencies[β]^2/(u"c")^2))
+                # Note the tolerance here is set by the resolution of the map used for the spherical
+                # harmonic transform of the beam during transfer matrix generation.
+                @test abs(block[1] - expected) < 0.05
+            end
+        finally
+            rm(path, recursive=true)
         end
-
-    finally
-        rm(path, recursive=true)
     end
 end
 
