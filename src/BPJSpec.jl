@@ -40,8 +40,8 @@ module BPJSpec
 
 # Matrices
 export NoFile, SingleFile, MultipleFiles
-export MBlockMatrix, MFBlockMatrix
-export MBlockVector, MFBlockVector
+export MBlockMatrix, FBlockMatrix, MFBlockMatrix
+export MBlockVector, FBlockVector, MFBlockVector
 export TransferMatrix, NoiseCovarianceMatrix, AngularCovarianceMatrix
 export compute!, cache!, flush!
 
@@ -83,7 +83,7 @@ end
 two(m) = ifelse(m != 0, 2, 1)
 
 "Convert and strip units from the given quantity."
-u(units, quantity) = ustip(uconvert(units, quantity))
+u(units, quantity) = ustrip(uconvert(units, quantity))
 
 include("parallel.jl")
 include("spherical-harmonics.jl")
@@ -110,26 +110,18 @@ include("matrices/transfer-matrix.jl")
 include("matrices/noise-covariance-matrix.jl")
 include("matrices/angular-covariance-matrix.jl")
 
-
-
-#invlude("vectors/block-vector.jl")
-#include("vectors/block-diagonal-vector.jl")
-#include("vectors/wrapper-vectors.jl")
-
-#include("vectors/spectral-block-vector.jl")
 #include("vectors/angular-block-vector.jl")
 #include("vectors/random-angular-block-vector.jl")
 #include("vectors/white-noise-vector.jl")
-#include("vectors/random-vector.jl")
 #include("m-modes.jl")
 
-#include("algorithms/average-frequency-channels.jl")
-#include("algorithms/full-rank-compress.jl")
-#include("algorithms/karhunen-loeve-transforms.jl")
-#include("imaging.jl")
-#
-#include("quadratic-estimator/fisher-information.jl")
-#include("quadratic-estimator/mixing-matrix.jl")
+include("algorithms/average-frequency-channels.jl")
+include("algorithms/full-rank-compress.jl")
+include("algorithms/karhunen-loeve-transforms.jl")
+include("algorithms/tikhonov-regularization.jl")
+
+include("quadratic-estimator/fisher-information.jl")
+include("quadratic-estimator/mixing-matrix.jl")
 
 end
 

@@ -13,7 +13,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-function tikhonov(transfermatrix::HierarchicalTransferMatrix, mmodes::MModes, tolerance)
+function tikhonov(transfermatrix, mmodes; tolerance=1e-2)
     lmax = mmax = transfermatrix.lmax
     alm  = Alm(lmax, mmax)
 

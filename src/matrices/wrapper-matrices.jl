@@ -39,6 +39,20 @@ Base.show(io::IO, metadata::MMax) = @printf(io, "{mmax: %d}", metadata.mmax)
 indices(metadata::MMax) = 0:metadata.mmax
 number_of_blocks(metadata::MMax) = metadata.mmax+1
 
+"Metadata for matrices that will be split into blocks of frequency."
+struct Frequencies <: MatrixMetadata
+    frequencies :: Vector{typeof(1.0*u"Hz")}
+    bandwidth   :: Vector{typeof(1.0*u"Hz")}
+end
+function Base.show(io::IO, metadata::Frequencies)
+    @printf(io, "{ν: %.3f MHz..%.3f MHz, Δν: %.3f MHz total}",
+            ustrip(uconvert(u"MHz", metadata.frequencies[1])),
+            ustrip(uconvert(u"MHz", metadata.frequencies[end])),
+            ustrip(uconvert(u"MHz", sum(metadata.bandwidth))))
+end
+indices(metadata::Frequencies) = 1:length(metadata.frequencies)
+number_of_blocks(metadata::Frequencies) = length(metadata.frequencies)
+
 "Metadata for matrices that will be split into blocks of m and frequency."
 struct MMaxFrequencies <: MatrixMetadata
     mmax        :: Int
@@ -73,6 +87,20 @@ MBlockMatrix(path::String) = MBlockMatrix(BlockMatrix{Matrix{Complex128}, 1}(pat
 Base.getindex(matrix::MBlockMatrix, m) = matrix.matrix[m+1]
 Base.setindex!(matrix::MBlockMatrix, block, m) = matrix.matrix[m+1] = block
 
+"Matrix that is split into blocks of frequency."
+struct FBlockMatrix{S} <: AbstractBlockMatrix
+    matrix :: BlockMatrix{Matrix{Complex128}, 1, Frequencies, S}
+end
+function FBlockMatrix(storage::Mechanism, frequencies, bandwidth)
+    metadata = Frequencies(frequencies, bandwidth)
+    matrix = BlockMatrix{Matrix{Complex128}, 1}(storage, metadata)
+    FBlockMatrix(matrix)
+end
+FBlockMatrix(path::String) = FBlockMatrix(BlockMatrix{Matrix{Complex128}, 1}(path))
+
+Base.getindex(matrix::FBlockMatrix, β) = matrix.matrix[β]
+Base.setindex!(matrix::FBlockMatrix, block, β) = matrix.matrix[β] = block
+
 "Matrix that is split into blocks of m and frequency."
 struct MFBlockMatrix{S} <: AbstractBlockMatrix
     matrix :: BlockMatrix{Matrix{Complex128}, 2, MMaxFrequencies, S}
@@ -100,6 +128,20 @@ MBlockVector(path::String) = MBlockVector(BlockMatrix{Vector{Complex128}, 1}(pat
 
 Base.getindex(vector::MBlockVector, m) = vector.matrix[m+1]
 Base.setindex!(vector::MBlockVector, block, m) = vector.matrix[m+1] = block
+
+"Vector that is split into blocks of frequency."
+struct FBlockVector{S} <: AbstractBlockMatrix
+    matrix :: BlockMatrix{Vector{Complex128}, 1, Frequencies, S}
+end
+function FBlockVector(storage::Mechanism, frequencies, bandwidth)
+    metadata = Frequencies(frequencies, bandwidth)
+    matrix = BlockMatrix{Vector{Complex128}, 1}(storage, metadata)
+    FBlockVector(matrix)
+end
+FBlockVector(path::String) = MBlockVector(BlockMatrix{Vector{Complex128}, 1}(path))
+
+Base.getindex(vector::FBlockVector, β) = vector.matrix[β]
+Base.setindex!(vector::FBlockVector, block, β) = vector.matrix[β] = block
 
 "Vector that is split into blocks of m and frequency."
 struct MFBlockVector{S} <: AbstractBlockMatrix

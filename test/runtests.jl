@@ -46,13 +46,13 @@ srand(123)
         include("sky/noise.jl")
     end
 
-    #@testset "algorithms" begin
-    #    include("algorithms/average-frequency-channels.jl")
-    #    #include("algorithms/full-rank-compress.jl")
-    #end
+    @testset "algorithms" begin
+        include("algorithms/average-frequency-channels.jl")
+        #include("algorithms/full-rank-compress.jl")
+    end
 
-    #@testset "quadratic-estimator" begin
-    #    include("quadratic-estimator/mixing-matrix.jl")
-    #end
+    @testset "quadratic-estimator" begin
+        include("quadratic-estimator/mixing-matrix.jl")
+    end
 end
 
