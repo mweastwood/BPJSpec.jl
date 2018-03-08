@@ -40,6 +40,10 @@ srand(123)
         include("matrices/storage-mechanisms.jl")
         include("matrices/block-matrix.jl")
         include("matrices/wrapper-matrices.jl")
+        include("matrices/broadcasting.jl")
+
+
+
     #    include("matrices/block-diagonal-matrix.jl")
     #    include("matrices/spectral-block-diagonal-matrix.jl")
     #    include("matrices/angular-covariance-matrix.jl")

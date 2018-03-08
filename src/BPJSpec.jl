@@ -95,7 +95,7 @@ abstract type MatrixMetadata end
 include("matrices/storage-mechanisms.jl")
 include("matrices/block-matrix.jl")
 include("matrices/wrapper-matrices.jl")
-#include("matrices/broadcasting.jl")
+include("matrices/broadcasting.jl")
 
 include("interferometer/metadata.jl")
 include("interferometer/baseline-hierarchy.jl")

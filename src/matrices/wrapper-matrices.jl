@@ -17,6 +17,8 @@ indices(matrix::AbstractBlockMatrix) = indices(matrix.matrix.metadata)
 Base.show(io::IO, matrix::AbstractBlockMatrix) = show(io, matrix.matrix)
 cache!(matrix::AbstractBlockMatrix) = cache!(matrix.matrix)
 flush!(matrix::AbstractBlockMatrix) = flush!(matrix.matrix)
+distribute_write(matrix::AbstractBlockMatrix) = distribute_write(matrix.matrix)
+distribute_read(matrix::AbstractBlockMatrix) = distribute_read(matrix.matrix)
 
 "Metadata for matrices that will be split into blocks of m."
 struct MMax <: MatrixMetadata
@@ -69,27 +71,36 @@ end
 struct MBlockMatrix{S} <: AbstractBlockMatrix
     matrix :: BlockMatrix{Matrix{Complex128}, 1, MMax, S}
 end
-function MBlockMatrix(args...)
-    MBlockMatrix(BlockMatrix{Matrix{Complex128}, 1}(args...))
+function MBlockMatrix(storage::Mechanism, mmax)
+    metadata = MMax(mmax)
+    matrix = BlockMatrix{Matrix{Complex128}, 1}(storage, metadata)
+    MBlockMatrix(matrix)
 end
+MBlockMatrix(path::String) = MBlockMatrix(BlockMatrix(path))
 Base.getindex(matrix::MBlockMatrix, m) = matrix.matrix[m+1]
 Base.setindex!(matrix::MBlockMatrix, block, m) = matrix.matrix[m+1] = block
 
 struct MFBlockMatrix{S} <: AbstractBlockMatrix
     matrix :: BlockMatrix{Matrix{Complex128}, 2, MMaxFrequencies, S}
 end
-function MFBlockMatrix(args...)
-    MFBlockMatrix(BlockMatrix{Matrix{Complex128}, 2}(args...))
+function MFBlockMatrix(storage::Mechanism, mmax, frequencies, bandwidth)
+    metadata = MMaxFrequencies(mmax, frequencies, bandwidth)
+    matrix = BlockMatrix{Matrix{Complex128}, 2}(storage, metadata)
+    MFBlockMatrix(matrix)
 end
+MFBlockMatrix(path::String) = MFBlockMatrix(BlockMatrix(path))
 Base.getindex(matrix::MFBlockMatrix, m, β) = matrix.matrix[m+1, β]
 Base.setindex!(matrix::MFBlockMatrix, block, m, β) = matrix.matrix[m+1, β] = block
 
 struct NoiseCovarianceMatrix{S} <: AbstractBlockMatrix
     matrix :: BlockMatrix{Diagonal{Float64}, 2, MMaxFrequencies, S}
 end
-function NoiseCovarianceMatrix(args...)
-    NoiseCovarianceMatrix(BlockMatrix{Matrix{Complex128}, 2}(args...))
+function NoiseCovarianceMatrix(storage::Mechanism, mmax, frequencies, bandwidth)
+    metadata = MMaxFrequencies(mmax, frequencies, bandwidth)
+    matrix = BlockMatrix{Diagonal{Float64}, 2}(storage, metadata)
+    NoiseCovarianceMatrix(matrix)
 end
+NoiseCovarianceMatrix(path::String) = NoiseCovarianceMatrix(BlockMatrix(path))
 Base.getindex(matrix::NoiseCovarianceMatrix, m, β) = matrix.matrix[m+1, β]
 Base.setindex!(matrix::NoiseCovarianceMatrix, block, m, β) = matrix.matrix[m+1, β] = block
 

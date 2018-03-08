@@ -101,3 +101,6 @@ function flush!(matrix::BlockMatrix)
     matrix
 end
 
+distribute_write(matrix::BlockMatrix) = distribute_write(matrix.storage) && !used(matrix.cache)
+distribute_read(matrix::BlockMatrix) = distribute_read(matrix.storage) && !used(matrix.cache)
+
