@@ -4,6 +4,19 @@
     bandwidth = [24u"kHz", 1.0u"MHz"]
     path = tempname()
 
+    @testset "SimpleBlockMatrix" begin
+        for storage in (NoFile(), SingleFile(path), MultipleFiles(path))
+            matrix = MBlockMatrix(storage, mmax+1)
+            X = rand(Complex128, 5, 5)
+            Y = rand(Complex128, 3, 3)
+            matrix[1] = X
+            matrix[3] = Y
+            @test matrix[1] == X
+            @test matrix[3] == Y
+            rm(path, force=true, recursive=true)
+        end
+    end
+
     @testset "MBlockMatrix" begin
         for storage in (NoFile(), SingleFile(path), MultipleFiles(path))
             matrix = MBlockMatrix(storage, mmax)

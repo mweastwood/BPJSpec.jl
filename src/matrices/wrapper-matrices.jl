@@ -31,6 +31,14 @@ phase_center(matrix::AbstractBlockMatrix) = matrix.matrix.metadata.phase_center
 lmax(matrix::AbstractBlockMatrix) = matrix.matrix.metadata.lmax
 mmax(matrix::AbstractBlockMatrix) = matrix.matrix.metadata.mmax
 
+"Metadata for matrices that don't have any metadata."
+struct NoMetadata <: MatrixMetadata
+    length :: Int
+end
+Base.show(io::IO, metadata::NoMetadata) = @printf(io, "{length: %d}", metadata.length)
+indices(metadata::NoMetadata) = 1:length
+number_of_blocks(metadata::NoMetadata) = metadata.length
+
 "Metadata for matrices that will be split into blocks of m."
 struct MMax <: MatrixMetadata
     mmax :: Int
@@ -72,6 +80,20 @@ end
 function number_of_blocks(metadata::MMaxFrequencies)
     (metadata.mmax+1, length(metadata.frequencies))
 end
+
+"Matrix that is split into arbitrary blocks."
+struct SimpleBlockMatrix{S} <: AbstractBlockMatrix
+    matrix :: BlockMatrix{Matrix{Complex128}, 1, NoMetadata, S}
+end
+function SimpleBlockMatrix(storage::Mechanism, length)
+    metadata = NoMetadata(length)
+    matrix = BlockMatrix{Matrix{Complex128}, 1}(storage, metadata)
+    SimpleBlockMatrix(matrix)
+end
+SimpleBlockMatrix(path::String) = SimpleBlockMatrix(BlockMatrix{Matrix{Complex128}, 1}(path))
+
+Base.getindex(matrix::SimpleBlockMatrix, idx) = matrix.matrix[idx]
+Base.setindex!(matrix::SimpleBlockMatrix, block, idx) = matrix.matrix[idx] = block
 
 "Matrix that is split into blocks of m."
 struct MBlockMatrix{S} <: AbstractBlockMatrix

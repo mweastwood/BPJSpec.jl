@@ -40,6 +40,7 @@ module BPJSpec
 
 # Matrices
 export NoFile, SingleFile, MultipleFiles
+export SimpleBlockMatrix
 export MBlockMatrix, FBlockMatrix, MFBlockMatrix
 export MBlockVector, FBlockVector, MFBlockVector
 export TransferMatrix, NoiseCovarianceMatrix, AngularCovarianceMatrix
