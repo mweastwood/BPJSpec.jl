@@ -36,17 +36,22 @@ distribute_read(::MultipleFiles) = true
 
 function write_metadata(storage::Mechanism, metadata)
     isdir(storage.path) || mkpath(storage.path)
-    save(joinpath(storage.path, "METADATA.jld2"), "storage", storage, "metadata", metadata)
+    jldopen(joinpath(storage.path, "METADATA.jld2"), mode[w]..., IOStream) do file
+        file["storage"]  = storage
+        file["metadata"] = metadata
+    end
 end
 
 function read_metadata(path::String)
-    load(joinpath(path, "METADATA.jld2"), "storage", "metadata")
+    jldopen(joinpath(path, "METADATA.jld2"), mode[r]..., IOStream) do file
+        return file["storage"], file["metadata"]
+    end
 end
 
 function Base.setindex!(storage::SingleFile, block, idx::Int)
     filename   = "BLOCKS.jld2"
     objectname = @sprintf("%04d", idx)
-    jldopen(joinpath(storage.path, filename), "a+") do file
+    jldopen(joinpath(storage.path, filename), mode[a]..., IOStream) do file
         file[objectname] = block
     end
     block
@@ -55,13 +60,15 @@ end
 function Base.getindex(storage::SingleFile, idx::Int)
     filename   = "BLOCKS.jld2"
     objectname = @sprintf("%04d", idx)
-    load(joinpath(storage.path, filename), objectname)
+    jldopen(joinpath(storage.path, filename), mode[r]..., IOStream) do file
+        return file[objectname]
+    end
 end
 
 function Base.setindex!(storage::SingleFile, block, idx::Int, jdx::Int)
     filename   = "BLOCKS.jld2"
     objectname = @sprintf("%04d/%04d", jdx, idx)
-    jldopen(joinpath(storage.path, filename), "a+") do file
+    jldopen(joinpath(storage.path, filename), mode[a]..., IOStream) do file
         file[objectname] = block
     end
     block
@@ -70,20 +77,26 @@ end
 function Base.getindex(storage::SingleFile, idx::Int, jdx::Int)
     filename   = "BLOCKS.jld2"
     objectname = @sprintf("%04d/%04d", jdx, idx)
-    load(joinpath(storage.path, filename), objectname)
+    jldopen(joinpath(storage.path, filename), mode[r]..., IOStream) do file
+        return file[objectname]
+    end
 end
 
 function Base.setindex!(storage::MultipleFiles, block, idx::Int)
     filename   = @sprintf("%04d.jld2", idx)
     objectname = "block"
-    save(joinpath(storage.path, filename), objectname, block)
+    jldopen(joinpath(storage.path, filename), mode[w]..., IOStream) do file
+        file[objectname] = block
+    end
     block
 end
 
 function Base.getindex(storage::MultipleFiles, idx::Int)
     filename   = @sprintf("%04d.jld2", idx)
     objectname = "block"
-    load(joinpath(storage.path, filename), objectname)
+    jldopen(joinpath(storage.path, filename), mode[r]..., IOStream) do file
+        return file[objectname]
+    end
 end
 
 function Base.setindex!(storage::MultipleFiles, block, idx::Int, jdx::Int)
@@ -91,7 +104,9 @@ function Base.setindex!(storage::MultipleFiles, block, idx::Int, jdx::Int)
     filename   = @sprintf("%04d.jld2", idx)
     objectname = "block"
     isdir(joinpath(storage.path, dirname)) || mkpath(joinpath(storage.path, dirname))
-    save(joinpath(storage.path, dirname, filename), objectname, block)
+    jldopen(joinpath(storage.path, dirname, filename), mode[w]..., IOStream) do file
+        file[objectname] = block
+    end
     block
 end
 
@@ -99,7 +114,9 @@ function Base.getindex(storage::MultipleFiles, idx::Int, jdx::Int)
     dirname    = @sprintf("%04d",      jdx)
     filename   = @sprintf("%04d.jld2", idx)
     objectname = "block"
-    load(joinpath(storage.path, dirname, filename), objectname)
+    jldopen(joinpath(storage.path, dirname, filename), mode[r]..., IOStream) do file
+        return file[objectname]
+    end
 end
 
 @inline Base.getindex(storage::Mechanism, idx::Tuple) = storage[idx...]

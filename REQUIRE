@@ -4,7 +4,6 @@ CasaCore
 Cosmology
 Cubature
 FastTransforms
-FileIO
 JLD2
 ProgressMeter
 StaticArrays

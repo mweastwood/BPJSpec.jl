@@ -43,7 +43,7 @@ function Base.getindex(storage::HierarchicalStorage, m, β)
     blocks = Matrix{Complex128}[]
     dirname  = @sprintf("%04d",      β)
     filename = @sprintf("%04d.jld2", m)
-    jldopen(joinpath(storage.path, dirname, filename), "r") do file
+    jldopen(joinpath(storage.path, dirname, filename), mode[r]..., IOStream) do file
         for idx = 1:length(hierarchy.divisions)-1
             lmax = hierarchy.divisions[idx+1]
             lmax ≥ m || continue
@@ -80,7 +80,7 @@ function Base.setindex!(storage::HierarchicalStorage, block, lmax, m, β)
     filename   = @sprintf("%04d.jld2", m)
     objectname = @sprintf("%04d",   lmax)
     isdir(joinpath(storage.path, dirname)) || mkpath(joinpath(storage.path, dirname))
-    jldopen(joinpath(storage.path, dirname, filename), true, true, false, IOStream) do file
+    jldopen(joinpath(storage.path, dirname, filename), mode[a]..., IOStream) do file
         file[objectname] = block
     end
     block
@@ -97,12 +97,18 @@ end
 
 function write_metadata(storage::HierarchicalStorage, metadata, lmax, mmax)
     isdir(storage.path) || mkpath(storage.path)
-    save(joinpath(storage.path, "METADATA.jld2"),
-         "storage", storage, "metadata", metadata, "lmax", lmax, "mmax", mmax)
+    jldopen(joinpath(storage.path, "METADATA.jld2"), mode[w]..., IOStream) do file
+        file["storage"]  = storage
+        file["metadata"] = metadata
+        file["lmax"] = lmax
+        file["mmax"] = mmax
+    end
 end
 
 function read_transfer_matrix_metadata(path::String)
-    load(joinpath(path, "METADATA.jld2"), "storage", "metadata", "lmax", "mmax")
+    jldopen(joinpath(storage.path, "METADATA.jld2"), mode[r]..., IOStream) do file
+        return file["storage"], file["metadata"], file["lmax"], file["mmax"]
+    end
 end
 
 doc"""

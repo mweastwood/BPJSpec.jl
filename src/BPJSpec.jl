@@ -57,7 +57,7 @@ using CasaCore.Measures
 using Cosmology
 using Cubature
 using FastTransforms
-using FileIO, JLD2
+using JLD2
 using ProgressMeter
 using StaticArrays
 
@@ -85,6 +85,9 @@ two(m) = ifelse(m != 0, 2, 1)
 
 "Convert and strip units from the given quantity."
 u(units, quantity) = ustrip(uconvert(units, quantity))
+
+@enum Mode r a w
+const mode = Dict(r => (false, false, false), a => (true, true, false), w => (true, true, true))
 
 include("parallel.jl")
 include("spherical-harmonics.jl")
