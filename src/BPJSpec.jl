@@ -43,9 +43,8 @@ export NoFile, SingleFile, MultipleFiles
 export SimpleBlockMatrix, SimpleBlockVector
 export MBlockMatrix, FBlockMatrix, MFBlockMatrix
 export MBlockVector, FBlockVector, MFBlockVector
-export TransferMatrix, NoiseCovarianceMatrix, AngularCovarianceMatrix
-export MModes
-export compute!, cache!, flush!
+export TransferMatrix, NoiseCovarianceMatrix, AngularCovarianceMatrix, MModes
+export ProgressBar, compute!, cache!, flush!
 
 using Unitful, UnitfulAstro # Travis CI fails with "invalid age range update" unless this is first
 
@@ -111,6 +110,8 @@ include("matrices/noise-covariance-matrix.jl")
 include("matrices/angular-covariance-matrix.jl")
 # Specialized block vectors
 include("matrices/m-modes.jl")
+include("matrices/angular-block-vector.jl")
+include("matrices/random-vector.jl")
 
 #include("vectors/angular-block-vector.jl")
 #include("vectors/random-angular-block-vector.jl")
@@ -124,6 +125,8 @@ include("algorithms/karhunen-loeve-transforms.jl")
 include("algorithms/tikhonov-regularization.jl")
 
 include("quadratic-estimator/fisher-information.jl")
+include("quadratic-estimator/noise-bias.jl")
+include("quadratic-estimator/q-estimator.jl")
 include("quadratic-estimator/mixing-matrix.jl")
 
 end

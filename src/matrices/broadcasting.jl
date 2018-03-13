@@ -24,14 +24,14 @@ unwrap(x) = x
 const BroadcastTypes = Union{ProgressBar, AbstractBlockMatrix}
 
 function Base.broadcast!(f, output::BroadcastTypes, args...)
-    internal_broadcast!(f, output, unwrap.(args))
+    internal_broadcast!(f, output, unwrap.(args)...)
 end
 
 function internal_broadcast!(f, output::ProgressBar, args...)
-    internal_broadcast!(f, unwrap(output), args, progress=true)
+    internal_broadcast!(f, unwrap(output), args..., progress=true)
 end
 
-function internal_broadcast!(f, output, args; progress=false)
+function internal_broadcast!(f, output, args...; progress=false)
     distribute = distribute_write(output) && all(distribute_read.(args))
     if distribute
         return distributed_broadcast!(f, output, args, progress=progress)

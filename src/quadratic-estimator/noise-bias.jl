@@ -13,59 +13,44 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-function fisher_information(transfermatrix, covariancematrix, basis; iterations=10)
+function noise_bias(transfermatrix, covariancematrix, basis; iterations=10)
     N = length(basis)
     M = length(workers())
-    F = zeros(N, N)
+    b = zeros(N)
     @sync for worker in workers()
         @async begin
-            F′ = remotecall_fetch(_fisher, worker, transfermatrix, covariancematrix,
+            b′ = remotecall_fetch(_bias, worker, transfermatrix, covariancematrix,
                                   basis, cld(iterations, M))
-            F .+= F′
+            b .+= b′
         end
     end
-    F ./= M
-    F
+    b ./= M
+    b
 end
 
-function _fisher(transfermatrix, covariancematrix, basis, iterations)
+function _bias(transfermatrix, covariancematrix, basis, iterations)
     cache!(transfermatrix)
     cache!(covariancematrix)
     foreach(cache!, basis)
-    compute_fisher(transfermatrix, covariancematrix, basis, iterations)
+    compute_bias(transfermatrix, covariancematrix, basis, iterations)
 end
 
-function compute_fisher(B, C, basis, iterations)
+function compute_bias(B, C, basis, iterations)
     N = length(basis)
     lmax = mmax = B.mmax
 
-    v   = RandomVector(C)
-    Bv  = create(MBlockVector, mmax)
-    CBv = create(AngularBlockVector, lmax, mmax)
+    w   = WhiteNoiseVector()
+    Bw  = create(MBlockVector, mmax)
+    CBw = create(AngularBlockVector, lmax, mmax)
 
-    q  = zeros(N)
-    μ  = zeros(N)
-    σ² = zeros(N, N)
+    b = zeros(N)
+    q = zeros(N)
 
     for iter = 1:iterations
-        fisher_iteration!(q, B, C, basis, v, Bv, CBv)
-        μ  .+= q
-        σ² .+= q*q'
+        fisher_iteration!(q, B, C, basis, w, Bw, CBw)
+        b .+= q
     end
-    μ  ./= iterations
-    σ² ./= iterations
-    σ² .- μ*μ'
-end
-
-function fisher_iteration!(q, B, C, basis, v, Bv, CBv)
-    N = length(basis)
-    @. Bv = T(B) * (C \ v)
-    Bv′ = AngularBlockVector(Bv)
-    for a = 1:N
-        Ca = basis[a]
-        @. CBv = Ca * Bv′
-        q[a] = real(dot(CBv, Bv′))
-    end
-    q
+    b ./= iterations
+    b
 end
 

@@ -86,6 +86,9 @@ Base.setindex!(matrix::AbstractBlockMatrix, block, idx::Int) = set!(matrix, bloc
 Base.setindex!(matrix::AbstractBlockMatrix, block, idx::Int, jdx::Int) =
     set!(matrix, block, idx, jdx)
 
+@inline Base.getindex(matrix::AbstractBlockMatrix, idx::Tuple) = matrix[idx...]
+@inline Base.setindex!(matrix::AbstractBlockMatrix, block, idx::Tuple) = matrix[idx...] = block
+
 function linear_index(matrix::M, tuple::Tuple) where M<:AbstractBlockMatrix
     linear_index(matrix, tuple[1], tuple[2])
 end
@@ -125,17 +128,17 @@ function set!(matrix::AbstractBlockMatrix{B, 2}, block::B, idx, jdx) where B
 end
 
 function cache!(matrix::AbstractBlockMatrix)
-    set!(matrix.cache)
     for idx in indices(matrix)
-        matrix.cache[linear_index(matrix, idx)] = matrix.storage[idx]
+        matrix.cache[linear_index(matrix, idx)] = matrix[idx]
     end
+    set!(matrix.cache)
     matrix
 end
 
 function flush!(matrix::AbstractBlockMatrix)
     unset!(matrix.cache)
     for idx in indices(matrix)
-        matrix.storage[idx] = matrix.cache[linear_index(matrix, idx)]
+        matrix[idx] = matrix.cache[linear_index(matrix, idx)]
     end
     matrix
 end

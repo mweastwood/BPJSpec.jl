@@ -13,36 +13,39 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-struct AngularBlockVector <: BlockVector
+struct AngularBlockVector{S} <: AbstractBlockMatrix{Vector{Complex128}, 2}
+    storage :: S
+    cache   :: Cache{Vector{Complex128}}
     lmax :: Int
     mmax :: Int
-    blocks :: Matrix{Vector{Complex128}}
 end
-
-function AngularBlockVector(lmax, mmax)
-    blocks = Array{Vector{Complex128}}(lmax+1, mmax+1)
-    AngularBlockVector(lmax, mmax, blocks)
+function AngularBlockVector(storage::S, cache, lmax, mmax) where S
+    AngularBlockVector{S}(storage, cache, lmax, mmax)
 end
+metadata_fields(matrix::AngularBlockVector) = (matrix.lmax, matrix.mmax)
+nblocks(::Type{<:AngularBlockVector}, lmax, mmax) = ((2lmax + 2 - mmax) * (mmax + 1)) ÷ 2
+linear_index(matrix::AngularBlockVector, l, m) = (m * (2matrix.lmax - m + 3)) ÷ 2 + l - m + 1
+indices(matrix::AngularBlockVector) = ((l, m) for m = 0:matrix.mmax for l = m:matrix.lmax)
 
-function AngularBlockVector(input::SpectralBlockVector)
-    lmax = mmax = input.mmax
-    Nfreq = length(input.frequencies)
-    output = AngularBlockVector(lmax, mmax)
-    for m = 0:mmax, l = m:lmax
-        output_block = zeros(Complex128, Nfreq)
-        for β = 1:Nfreq
-            input_block = input[m, β]
-            output_block[β] = input_block[l-m+1]
-        end
-        output[l, m] = output_block
-    end
-    output
-end
+#function AngularBlockVector(input::SpectralBlockVector)
+#    lmax = mmax = input.mmax
+#    Nfreq = length(input.frequencies)
+#    output = AngularBlockVector(lmax, mmax)
+#    for m = 0:mmax, l = m:lmax
+#        output_block = zeros(Complex128, Nfreq)
+#        for β = 1:Nfreq
+#            input_block = input[m, β]
+#            output_block[β] = input_block[l-m+1]
+#        end
+#        output[l, m] = output_block
+#    end
+#    output
+#end
 
-function AngularBlockVector(input::BlockDiagonalVector)
+function AngularBlockVector(input::MBlockVector)
     lmax = mmax = input.mmax
     Nfreq = length(input[0]) ÷ (lmax+1)
-    output = AngularBlockVector(lmax, mmax)
+    output = create(AngularBlockVector, lmax, mmax)
     for m = 0:mmax, l = m:lmax
         output_block = zeros(Complex128, Nfreq)
         for β = 1:Nfreq
@@ -54,14 +57,8 @@ function AngularBlockVector(input::BlockDiagonalVector)
     output
 end
 
-indices(matrix::AngularBlockVector) =
-    [(l, m) for m = 0:matrix.mmax for l = m:matrix.lmax]
-
-Base.getindex(vector::AngularBlockVector, l, m) = vector.blocks[l+1, m+1]
-Base.setindex!(vector::AngularBlockVector, block, l, m) = vector.blocks[l+1, m+1] = block
-
 function Base.dot(lhs::AngularBlockVector, rhs::AngularBlockVector)
-    output = complex(0.0)
+    output = zero(Complex128)
     for m = 0:lhs.mmax, l = m:lhs.lmax
         output += dot(lhs[l, m], rhs[l, m])
     end

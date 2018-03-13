@@ -13,45 +13,50 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-function kltransforms(transfermatrix, noisematrix, foregroundmatrix, signalmatrix; threshold=0.1)
-    mmax = transfermatrix.mmax
+function kltransforms(mmodes, transfermatrix, noisematrix,
+                      foregroundmatrix, signalmatrix,
+                      observed_foregroundmatrix_storage = NoFile(),
+                      observed_signalmatrix_storage     = NoFile(),
+                      foreground_filter_storage         = NoFile(),
+                      filtered_signalmatrix_storage     = NoFile(),
+                      filtered_noisematrix_storage      = NoFile(),
+                      whitening_matrix_storage          = NoFile(),
+                      mmodes_storage                    = NoFile(),
+                      transfermatrix_storage            = NoFile(),
+                      covariancematrix_storage          = NoFile();
+                      threshold = 0.1)
+    mmax = mmodes.mmax
 
     # Run the sky covariances through the interferometer's response.
-    file = joinpath(dirname(foregroundmatrix.path), "covariance-matrix-fiducial-foregrounds-observed")
-    F = DenseBlockDiagonalMatrix(file, mmax, progressbar=true, distribute=true)
-    file = joinpath(dirname(signalmatrix.path), "covariance-matrix-fiducial-signal-observed")
-    S = DenseBlockDiagonalMatrix(file, mmax, progressbar=true, distribute=true)
+    F = create(MBlockMatrix, observed_foregroundmatrix_storage, mmax) |> ProgressBar
+    S = create(MBlockMatrix, observed_signalmatrix_storage,     mmax) |> ProgressBar
     @. F = fix(transfermatrix * foregroundmatrix * T(transfermatrix))
     @. S = fix(transfermatrix *     signalmatrix * T(transfermatrix))
 
     # Compute the foreground filter...
-    file = joinpath(dirname(transfermatrix.path), "foreground-filter")
-    V = DenseBlockDiagonalMatrix(file, mmax, progressbar=true, distribute=true)
+    V = create(MBlockMatrix, foreground_filter_storage, mmax) |> ProgressBar
     construct_filter′(F, S) = construct_filter(F, S, threshold)
     @. V = construct_filter′(F, S)
 
     # ...and apply that filter.
-    file = joinpath(dirname(signalmatrix.path), "covariance-matrix-fiducial-signal-filtered")
-    S′ = DenseBlockDiagonalMatrix(file, mmax, progressbar=true, distribute=true)
-    file = joinpath(dirname(noisematrix.path), "covariance-matrix-noise-filtered")
-    N′ = DenseBlockDiagonalMatrix(file, mmax, progressbar=true, distribute=true)
+    S′ = create(MBlockMatrix, filtered_signalmatrix_storage, mmax) |> ProgressBar
+    N′ = create(MBlockMatrix, filtered_noisematrix_storage,  mmax) |> ProgressBar
     @. S′ = fix(T(V) * S * V)
     @. N′ = fix(T(V) * noisematrix * V) + H(T(V) * F * V)
 
     # Whiten the noise.
-    file = joinpath(dirname(transfermatrix.path), "whitening-matrix")
-    W = DenseBlockDiagonalMatrix(file, mmax, progressbar=true, distribute=true)
+    W = create(MBlockMatrix, whitening_matrix_storage, mmax) |> ProgressBar
     @. W = construct_whiten(S′, N′)
 
-    # Compute the final transfer matrix and covariance matrix.
-    file = joinpath(dirname(transfermatrix.path), "transfer-matrix-final")
-    B = DenseBlockDiagonalMatrix(file, mmax, progressbar=true, distribute=true)
-    file = joinpath(dirname(transfermatrix.path), "covariance-matrix-final")
-    C = DenseBlockDiagonalMatrix(file, mmax, progressbar=true, distribute=true)
+    # Compute the final m-modes, transfer matrix, and covariance matrix.
+    v = create(MBlockVector, mmodes_storage,           mmax) |> ProgressBar
+    B = create(MBlockMatrix, transfermatrix_storage,   mmax) |> ProgressBar
+    C = create(MBlockMatrix, covariancematrix_storage, mmax) |> ProgressBar
+    @. v = T(W) * (T(V) * mmodes)
     @. B = T(W) * (T(V) * transfermatrix)
     @. C = H(T(W) * S′ * W) + H(T(W) * N′ * W)
 
-    B, C
+    unwrap(v), unwrap(B), unwrap(C)
 end
 
 function construct_filter(F, S, threshold)

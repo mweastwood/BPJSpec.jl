@@ -26,6 +26,7 @@ Base.convert(::Type{L}, l::Int) = L(l)
 Base.convert(::Type{Int}, l::L) = l.l
 Base.promote_rule(::Type{L}, ::Type{Int}) = L
 Base.oneunit(::L) = L(1)
+Base.:<(lhs::L, rhs::L) = lhs.l < rhs.l
 Base.:≤(lhs::L, rhs::L) = lhs.l ≤ rhs.l
 Base.:+(lhs::L, rhs::L) = L(lhs.l + rhs.l)
 Base.:-(lhs::L, rhs::L) = L(lhs.l - rhs.l)
@@ -46,12 +47,12 @@ nblocks(::Type{<:AngularCovarianceMatrix}, lmax, frequencies, bandwidth) = lmax+
 linear_index(matrix::AngularCovarianceMatrix, l) = l+1
 indices(matrix::AngularCovarianceMatrix) = L(0):L(matrix.lmax)
 
-Base.getindex(matrix::AngularCovarianceMatrix, l::L) = get(matrix, l)
+Base.getindex(matrix::AngularCovarianceMatrix, l::L) = get(matrix, l.l)
 Base.getindex(matrix::AngularCovarianceMatrix, l::Int, m::Int) = matrix[L(l)]
-Base.setindex!(matrix::AngularCovarianceMatrix, block, l::L) = set!(matrix, block, l)
+Base.setindex!(matrix::AngularCovarianceMatrix, block, l::L) = set!(matrix, block, l.l)
 
-function Base.getindex(matrix::AngularCovarianceMatrix, m)
-    blocks = [matrix[l, m] for l = m:lmax(matrix)]
+function Base.getindex(matrix::AngularCovarianceMatrix, m::Int)
+    blocks = [matrix[l] for l = L(m):L(matrix.lmax)]
     Nfreq  = length(matrix.frequencies)
     Nl     = matrix.lmax-m+1
     Ntotal = Nfreq*Nl

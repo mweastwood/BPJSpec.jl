@@ -13,23 +13,13 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-struct RandomVector <: BlockVector
-    mmax :: Int
-    covariance :: BlockDiagonalMatrix
-end
-
-function RandomVector(covariance::BlockDiagonalMatrix)
-    mmax = covariance.mmax
-    RandomVector(mmax, covariance)
-end
-
-indices(vector::RandomVector) = collect(0:vector.mmax)
-
-function Base.getindex(vector::RandomVector, m)
-    C = vector.covariance[m]
-    N = size(C, 1)
-    U = chol(C)
-    x = complex.(randn(N), randn(N)) ./ √2
-    U'*x # random variable with the correct covariance
+function q_estimator(mmodes, transfermatrix, covariancematrix, basis)
+    N = length(basis)
+    lmax = mmax = mmodes.mmax
+    q = zeros(N)
+    Bv  = create(MBlockVector, mmax)
+    CBv = create(AngularBlockVector, lmax, mmax)
+    fisher_iteration!(q, transfermatrix, covariancematrix, basis, mmodes, Bv, CBv)
+    q
 end
 
