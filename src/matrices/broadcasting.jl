@@ -68,38 +68,38 @@ function distributed_broadcast!(f, output, args; progress=false)
     output
 end
 
-#function multi_broadcast!(f, outputs, args)
-#    queue = indices(outputs[1])
-#    pool  = CachingPool(workers())
-#    if progressbar(outputs[1])
-#        lck = ReentrantLock()
-#        prg = Progress(length(queue))
-#        increment() = (lock(lck); next!(prg); unlock(lck))
-#    end
-#    @sync for worker in workers()
-#        @async while length(queue) > 0
-#            indices = shift!(queue)
-#            remotecall_fetch(just_do_it!, pool, f, outputs, args, indices)
-#            progressbar(outputs[1]) && increment()
-#        end
-#    end
-#    outputs
-#end
+function multi_broadcast!(f, outputs, args; progress=false)
+    queue = collect(indices(outputs[1]))
+    pool  = CachingPool(workers())
+    if progress
+        lck = ReentrantLock()
+        prg = Progress(length(queue))
+        increment() = (lock(lck); next!(prg); unlock(lck))
+    end
+    @sync for worker in workers()
+        @async while length(queue) > 0
+            indices = shift!(queue)
+            remotecall_fetch(just_do_it!, pool, f, outputs, args, indices)
+            progress && increment()
+        end
+    end
+    outputs
+end
 
 function just_do_it!(f, output, args, indices) # (c) Nike
     output[indices...] = f(getindex.(args, indices...)...)
 end
 
-#function just_do_it!(f, outputs::Tuple, args, indices) # (c) Nike
-#    local results
-#    try
-#        results = f(getindex.(args, indices...)...)
-#    catch exception
-#        @show indices
-#        rethrow(exception)
-#    end
-#    for idx = 1:length(results)
-#        outputs[idx][indices...] = results[idx]
-#    end
-#end
+function just_do_it!(f, outputs::Tuple, args, indices) # (c) Nike
+    local results
+    try
+        results = f(getindex.(args, indices...)...)
+    catch exception
+        @show indices
+        rethrow(exception)
+    end
+    for idx = 1:length(results)
+        outputs[idx][indices...] = results[idx]
+    end
+end
 

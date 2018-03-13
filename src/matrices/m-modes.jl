@@ -13,27 +13,33 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-"""
-    struct MModes{S} <: AbstractBlockMatrix
+doc"""
+    struct MModes{S} <: AbstractBlockMatrix{Vector{Complex128}, 2}
 
-This type represents the m-modes measured by the interferometer.
+This type represents the $m$-modes measured by the interferometer.
 
 # Fields
 
-* `matrix` is the `BlockMatrix` backend that stores the m-modes
+* `storage` contains instructions on how to read the m-modes from disk
+* `cache` is used if we want to keep the $m$-modes in memory
+* `mmax` is the largest value of the $m$ quantum number
+* `frequencies` is the list of frequencies
+* `bandwidth` is the bandwidth associated with each frequency channel
 """
-struct MModes{S} <: AbstractBlockMatrix
-    matrix :: BlockMatrix{Vector{Complex128}, 2, MMaxFrequencies, S}
+struct MModes{S} <: AbstractBlockMatrix{Vector{Complex128}, 2}
+    storage :: S
+    cache   :: Cache{Vector{Complex128}}
+    mmax    :: Int
+    frequencies :: Vector{typeof(1.0u"Hz")}
+    bandwidth   :: Vector{typeof(1.0u"Hz")}
 end
-function MModes(storage::Mechanism, mmax, frequencies, bandwidth)
-    metadata = MMaxFrequencies(mmax, frequencies, bandwidth)
-    matrix = BlockMatrix{Vector{Complex128}, 2}(storage, metadata)
-    MModes(matrix)
+function MModes(storage::S, cache, mmax, frequencies, bandwidth) where S
+    MModes{S}(storage, cache, mmax, frequencies, bandwidth)
 end
-MModes(path::String) = MModes(BlockMatrix{Vector{Complex128}, 2}(path))
-
-Base.getindex(vector::MModes, m, β) = vector.matrix[m+1, β]
-Base.setindex!(vector::MModes, block, m, β) = vector.matrix[m+1, β] = block
+metadata_fields(mmodes::MModes) = (mmodes.mmax, mmodes.frequencies, mmodes.bandwidth)
+nblocks(::Type{<:MModes}, mmax, frequencies, bandwidth) = (mmax+1)*length(frequencies)
+linear_index(mmodes::MModes, m, β) = (mmodes.mmax+1)*(β-1) + (m+1)
+indices(mmodes::MModes) = ((m, β) for β = 1:length(mmodes.frequencies) for m = 0:mmodes.mmax)
 
 "Compute m-modes from two dimensional matrix of visibilities (time × baseline)."
 function compute!(mmodes::MModes, visibilities::Matrix{Complex128}, β)
@@ -58,7 +64,7 @@ function store!(mmodes, transformed_visibilities, β)
 
     # m > 0
     block = zeros(Complex128, 2Nbase)
-    for m = 1:mmax(mmodes)
+    for m = 1:mmodes.mmax
         for α = 1:Nbase
             α1 = 2α-1 # positive m
             α2 = 2α-0 # negative m

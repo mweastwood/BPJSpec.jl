@@ -4,7 +4,7 @@
     frequencies = [74.0u"MHz", 100.0u"MHz"]
     bandwidth = [24u"kHz", 1.0u"MHz"]
 
-    mmodes = MModes(NoFile(), mmax, frequencies, bandwidth)
+    mmodes = BPJSpec.create(MModes, mmax, frequencies, bandwidth)
 
     ϕ = linspace(0, 2π, 6629)[1:6628]
     X = reshape(cis.(ϕ) .+ 1, 6628, 1)

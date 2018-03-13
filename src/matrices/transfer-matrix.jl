@@ -86,33 +86,8 @@ function Base.setindex!(storage::HierarchicalStorage, block, lmax, m, β)
     block
 end
 
-function rm_old_blocks!(storage::HierarchicalStorage, mmax, Nfreq)
-    for β = 1:Nfreq, m = 0:mmax
-        dirname    = @sprintf("%04d",      β)
-        filename   = @sprintf("%04d.jld2", m)
-        path = joinpath(storage.path, dirname, filename)
-        isfile(path) && rm(path)
-    end
-end
-
-function write_metadata(storage::HierarchicalStorage, metadata, lmax, mmax)
-    isdir(storage.path) || mkpath(storage.path)
-    jldopen(joinpath(storage.path, "METADATA.jld2"), mode[w]..., IOStream) do file
-        file["storage"]  = storage
-        file["metadata"] = metadata
-        file["lmax"] = lmax
-        file["mmax"] = mmax
-    end
-end
-
-function read_transfer_matrix_metadata(path::String)
-    jldopen(joinpath(storage.path, "METADATA.jld2"), mode[r]..., IOStream) do file
-        return file["storage"], file["metadata"], file["lmax"], file["mmax"]
-    end
-end
-
 doc"""
-    struct TransferMatrix <: AbstractBlockMatrix
+    struct TransferMatrix <: AbstractBlockMatrix{Matrix{Complex128}, 2}
 
 This type represents the transfer matrix of an interferometer. This matrix effectively describes how
 an interferometer responds to the sky, including the antenna primary beam, bandpass, and baseline
@@ -123,40 +98,42 @@ by separating long baselines from short baselines.
 
 # Fields
 
-* `metadata` stores the interferometer's metadata
 * `storage` contains instructions on how to read the matrix from disk
+* `cache` is used if we want to keep the matrix in memory
+* `metadata` stores the interferometer's metadata
 * `lmax` is the largest value of the $l$ quantum number used by the matrix
 * `mmax` is the largest value of the $m$ quantum number used by the matrix
 """
-struct TransferMatrix <: AbstractBlockMatrix
-    metadata :: Metadata
+struct TransferMatrix <: AbstractBlockMatrix{Matrix{Complex128}, 2}
     storage  :: HierarchicalStorage
+    cache    :: Cache{Matrix{Complex128}}
+    metadata :: Metadata
     lmax :: Int
     mmax :: Int
 end
+metadata_fields(matrix::TransferMatrix) = (matrix.metadata, matrix.lmax, matrix.mmax)
+nblocks(::Type{TransferMatrix}, metadata, lmax, mmax) = (mmax+1)*length(metadata.frequencies)
+linear_index(matrix::TransferMatrix, m, β) = (marxi.mmax+1)*(β-1) + (m+1)
+indices(matrix::TransferMatrix) = ((m, β) for β = 1:length(array.frequencies) for m = 0:array.mmax)
 
-function TransferMatrix(path::String, metadata::Metadata, write=true;
-                        lmax=maximum(maximum_multipole_moment(metadata))+1)
+function create(::Type{TransferMatrix}, path::String, metadata::Metadata;
+                lmax=maximum(maximum_multipole_moment(metadata))+1, rm=false)
     hierarchy = compute_baseline_hierarchy(metadata, lmax)
     storage   = HierarchicalStorage(path, hierarchy)
     mmax = lmax = maximum(hierarchy.divisions)
-    rm_old_blocks!(storage, mmax, length(metadata.frequencies))
-    write && write_metadata(storage, metadata, lmax, mmax)
-    TransferMatrix(metadata, storage, lmax, mmax)
+    output = construct(TransferMatrix, storage, metadata, lmax, mmax)
+    rm && rm_old_blocks!(storage, mmax, length(metadata.frequencies))
+    write_metadata(storage, MatrixMetadata(output))
+    output
 end
 
-function TransferMatrix(path)
-    storage, metadata, lmax, mmax = read_transfer_matrix_metadata(path)
-    TransferMatrix(metadata, storage, lmax, mmax)
-end
-
-Base.getindex(transfermatrix::TransferMatrix, m, β) = transfermatrix.storage[m, β]
-function indices(transfermatrix::TransferMatrix)
-    ((m, β) for β = 1:length(transfermatrix.metadata.frequencies) for m = 0:transfermatrix.mmax)
-end
-
-function Base.show(io::IO, transfermatrix::TransferMatrix)
-    @printf(io, "TransferMatrix(%s)", transfermatrix.storage)
+function rm_old_blocks!(storage::HierarchicalStorage, mmax, Nfreq)
+    for β = 1:Nfreq, m = 0:mmax
+        dirname    = @sprintf("%04d",      β)
+        filename   = @sprintf("%04d.jld2", m)
+        path = joinpath(storage.path, dirname, filename)
+        isfile(path) && rm(path)
+    end
 end
 
 function compute!(transfermatrix::TransferMatrix, beam; progress=false)

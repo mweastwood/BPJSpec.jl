@@ -21,30 +21,27 @@
 # disk space to store. Therefore we will compute the SVD, compress both the transfer matrix and the
 # m-modes before discarding the SVD.
 
-function full_rank_compress(transfermatrix, noisematrix)
-    path = dirname(transfermatrix.path)
-    mmax = transfermatrix.mmax
-    frequencies = transfermatrix.frequencies
-    bandwidth   = transfermatrix.bandwidth
+function full_rank_compress(input_mmodes, input_transfermatrix, input_noisematrix;
+                            mmodes_storage=NoFile(),
+                            transfermatrix_storage=NoFile(),
+                            noisematrix_storage=NoFile(),
+                            progress=false)
 
-    suffix = "-compressed"
-    file = joinpath(path, "transfer-matrix"*suffix)
-    output_transfermatrix = TransferMatrix(file, mmax, frequencies, bandwidth,
-                                           progressbar=true, distribute=true)
-
-    file = joinpath(path, "covariance-matrix-noise"*suffix)
-    output_noisematrix = DenseSpectralBlockDiagonalMatrix(file, mmax, frequencies, bandwidth,
-                                                          progressbar=true, distribute=true)
+    output_mmodes         = similar(input_mmodes,                 mmodes_storage)
+    output_transfermatrix = similar(input_transfermatrix, transfermatrix_storage)
+    output_noisematrix    = create(MFBlockMatrix, noisematrix_storage, input_noisematrix.mmax,
+                                   input_noisematrix.frequencies, input_noisematrix.bandwidth)
 
     multi_broadcast!(_full_rank_compress,
-                     (output_transfermatrix, output_noisematrix),
-                     (transfermatrix, noisematrix))
+                     (output_mmodes, output_transfermatrix, output_noisematrix),
+                     (input_mmodes, input_transfermatrix, input_noisematrix), progress=progress)
 end
 
-function _full_rank_compress(B, N)
+function _full_rank_compress(v, B, N)
     F = svdfact(B)
+    v′ = F[:U]'*v
     B′ = F[:U]'*B
     N′ = fix(F[:U]'*N*F[:U])
-    B′, N′
+    v′, B′, N′
 end
 

@@ -16,6 +16,7 @@
 abstract type Mechanism end
 
 struct NoFile <: Mechanism end
+NoFile(path) = NoFile()
 Base.show(io::IO, ::NoFile) = print(io, "<no file>")
 distribute_write(::NoFile) = false
 distribute_read(::NoFile) = false
@@ -41,6 +42,8 @@ function write_metadata(storage::Mechanism, metadata)
         file["metadata"] = metadata
     end
 end
+
+write_metadata(storage::NoFile, metadata) = nothing
 
 function read_metadata(path::String)
     jldopen(joinpath(path, "METADATA.jld2"), mode[r]..., IOStream) do file
@@ -122,29 +125,18 @@ end
 @inline Base.getindex(storage::Mechanism, idx::Tuple) = storage[idx...]
 @inline Base.setindex!(storage::Mechanism, block, idx::Tuple) = storage[idx...] = block
 
-struct Cache{T, N}
+struct Cache{T}
     used  :: Ref{Bool}
-    cache :: Array{T, N}
+    cache :: Vector{T}
 end
 
 function Cache{T}(length::Int) where T
-    Cache{T, 1}(Ref(false), Vector{T}(length))
+    Cache{T}(Ref(false), Vector{T}(length))
 end
 
-function Cache{T}(x::Int, y::Int) where T
-    Cache{T, 2}(Ref(false), Matrix{T}(x, y))
-end
-
-function Cache{T}(tuple::Tuple) where T
-    Cache{T}(tuple...)
-end
-
+Base.length(cache::Cache) = length(cache.cache)
 Base.getindex(cache::Cache, idx) = cache.cache[idx]
 Base.setindex!(cache::Cache, X, idx) = cache.cache[idx] = copy(X)
-Base.getindex(cache::Cache, idx, jdx) = cache.cache[idx, jdx]
-Base.setindex!(cache::Cache, X, idx, jdx) = cache.cache[idx, jdx] = copy(X)
-@inline Base.getindex(cache::Cache, idx::Tuple) = cache[idx...]
-@inline Base.setindex!(cache::Cache, X, idx::Tuple) = cache[idx...] = X
 used(cache::Cache) = cache.used[]
 set!(cache::Cache) = (cache.used[] = true; cache)
 unset!(cache::Cache) = (cache.used[] = false; cache)

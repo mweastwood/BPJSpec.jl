@@ -13,21 +13,6 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-struct AngularCovarianceMetadata <: MatrixMetadata
-    lmax        :: Int
-    frequencies :: Vector{typeof(1.0*u"Hz")}
-    bandwidth   :: Vector{typeof(1.0*u"Hz")}
-end
-function Base.show(io::IO, metadata::AngularCovarianceMetadata)
-    @printf(io, "{lmax: %d, ν: %.3f MHz..%.3f MHz, Δν: %.3f MHz total}",
-            metadata.lmax,
-            ustrip(uconvert(u"MHz", metadata.frequencies[1])),
-            ustrip(uconvert(u"MHz", metadata.frequencies[end])),
-            ustrip(uconvert(u"MHz", sum(metadata.bandwidth))))
-end
-indices(metadata::AngularCovarianceMetadata) = L(0):L(metadata.lmax)
-number_of_blocks(metadata::AngularCovarianceMetadata) = metadata.lmax+1
-
 """
 Generally speaking we want to index all of our matrices by the integer m. However, our angular
 covariance matrices are block-diagonal in l, which is also an integer. We will therefore use this
@@ -45,29 +30,33 @@ Base.:≤(lhs::L, rhs::L) = lhs.l ≤ rhs.l
 Base.:+(lhs::L, rhs::L) = L(lhs.l + rhs.l)
 Base.:-(lhs::L, rhs::L) = L(lhs.l - rhs.l)
 
-struct AngularCovarianceMatrix{S} <: AbstractBlockMatrix
-    matrix :: BlockMatrix{Matrix{Float64}, 1, AngularCovarianceMetadata, S}
+struct AngularCovarianceMatrix{S} <: AbstractBlockMatrix{Matrix{Float64}, 1}
+    storage :: S
+    cache   :: Cache{Matrix{Float64}}
+    lmax    :: Int
+    frequencies :: Vector{typeof(1.0u"Hz")}
+    bandwidth   :: Vector{typeof(1.0u"Hz")}
 end
-function AngularCovarianceMatrix(storage::Mechanism, mmax, frequencies, bandwidth)
-    metadata = AngularCovarianceMetadata(mmax, frequencies, bandwidth)
-    matrix = BlockMatrix{Matrix{Float64}, 1}(storage, metadata)
-    AngularCovarianceMatrix(matrix)
+function AngularCovarianceMatrix(storage::S, cache, lmax, frequencies, bandwidth) where S
+    AngularCovarianceMatrix{S}(storage, cache, lmax, frequencies, bandwidth)
 end
-function AngularCovarianceMatrix(path::String)
-    AngularCovarianceMatrix(BlockMatrix{Matrix{Float64}, 1}(path))
-end
+metadata_fields(matrix::AngularCovarianceMatrix) =
+    (matrix.lmax, matrix.frequencies, matrix.bandwidth)
+nblocks(::Type{<:AngularCovarianceMatrix}, lmax, frequencies, bandwidth) = lmax+1
+linear_index(matrix::AngularCovarianceMatrix, l) = l+1
+indices(matrix::AngularCovarianceMatrix) = L(0):L(matrix.lmax)
 
-Base.getindex(matrix::AngularCovarianceMatrix, l::L) = matrix.matrix[l+1]
-Base.getindex(matrix::AngularCovarianceMatrix, l, m) = matrix.matrix[l+1]
-Base.setindex!(matrix::AngularCovarianceMatrix, block, l) = matrix.matrix[l+1] = block
+Base.getindex(matrix::AngularCovarianceMatrix, l::L) = get(matrix, l)
+Base.getindex(matrix::AngularCovarianceMatrix, l::Int, m::Int) = matrix[L(l)]
+Base.setindex!(matrix::AngularCovarianceMatrix, block, l::L) = set!(matrix, block, l)
 
 function Base.getindex(matrix::AngularCovarianceMatrix, m)
     blocks = [matrix[l, m] for l = m:lmax(matrix)]
-    Nfreq  = length(frequencies(matrix))
-    Nl     = lmax(matrix)-m+1
+    Nfreq  = length(matrix.frequencies)
+    Nl     = matrix.lmax-m+1
     Ntotal = Nfreq*Nl
     output = zeros(Float64, Ntotal, Ntotal)
-    for l = m:lmax(matrix)
+    for l = m:matrix.lmax
         block = blocks[l-m+1]
         for β1 = 1:Nfreq, β2 = 1:Nfreq
             idx1 = (β1-1)*Nl + l - m + 1
@@ -79,12 +68,12 @@ function Base.getindex(matrix::AngularCovarianceMatrix, m)
 end
 
 function compute!(matrix::AngularCovarianceMatrix, component::SkyComponent; progress=false)
-    ν  = frequencies(matrix)
-    Δν =   bandwidth(matrix)
+    ν  = matrix.frequencies
+    Δν = matrix.bandwidth
     Nfreq = length(ν)
     args  = precomputation(component)
-    progress && (prg = Progress(lmax(matrix)+1))
-    for l = 0:lmax(matrix)
+    progress && (prg = Progress(matrix.lmax+1))
+    for l = 0:matrix.lmax
         block = zeros(Float64, Nfreq, Nfreq)
         for β1 = 1:Nfreq
             ν1  =  ν[β1]

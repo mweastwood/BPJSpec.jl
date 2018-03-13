@@ -13,9 +13,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-function average_frequency_channels(input_matrix, Navg; output=NoFile(), progress=false)
-    ν = frequencies(input_matrix)
-    Δν = bandwidth(input_matrix)
+function average_frequency_channels(input, Navg; storage=NoFile(), progress=false)
+    ν, Δν = νΔν(input)
     Nfreq = length(ν)
 
     partition = collect(Iterators.partition(1:Nfreq, Navg))
@@ -31,9 +30,9 @@ function average_frequency_channels(input_matrix, Navg; output=NoFile(), progres
     end
 
     # Perform the averaging.
-    output_matrix = MFBlockMatrix(output, mmax(input_matrix), ν′, Δν′)
-    queue = collect(indices(output_matrix))
-    pool  = CachingPool(workers())
+    output = average_frequency_channels_output(input, storage, input.mmax, ν′, Δν′)
+    queue  = collect(indices(output))
+    pool   = CachingPool(workers())
     if progress
         lck = ReentrantLock()
         prg = Progress(length(queue))
@@ -43,24 +42,36 @@ function average_frequency_channels(input_matrix, Navg; output=NoFile(), progres
         @async while length(queue) > 0
             m, β = shift!(queue)
             remotecall_fetch(_average_frequency_channels, pool,
-                             input_matrix, output_matrix, m, β, partition[β])
+                             input, output, Δν, Δν′, m, β, partition[β])
             progress && increment()
         end
     end
-
-    output_matrix
+    output
 end
 
-function _average_frequency_channels(input, output, m, β, channels)
+function _average_frequency_channels(input, output, Δν, Δν′, m, β, channels)
     β′ = channels[1]
-    weight = u(NoUnits, bandwidth(input)[β′]/bandwidth(output)[β])
+    weight = u(NoUnits, Δν[β′]/Δν′[β])
     B = input[m, β′] .* weight
 
     for β′ in channels[2:end]
-        weight = u(NoUnits, bandwidth(input)[β′]/bandwidth(output)[β])
+        weight = u(NoUnits, Δν[β′]/Δν′[β])
         B .+= input[m, β′] .* weight
     end
 
     output[m, β] = B
+end
+
+νΔν(matrix::AbstractBlockMatrix) = matrix.frequencies, matrix.bandwidth
+νΔν(matrix::TransferMatrix) = matrix.metadata.frequencies, matrix.metadata.bandwidth
+
+function average_frequency_channels_output(input::AbstractBlockMatrix{<:Vector, 2},
+                                           storage, mmax, frequencies, bandwidth)
+    create(MFBlockVector, storage, mmax, frequencies, bandwidth)
+end
+
+function average_frequency_channels_output(input::AbstractBlockMatrix{<:Matrix, 2},
+                                           storage, mmax, frequencies, bandwidth)
+    create(MFBlockMatrix, storage, mmax, frequencies, bandwidth)
 end
 

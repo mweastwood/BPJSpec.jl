@@ -18,6 +18,6 @@ MModes
 ## Internals
 
 ```@docs
-BlockMatrix
+AbstractBlockMatrix
 ```
 

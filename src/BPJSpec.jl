@@ -40,16 +40,12 @@ module BPJSpec
 
 # Matrices
 export NoFile, SingleFile, MultipleFiles
-export SimpleBlockMatrix
+export SimpleBlockMatrix, SimpleBlockVector
 export MBlockMatrix, FBlockMatrix, MFBlockMatrix
 export MBlockVector, FBlockVector, MFBlockVector
 export TransferMatrix, NoiseCovarianceMatrix, AngularCovarianceMatrix
 export MModes
 export compute!, cache!, flush!
-
-# Vectors
-#export SpectralBlockVector
-#export MModes
 
 using Unitful, UnitfulAstro # Travis CI fails with "invalid age range update" unless this is first
 
@@ -105,22 +101,24 @@ include("sky/noise.jl")
 include("interferometer/metadata.jl")
 include("interferometer/baseline-hierarchy.jl")
 
-abstract type AbstractBlockMatrix end
-abstract type MatrixMetadata end
 include("matrices/storage-mechanisms.jl")
-include("matrices/block-matrix.jl")
-include("matrices/wrapper-matrices.jl")
+include("matrices/abstract-block-matrix.jl")
+include("matrices/concrete-block-matrices.jl")
 include("matrices/broadcasting.jl")
+# Specialized block matrices
 include("matrices/transfer-matrix.jl")
 include("matrices/noise-covariance-matrix.jl")
 include("matrices/angular-covariance-matrix.jl")
+# Specialized block vectors
 include("matrices/m-modes.jl")
 
 #include("vectors/angular-block-vector.jl")
 #include("vectors/random-angular-block-vector.jl")
 #include("vectors/white-noise-vector.jl")
 
+include("algorithms/permute-m-modes.jl")
 include("algorithms/average-frequency-channels.jl")
+include("algorithms/propagate-flags.jl")
 include("algorithms/full-rank-compress.jl")
 include("algorithms/karhunen-loeve-transforms.jl")
 include("algorithms/tikhonov-regularization.jl")

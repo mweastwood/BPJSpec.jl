@@ -28,13 +28,13 @@ const simple_beam_solid_angle = π
 
     # Construct a uniform sky and verify that the auto-correlation gets the correct amplitude.
     @testset "uniform sky" begin
-        transfermatrix = TransferMatrix(path, metadata)
+        transfermatrix = BPJSpec.create(TransferMatrix, path, metadata)
         try
             @test transfermatrix.storage.hierarchy.divisions == [0, 32]
             @test transfermatrix.storage.hierarchy.baselines == [[1, 2, 3, 4]]
-            BPJSpec.compute!(transfermatrix, simple_beam)
+            compute!(transfermatrix, simple_beam)
 
-            alm = MFBlockVector(NoFile(), transfermatrix.mmax, frequencies, bandwidth)
+            alm = BPJSpec.create(MFBlockVector, transfermatrix.mmax, frequencies, bandwidth)
             for β = 1:length(frequencies)
                 for m = 0:transfermatrix.mmax
                     block = zeros(Complex128, transfermatrix.lmax - m + 1)
@@ -45,7 +45,7 @@ const simple_beam_solid_angle = π
                 end
             end
 
-            mmodes = MFBlockVector(NoFile(), transfermatrix.mmax, frequencies, bandwidth)
+            mmodes = BPJSpec.create(MFBlockVector, transfermatrix.mmax, frequencies, bandwidth)
             @. mmodes = transfermatrix * alm
             for β = 1:length(frequencies)
                 block = mmodes[0, β]

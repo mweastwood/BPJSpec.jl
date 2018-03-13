@@ -64,18 +64,6 @@
         X = randn(5)
         cache[2] = X
         @test cache[2] == cache.cache[2] == X
-
-        cache = BPJSpec.Cache{Vector{Float64}}(3, 4)
-        @test cache.used[] == false
-        @test typeof(cache.cache) == Matrix{Vector{Float64}}
-        @test size(cache.cache) == (3, 4)
-        BPJSpec.set!(cache)
-        @test cache.used[] == true
-        BPJSpec.unset!(cache)
-        @test cache.used[] == false
-        X = randn(5)
-        cache[2, 4] = X
-        @test cache[2, 4] == cache.cache[2, 4] == X
     end
 end
 

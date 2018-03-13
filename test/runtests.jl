@@ -30,21 +30,20 @@ srand(123)
         include("physics/recombination-lines.jl")
     end
 
+    @testset "sky" begin
+        include("sky/foregrounds.jl")
+        include("sky/signal.jl")
+        include("sky/noise.jl")
+    end
+
     @testset "matrices" begin
         include("matrices/storage-mechanisms.jl")
-        include("matrices/block-matrix.jl")
-        include("matrices/wrapper-matrices.jl")
+        include("matrices/concrete-block-matrices.jl")
         include("matrices/broadcasting.jl")
         include("matrices/transfer-matrix.jl")
         include("matrices/noise-covariance-matrix.jl")
         include("matrices/angular-covariance-matrix.jl")
         include("matrices/m-modes.jl")
-    end
-
-    @testset "sky" begin
-        include("sky/foregrounds.jl")
-        include("sky/signal.jl")
-        include("sky/noise.jl")
     end
 
     @testset "algorithms" begin
