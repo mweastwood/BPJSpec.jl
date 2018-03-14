@@ -5,6 +5,7 @@ Cosmology
 Cubature
 FastTransforms
 JLD2
+MacroTools
 ProgressMeter
 StaticArrays
 Unitful

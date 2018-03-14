@@ -202,7 +202,7 @@ function compute_baseline_group_one_frequency!(transfermatrix::TransferMatrix,
     phase_center = transfermatrix.metadata.phase_center
     beam_map = create_beam_map(beam, transfermatrix.metadata, (lmax+1, 2mmax+1))
     rhat = unit_vectors(beam_map)
-    plan = plan_sht(lmax, mmax, size(rhat))
+    plan = FastTransformsWrapper.plan_sht(lmax, mmax, size(rhat))
 
     queue  = collect(1:length(baselines))
     blocks = [zeros(Complex128, two(m)*length(baselines), lmax-m+1) for m = 0:mmax]
@@ -259,8 +259,8 @@ end
 function fringe_pattern(baseline, phase_center, beam_map, rhat, plan, ν)
     λ = u"c" / ν
     real_fringe, imag_fringe = plane_wave(rhat, baseline, phase_center, λ)
-    real_coeff = plan * Map(real_fringe .* beam_map)
-    imag_coeff = plan * Map(imag_fringe .* beam_map)
+    real_coeff = plan * FastTransformsWrapper.Map(real_fringe .* beam_map)
+    imag_coeff = plan * FastTransformsWrapper.Map(imag_fringe .* beam_map)
     real_coeff, imag_coeff
 end
 
@@ -274,14 +274,14 @@ function plane_wave(rhat, baseline, phase_center, λ)
         real_part[idx] = cos(ϕ)
         imag_part[idx] = sin(ϕ)
     end
-    Map(real_part), Map(imag_part)
+    FastTransformsWrapper.Map(real_part), FastTransformsWrapper.Map(imag_part)
 end
 
 "Compute the unit vector to each point on the sky."
 function unit_vectors(map)
     rhat = Matrix{Direction}(size(map))
     for jdx = 1:size(map, 2), idx = 1:size(map, 1)
-        rhat[idx, jdx] = index2vector(map, idx, jdx)
+        rhat[idx, jdx] = FastTransformsWrapper.index2vector(map, idx, jdx)
     end
     rhat
 end
@@ -292,9 +292,9 @@ function create_beam_map(f, metadata, size)
     north  = gram_schmidt(Direction(dir"ITRF", 0, 0, 1), zenith)
     east   = cross(north, zenith)
 
-    map = BPJSpec.Map(zeros(size))
+    map = FastTransformsWrapper.Map(zeros(size))
     for jdx = 1:size[2], idx = 1:size[1]
-        vec = index2vector(map, idx, jdx)
+        vec = FastTransformsWrapper.index2vector(map, idx, jdx)
         x = dot(vec, east)
         y = dot(vec, north)
         z = dot(vec, zenith)

@@ -13,6 +13,11 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+module FastTransformsWrapper
+
+using FastTransforms
+using CasaCore.Measures
+
 struct SHT
     sph2fourier_plan
     #synthesis_plan
@@ -119,5 +124,7 @@ function index2vector(map::Map, idx, jdx)
     y = s*sin(ϕ)
     z = cos(θ)
     Direction(dir"ITRF", x, y, z)
+end
+
 end
 

@@ -22,7 +22,8 @@ makedocs(
     linkcheck = true,
     html_prettyurls = !("local" in ARGS),
     pages = [
-        "Home" => "index.md"
+        "Home"     => "index.md",
+        "Wrappers" => "wrappers.md"
     ]
 )
 

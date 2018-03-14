@@ -1,4 +1,4 @@
-@testset "cosmology.jl" begin
+@testset "CosmologyWrapper.jl" begin
     # Tests against Ned Wright's cosmology calculator
     # (www.astro.ucla.edu/~wright/CosmoCalc.html)
     # - remember to set H0 = 69, OmegaM = 0.29, flat

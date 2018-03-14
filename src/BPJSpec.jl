@@ -54,45 +54,25 @@ using Cosmology
 using Cubature
 using FastTransforms
 using JLD2
+using MacroTools
 using ProgressMeter
 using StaticArrays
 
-T(A) = ctranspose(A)
-H(A) = 0.5*(A+A') # guarantee Hermitian
+# Defines an extension of FastTransforms.jl that provides a more convenient interface for fast
+# spherical harmonic transforms.
+include("wrappers/FastTransformsWrapper.jl")
+using .FastTransformsWrapper
 
-"Try to make sure a matrix that should be positive definite is in fact positive definite."
-function fix(A)
-    N = size(A, 1)
-    N == 0 && return A
-    B = H(A)
-    λ = eigvals(B)
-    λmin = minimum(λ)
-    λmax = maximum(λ)
-    if λmin ≤ 0
-        factor = N * eps(Float64) * λmax
-        return B + factor * I
-    else
-        return B
-    end
-end
+# Defines an interface to Cosmology.jl that attaches units from UnitfulAstro.jl. Furthermore, we
+# include functionality from ApproxFun.jl to allow more rapid evaluation of these functions.
+include("wrappers/CosmologyWrapper.jl")
+using .CosmologyWrapper
 
-"Useful little function that helps account for grouping of positive and negative m."
-two(m) = ifelse(m != 0, 2, 1)
-
-"Convert and strip units from the given quantity."
-u(units, quantity) = ustrip(uconvert(units, quantity))
-
-@enum Mode r a w
-const mode = Dict(r => (false, false, false), a => (true, true, false), w => (true, true, true))
-
-include("parallel.jl")
-include("spherical-harmonics.jl")
-
-include("physics/cosmology.jl")
-include("physics/recombination-lines.jl")
+include("utilities/misc.jl")
+include("utilities/parallel.jl")
+include("utilities/recombination-lines.jl")
 
 abstract type SkyComponent end
-struct NoComponent <: SkyComponent end
 include("sky/foregrounds.jl")
 include("sky/signal.jl")
 include("sky/noise.jl")
@@ -112,10 +92,6 @@ include("matrices/angular-covariance-matrix.jl")
 include("matrices/m-modes.jl")
 include("matrices/angular-block-vector.jl")
 include("matrices/random-vector.jl")
-
-#include("vectors/angular-block-vector.jl")
-#include("vectors/random-angular-block-vector.jl")
-#include("vectors/white-noise-vector.jl")
 
 include("algorithms/permute-m-modes.jl")
 include("algorithms/average-frequency-channels.jl")

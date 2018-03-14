@@ -34,8 +34,8 @@ end
 function Base.show(io::IO, workers::Workers)
     hosts = collect(keys(workers.dict))
     sort!(hosts)
-    println("| Workers")
-    println("|---------")
+    println(io, "| Workers")
+    println(io, "|---------")
     for host in hosts
         ids = workers.dict[host]
         @printf(io, "| %7s : %s\n", host, join(string.(ids), ", "))
