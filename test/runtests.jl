@@ -17,8 +17,8 @@ srand(123)
     end
 
     @testset "sky" begin
-        include("sky/foregrounds.jl")
-        include("sky/signal.jl")
+        include("sky-components/foregrounds.jl")
+        include("sky-components/signal.jl")
     end
 
     @testset "interferometer" begin
@@ -27,14 +27,17 @@ srand(123)
         include("interferometer/noise.jl")
     end
 
-    @testset "matrices" begin
-        include("matrices/storage-mechanisms.jl")
-        include("matrices/concrete-block-matrices.jl")
-        include("matrices/broadcasting.jl")
-        include("matrices/transfer-matrix.jl")
-        include("matrices/noise-covariance-matrix.jl")
-        include("matrices/angular-covariance-matrix.jl")
-        include("matrices/m-modes.jl")
+    @testset "block-matrices" begin
+        include("block-matrices/storage-mechanisms.jl")
+        include("block-matrices/concrete-block-matrices.jl")
+        include("block-matrices/broadcasting.jl")
+    end
+
+    @testset "fundamentals" begin
+        include("fundamentals/transfer-matrix.jl")
+        include("fundamentals/noise-covariance-matrix.jl")
+        include("fundamentals/angular-covariance-matrix.jl")
+        include("fundamentals/m-modes.jl")
     end
 
     @testset "algorithms" begin

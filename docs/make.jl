@@ -23,7 +23,9 @@ makedocs(
     html_prettyurls = !("local" in ARGS),
     pages = [
         "Home"                 => "index.md",
+        "Noise Model"          => "noise-model.md",
         "Foreground Filtering" => "foreground-filtering.md",
+        "Enormous Matrices"    => "enormous-matrices.md",
         "Wrappers"             => "wrappers.md"
     ]
 )

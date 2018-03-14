@@ -71,27 +71,26 @@ using .CosmologyWrapper
 include("utilities/misc.jl")
 include("utilities/parallel.jl")
 include("utilities/recombination-lines.jl")
+include("utilities/random-vector.jl")
 
 abstract type SkyComponent end
-include("sky/foregrounds.jl")
-include("sky/signal.jl")
+include("sky-components/foregrounds.jl")
+include("sky-components/signal.jl")
 
 include("interferometer/metadata.jl")
 include("interferometer/baseline-hierarchy.jl")
 include("interferometer/noise.jl")
 
-include("matrices/storage-mechanisms.jl")
-include("matrices/abstract-block-matrix.jl")
-include("matrices/concrete-block-matrices.jl")
-include("matrices/broadcasting.jl")
-# Specialized block matrices
-include("matrices/transfer-matrix.jl")
-include("matrices/noise-covariance-matrix.jl")
-include("matrices/angular-covariance-matrix.jl")
-# Specialized block vectors
-include("matrices/m-modes.jl")
-include("matrices/angular-block-vector.jl")
-include("matrices/random-vector.jl")
+include("block-matrices/storage-mechanisms.jl")
+include("block-matrices/abstract-block-matrix.jl")
+include("block-matrices/concrete-block-matrices.jl")
+include("block-matrices/broadcasting.jl")
+
+include("fundamentals/transfer-matrix.jl")
+include("fundamentals/noise-covariance-matrix.jl")
+include("fundamentals/angular-covariance-matrix.jl")
+include("fundamentals/m-modes.jl")
+include("fundamentals/angular-block-vector.jl")
 
 include("algorithms/permute-m-modes.jl")
 include("algorithms/average-frequency-channels.jl")
