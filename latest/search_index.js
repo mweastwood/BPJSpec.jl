@@ -9,43 +9,43 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "#BPJSpec.TransferMatrix",
-    "page": "Home",
-    "title": "BPJSpec.TransferMatrix",
-    "category": "type",
-    "text": "struct TransferMatrix <: AbstractBlockMatrix{Matrix{Complex128}, 2}\n\nThis type represents the transfer matrix of an interferometer. This matrix effectively describes how an interferometer responds to the sky, including the antenna primary beam, bandpass, and baseline distribution.\n\nThis matrix is hierarchical in the sense that we save on some computational and storage requirements by separating long baselines from short baselines.\n\nFields\n\nstorage contains instructions on how to read the matrix from disk\ncache is used if we want to keep the matrix in memory\nmetadata stores the interferometer\'s metadata\nlmax is the largest value of the l quantum number used by the matrix\nmmax is the largest value of the m quantum number used by the matrix\n\n\n\n"
-},
-
-{
-    "location": "#BPJSpec.MModes",
-    "page": "Home",
-    "title": "BPJSpec.MModes",
-    "category": "type",
-    "text": "struct MModes{S} <: AbstractBlockMatrix{Vector{Complex128}, 2}\n\nThis type represents the m-modes measured by the interferometer.\n\nFields\n\nstorage contains instructions on how to read the m-modes from disk\ncache is used if we want to keep the m-modes in memory\nmmax is the largest value of the m quantum number\nfrequencies is the list of frequencies\nbandwidth is the bandwidth associated with each frequency channel\n\n\n\n"
-},
-
-{
     "location": "#BPJSpec-Documentation-1",
     "page": "Home",
     "title": "BPJSpec Documentation",
     "category": "section",
-    "text": "BPJSpec is a 21-cm power spectrum code developed for the OVRO-LWA based on the m-mode analysis formalism.CurrentModule = BPJSpec\nDocTestSetup = quote\n    using BPJSpec\nendTransferMatrix\nMModes"
+    "text": "BPJSpec is a 21-cm power spectrum code developed for the OVRO-LWA based on the m-mode analysis formalism."
 },
 
 {
-    "location": "#BPJSpec.AbstractBlockMatrix",
-    "page": "Home",
-    "title": "BPJSpec.AbstractBlockMatrix",
-    "category": "type",
-    "text": "abstract type AbstractBlockMatrix{B, N}\n\nThis type represents a (potentially enormous) block-diagonal matrix. This type is designed to be general enough to handle large matrices that fit in memory as well as enormous matrices that do not fit in memory. In principle this type can also be used to store small matrices, but it would be relatively inefficient compared to the standard Array{T, N}.\n\nType Parameters\n\nB specifies the type of the blocks that compose the matrix\nN specifies the number of indices used to index into the matrix blocks\n\nRequired Fields\n\nstorage contains instructions on how to read matrix blocks\ncache is used if we want to read the matrix from disk and then keep it in memory for faster   access.\n\n\n\n"
+    "location": "noise-model/#",
+    "page": "Noise Model",
+    "title": "Noise Model",
+    "category": "page",
+    "text": ""
 },
 
 {
-    "location": "#Internals-1",
-    "page": "Home",
-    "title": "Internals",
+    "location": "noise-model/#Noise-Model-1",
+    "page": "Noise Model",
+    "title": "Noise Model",
     "category": "section",
-    "text": "AbstractBlockMatrix"
+    "text": ""
+},
+
+{
+    "location": "noise-model/#BPJSpec.NoiseModel",
+    "page": "Noise Model",
+    "title": "BPJSpec.NoiseModel",
+    "category": "type",
+    "text": "struct NoiseModel\n\nThis type represents the thermal noise contributed to the measurement of a set of m-modes.\n\nA careful reading of Taylor, Carilli, Perley chapter 9 reveals that under the convention that Stokes-I is (rm xx + yy)2 we get the following expressions:\n\nUncertainty on single polarization visibilities (in flux density units):\n\n_rm xx = fracsqrt2 k T_rm sysA_e sqrt()\n\nUncertainty on Stokes I visibilities (in flux density units):\n\n_rm Stokes-I = frac_rm xxsqrt2 = frack T_rm sysA_e sqrt()\n\nWhere k is the Boltzmann constant, T_rm sys is the system temperature, A_e is the effective collecting area,  is the bandwidth, and  is the integration time.\n\nHowever, for a dipole antenna, the effective collecting area is not a very physically meaningful value. However, it turns out that we can relate the effective collecting are to the solid angle subtended by the primary beam :\n\nA_e = frac^2\n\nnote: Note\nThere seems to be some ambiguity in the literature in regards to notation. I believe we originally assumed that A_e refers to the maximum effective collecting area, and that we have normalized the beam to be unity in that direction.\n\nFinally we end  up with the following expression after including an additional contribution due to time smearing:\n\n_rm m-modes = frack T_rm sys ^2 sqrtN_rm int\n                  sincleft(fracmtautextsidereal dayright)\n\nFields:\n\nTsys specifies the system temperature\nτ specfies the length of a single integration\nNint specifies the total number of integrations used in the dataset\nΩ is the solid angle subtended by the primary beam\n\nUsage:\n\njulia> model = BPJSpec.NoiseModel(1000u\"K\", 13u\"s\", 6628, 2.41u\"sr\")\nNoiseModel(Tsys = 1000.0 K, τ = 13.0 s, Nint = 6628, Ω = 2.410 sr)\n\njulia> model(100, 74u\"MHz\", 24u\"kHz\")\n4.456470453155544 Jy\n\n\n\n"
+},
+
+{
+    "location": "noise-model/#API-1",
+    "page": "Noise Model",
+    "title": "API",
+    "category": "section",
+    "text": "CurrentModule = BPJSpec\nDocTestSetup = quote\n    using BPJSpec\n    using Unitful, UnitfulAstro\nendNoiseModel"
 },
 
 {
@@ -118,6 +118,54 @@ var documenterSearchIndex = {"docs": [
     "title": "API",
     "category": "section",
     "text": "CurrentModule = BPJSpec\nDocTestSetup = quote\n    using BPJSpec\n    using Unitful, UnitfulAstro\nendForegroundComponent\nCylindricalPS\nextragalactic_point_sources\nextragalactic_free_free\ngalactic_synchrotron\ngalactic_free_free"
+},
+
+{
+    "location": "enormous-matrices/#",
+    "page": "Enormous Matrices",
+    "title": "Enormous Matrices",
+    "category": "page",
+    "text": ""
+},
+
+{
+    "location": "enormous-matrices/#Enormous-Matrices-1",
+    "page": "Enormous Matrices",
+    "title": "Enormous Matrices",
+    "category": "section",
+    "text": ""
+},
+
+{
+    "location": "enormous-matrices/#BPJSpec.AbstractBlockMatrix",
+    "page": "Enormous Matrices",
+    "title": "BPJSpec.AbstractBlockMatrix",
+    "category": "type",
+    "text": "abstract type AbstractBlockMatrix{B, N}\n\nThis type represents a (potentially enormous) block-diagonal matrix. This type is designed to be general enough to handle large matrices that fit in memory as well as enormous matrices that do not fit in memory. In principle this type can also be used to store small matrices, but it would be relatively inefficient compared to the standard Array{T, N}.\n\nType Parameters\n\nB specifies the type of the blocks that compose the matrix\nN specifies the number of indices used to index into the matrix blocks\n\nRequired Fields\n\nstorage contains instructions on how to read matrix blocks\ncache is used if we want to read the matrix from disk and then keep it in memory for faster   access.\n\n\n\n"
+},
+
+{
+    "location": "enormous-matrices/#BPJSpec.TransferMatrix",
+    "page": "Enormous Matrices",
+    "title": "BPJSpec.TransferMatrix",
+    "category": "type",
+    "text": "struct TransferMatrix <: AbstractBlockMatrix{Matrix{Complex128}, 2}\n\nThis type represents the transfer matrix of an interferometer. This matrix effectively describes how an interferometer responds to the sky, including the antenna primary beam, bandpass, and baseline distribution.\n\nThis matrix is hierarchical in the sense that we save on some computational and storage requirements by separating long baselines from short baselines.\n\nFields\n\nstorage contains instructions on how to read the matrix from disk\ncache is used if we want to keep the matrix in memory\nmetadata stores the interferometer\'s metadata\nlmax is the largest value of the l quantum number used by the matrix\nmmax is the largest value of the m quantum number used by the matrix\n\n\n\n"
+},
+
+{
+    "location": "enormous-matrices/#BPJSpec.MModes",
+    "page": "Enormous Matrices",
+    "title": "BPJSpec.MModes",
+    "category": "type",
+    "text": "struct MModes{S} <: AbstractBlockMatrix{Vector{Complex128}, 2}\n\nThis type represents the m-modes measured by the interferometer.\n\nFields\n\nstorage contains instructions on how to read the m-modes from disk\ncache is used if we want to keep the m-modes in memory\nmmax is the largest value of the m quantum number\nfrequencies is the list of frequencies\nbandwidth is the bandwidth associated with each frequency channel\n\n\n\n"
+},
+
+{
+    "location": "enormous-matrices/#API-1",
+    "page": "Enormous Matrices",
+    "title": "API",
+    "category": "section",
+    "text": "CurrentModule = BPJSpec\nDocTestSetup = quote\n    using BPJSpec\nendAbstractBlockMatrix\nTransferMatrix\nMModes"
 },
 
 {
