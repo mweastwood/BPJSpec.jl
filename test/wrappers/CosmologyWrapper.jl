@@ -14,5 +14,10 @@
         z′ = BPJSpec.redshift(ν)
         @test z ≈ z′
     end
+
+    func = BPJSpec.approximate(BPJSpec.comoving_distance, 10, 30)
+    @test func(10) ≈ BPJSpec.comoving_distance(10)
+    @test func(20) ≈ BPJSpec.comoving_distance(20)
+    @test func(30) ≈ BPJSpec.comoving_distance(30)
 end
 

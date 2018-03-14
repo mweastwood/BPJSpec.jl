@@ -19,7 +19,10 @@ srand(123)
     @testset "sky" begin
         include("sky/foregrounds.jl")
         include("sky/signal.jl")
-        include("sky/noise.jl")
+    end
+
+    @testset "interferometer" begin
+        include("interferometer/noise.jl")
     end
 
     @testset "matrices" begin

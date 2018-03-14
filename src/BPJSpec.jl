@@ -75,10 +75,10 @@ include("utilities/recombination-lines.jl")
 abstract type SkyComponent end
 include("sky/foregrounds.jl")
 include("sky/signal.jl")
-include("sky/noise.jl")
 
 include("interferometer/metadata.jl")
 include("interferometer/baseline-hierarchy.jl")
+include("interferometer/noise.jl")
 
 include("matrices/storage-mechanisms.jl")
 include("matrices/abstract-block-matrix.jl")

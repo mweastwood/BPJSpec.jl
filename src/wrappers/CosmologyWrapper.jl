@@ -18,6 +18,7 @@ module CosmologyWrapper
 export comoving_distance, age, frequency, redshift, approximate
 
 using Cosmology
+using ApproxFun
 using Unitful, UnitfulAstro
 
 const HI = 1420.40575177u"MHz"
