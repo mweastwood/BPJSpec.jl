@@ -17,7 +17,7 @@ using Documenter, BPJSpec
 
 makedocs(
     format = :html,
-    sitename  = "BPJSpec.jl",
+    sitename  = "BPJSpec",
     authors   = "Michael Eastwood",
     linkcheck = true,
     html_prettyurls = !("local" in ARGS),
