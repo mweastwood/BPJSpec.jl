@@ -49,6 +49,78 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
+    "location": "foreground-filtering/#",
+    "page": "Foreground Filtering",
+    "title": "Foreground Filtering",
+    "category": "page",
+    "text": ""
+},
+
+{
+    "location": "foreground-filtering/#Foreground-Filtering-1",
+    "page": "Foreground Filtering",
+    "title": "Foreground Filtering",
+    "category": "section",
+    "text": ""
+},
+
+{
+    "location": "foreground-filtering/#BPJSpec.ForegroundComponent",
+    "page": "Foreground Filtering",
+    "title": "BPJSpec.ForegroundComponent",
+    "category": "type",
+    "text": "struct ForegroundComponent <: SkyComponent\n\nThis type represents the contribution of a single foreground component to the multi-frequency angular power spectrum.\n\nC_l(_1 _2) = A left(fracl+11001right)^-\n                  left(frac_1 _2_0^2right)^-\n                  expleft(-fraclog^2(_2_2)2^2right)\n\nFields:\n\nν0 specifies the reference frequency\nA specifies the overall amplitude at the reference frequency\nα is the power-law index for the multipole moment l\nβ is the power-law index for frequency\nζ essentially determines how quickly the foreground component decorrelates in frequency\n\nUsage:\n\nSome quick foreground models can be constructed based on the work of Santos, Cooray & Knox 2005. These can be accessed with the functions extragalactic_point_sources, extragalactic_free_free, galactic_synchrotron, and galactic_free_free.\n\njulia> BPJSpec.extragalactic_point_sources()\nForegroundComponent(ν0 = 130.000 MHz, A = 57.000 mK², α = 1.100, β = 2.070, ζ = 1.000)\n\njulia> BPJSpec.extragalactic_free_free()\nForegroundComponent(ν0 = 130.000 MHz, A = 0.014 mK², α = 1.000, β = 2.100, ζ = 35.000)\n\njulia> BPJSpec.galactic_synchrotron()\nForegroundComponent(ν0 = 130.000 MHz, A = 700.000 mK², α = 2.400, β = 2.800, ζ = 4.000)\n\njulia> BPJSpec.galactic_free_free()\nForegroundComponent(ν0 = 130.000 MHz, A = 0.088 mK², α = 3.000, β = 2.150, ζ = 35.000)\n\njulia> component = BPJSpec.ForegroundComponent(100u\"MHz\", 1u\"K^2\", 1, 1, 100)\n       component(100, 74u\"MHz\", 76u\"MHz\")\n17.622494197510505 K^2\n\n\n\n"
+},
+
+{
+    "location": "foreground-filtering/#BPJSpec.CylindricalPS",
+    "page": "Foreground Filtering",
+    "title": "BPJSpec.CylindricalPS",
+    "category": "type",
+    "text": "struct CylindricalPS <: PowerSpectrum <: SkyComponent\n\nThis type represents a cylindrically averaged power spectrum of the 21-cm brightness temperature over a given range in redshift. An instance of this type can be evaluated to compute an approximation of the multi-frequency angular power spectrum.\n\nC_l(_1 _2)  \n\nFields:\n\nzrange specifies the range over which this power spectrum is valid. It is used to define the range over which cosmological quantities can be approximated\nkpara is a list of wave numbers parallel to the line-of-sight\nkperp is a list of wave numbers perpendicular to the line-of-sight\npower is the amplitude of the power spectrum at the grid points specified by kpara and kperp\n\nUsage:\n\njulia> power_spectrum = BPJSpec.CylindricalPS((10, 30),\n                                              [0.0, 1.0].*u\"Mpc^-1\", # kpara\n                                              [0.0, 1.0].*u\"Mpc^-1\", # kperp\n                                              [1.0 1.0; 1.0 1.0].*u\"mK^2*Mpc^3\")\nCylindricalPS(10.0 < z < 30.0, k∥ = 0.00 Mpc⁻¹…1.00 Mpc⁻², k⟂ = 0.00 Mpc⁻¹…1.00 Mpc⁻², P ~ 1.0 mK²Mpc³)\n\njulia> power_spectrum(100, 74u\"MHz\", 74u\"MHz\")\n2.694677277820449e-15 K^2\n\njulia> power_spectrum(100, 74u\"MHz\", 75u\"MHz\")\n-4.315090053966302e-17 K^2\n\n\n\n"
+},
+
+{
+    "location": "foreground-filtering/#BPJSpec.extragalactic_point_sources",
+    "page": "Foreground Filtering",
+    "title": "BPJSpec.extragalactic_point_sources",
+    "category": "function",
+    "text": "extragalactic_point_sources()\n\nConstructs a model of extragalactic point sources based on the work of Santos, Cooray & Knox 2005.\n\n\n\n"
+},
+
+{
+    "location": "foreground-filtering/#BPJSpec.extragalactic_free_free",
+    "page": "Foreground Filtering",
+    "title": "BPJSpec.extragalactic_free_free",
+    "category": "function",
+    "text": "extragalactic_free_free()\n\nConstructs a model of extragalactic free-free emission based on the work of Santos, Cooray & Knox 2005.\n\n\n\n"
+},
+
+{
+    "location": "foreground-filtering/#BPJSpec.galactic_synchrotron",
+    "page": "Foreground Filtering",
+    "title": "BPJSpec.galactic_synchrotron",
+    "category": "function",
+    "text": "galactic_synchrotron()\n\nConstructs a model of galactic synchrotron emission based on the work of Santos, Cooray & Knox 2005.\n\n\n\n"
+},
+
+{
+    "location": "foreground-filtering/#BPJSpec.galactic_free_free",
+    "page": "Foreground Filtering",
+    "title": "BPJSpec.galactic_free_free",
+    "category": "function",
+    "text": "galactic_free_free()\n\nConstructs a model of galactic free-free emission based on the work of Santos, Cooray & Knox 2005.\n\n\n\n"
+},
+
+{
+    "location": "foreground-filtering/#API-1",
+    "page": "Foreground Filtering",
+    "title": "API",
+    "category": "section",
+    "text": "CurrentModule = BPJSpec\nDocTestSetup = quote\n    using BPJSpec\n    using Unitful, UnitfulAstro\nendForegroundComponent\nCylindricalPS\nextragalactic_point_sources\nextragalactic_free_free\ngalactic_synchrotron\ngalactic_free_free"
+},
+
+{
     "location": "wrappers/#",
     "page": "Wrappers",
     "title": "Wrappers",
