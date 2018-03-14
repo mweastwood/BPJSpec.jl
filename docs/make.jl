@@ -17,22 +17,23 @@ using Documenter, BPJSpec
 
 makedocs(
     format = :html,
-    sitename = "BPJSpec.jl",
-    authors = "Michael Eastwood",
+    sitename  = "BPJSpec.jl",
+    authors   = "Michael Eastwood",
     linkcheck = true,
     html_prettyurls = !("local" in ARGS),
     pages = [
-        "Home"     => "index.md",
-        "Wrappers" => "wrappers.md"
+        "Home"                 => "index.md",
+        "Foreground Filtering" => "foreground-filtering.md",
+        "Wrappers"             => "wrappers.md"
     ]
 )
 
 deploydocs(
-    repo = "github.com/mweastwood/BPJSpec.jl.git",
-    julia = "0.6",
+    repo   = "github.com/mweastwood/BPJSpec.jl.git",
+    julia  = "0.6",
     osname = "linux",
     target = "build",
-    deps = nothing,
-    make = nothing
+    deps   = nothing,
+    make   = nothing
 )
 

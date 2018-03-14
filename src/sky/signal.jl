@@ -15,11 +15,54 @@
 
 abstract type PowerSpectrum <: SkyComponent end
 
+doc"""
+    struct CylindricalPS <: PowerSpectrum <: SkyComponent
+
+This type represents a cylindrically averaged power spectrum of the 21-cm brightness temperature
+over a given range in redshift. An instance of this type can be evaluated to compute an
+approximation of the multi-frequency angular power spectrum.
+
+```math
+C_l(ν_1, ν_2) ≈ ...
+```
+
+**Fields:**
+
+* `zrange` specifies the range over which this power spectrum is valid. It is used to define the
+  range over which cosmological quantities can be approximated
+* `kpara` is a list of wave numbers parallel to the line-of-sight
+* `kperp` is a list of wave numbers perpendicular to the line-of-sight
+* `power` is the amplitude of the power spectrum at the grid points specified by `kpara` and `kperp`
+
+**Usage:**
+
+```jldoctest
+julia> power_spectrum = BPJSpec.CylindricalPS((10, 30),
+                                              [0.0, 1.0].*u"Mpc^-1", # kpara
+                                              [0.0, 1.0].*u"Mpc^-1", # kperp
+                                              [1.0 1.0; 1.0 1.0].*u"mK^2*Mpc^3")
+CylindricalPS(10.0 < z < 30.0, k∥ = 0.00 Mpc⁻¹…1.00 Mpc⁻², k⟂ = 0.00 Mpc⁻¹…1.00 Mpc⁻², P ~ 1.0 mK²Mpc³)
+
+julia> power_spectrum(100, 74u"MHz", 74u"MHz")
+2.694677277820449e-15 K^2
+
+julia> power_spectrum(100, 74u"MHz", 75u"MHz")
+-4.315090053966302e-17 K^2
+```
+"""
 struct CylindricalPS <: PowerSpectrum
     zrange :: Tuple{Float64, Float64} # redshift range for this power spectrum
     kpara  :: Vector{typeof(1.0u"Mpc^-1")}
     kperp  :: Vector{typeof(1.0u"Mpc^-1")}
     power  :: Matrix{typeof(1.0u"K^2*Mpc^3")}
+end
+
+function Base.show(io::IO, ps::CylindricalPS)
+    @printf(io, "CylindricalPS(%.1f < z < %.1f, k∥ = %.2f Mpc⁻¹…%.2f Mpc⁻², ",
+            ps.zrange[1], ps.zrange[2], u(u"Mpc^-1", ps.kpara[1]), u(u"Mpc^-1", ps.kpara[end]))
+    @printf(io, "k⟂ = %.2f Mpc⁻¹…%.2f Mpc⁻², P ~ %.1f mK²Mpc³)",
+            u(u"Mpc^-1", ps.kperp[1]), u(u"Mpc^-1", ps.kperp[end]),
+            u(u"mK^2*Mpc^3", mean(ps.power)))
 end
 
 struct SphericalPS <: PowerSpectrum
