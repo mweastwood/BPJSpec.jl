@@ -17,5 +17,8 @@
     @test model(1000, 130u"MHz", 130u"MHz") == 700u"mK^2"
     model = BPJSpec.galactic_free_free()
     @test model(1000, 130u"MHz", 130u"MHz") == 0.088u"mK^2"
+
+    str = "ForegroundComponent(ν0 = 130.000 MHz, A = 700.000 mK², α = 2.400, β = 2.800, ζ = 4.000)"
+    @test repr(BPJSpec.galactic_synchrotron()) == str
 end
 

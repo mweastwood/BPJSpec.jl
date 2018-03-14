@@ -22,7 +22,7 @@ angular power spectrum.
 ```math
 C_l(ν_1, ν_2) = A \left(\frac{l+1}{1001}\right)^{-α}
                   \left(\frac{ν_1 ν_2}{ν_0^2}\right)^{-β}
-                  \exp\left(-\frac{\log^2(ν_2/ν_2)}{2ζ^2}\right)
+                  \exp\left(-\frac{\log^2(ν_1/ν_2)}{2ζ^2}\right)
 ```
 
 **Fields:**

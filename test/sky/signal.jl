@@ -16,6 +16,12 @@
     χ2 = BPJSpec.comoving_distance(z2)
     Δχ = χ2 - χ1
 
+
+    power_spectrum = BPJSpec.CylindricalPS((10, 30), [0.0, 1.0].*u"Mpc^-1", [0.0, 1.0].*u"Mpc^-1",
+                                           [1.0 1.0; 1.0 1.0].*u"mK^2*Mpc^3")
+    str = "CylindricalPS(10.0 < z < 30.0, k∥ = 0.00 Mpc⁻¹…1.00 Mpc⁻², k⟂ = 0.00 Mpc⁻¹…1.00 Mpc⁻², P ~ 1.0 mK²Mpc³)"
+    @test repr(power_spectrum) == str
+
     # constant spectrum
     power = ones(length(kpara), length(kperp)) .* u"mK^2*Mpc^3"
     signal = BPJSpec.CylindricalPS((10, 30), kpara, kperp, power)

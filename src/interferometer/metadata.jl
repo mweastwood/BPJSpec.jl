@@ -14,8 +14,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 struct Metadata
-    frequencies  :: Vector{typeof(1.0*u"Hz")}
-    bandwidth    :: Vector{typeof(1.0*u"Hz")}
+    frequencies  :: Vector{typeof(1.0u"Hz")}
+    bandwidth    :: Vector{typeof(1.0u"Hz")}
     position     :: Position         # ITRF
     baselines    :: Vector{Baseline} # ITRF
     phase_center :: Direction        # ITRF
@@ -23,21 +23,23 @@ end
 
 # compatibility with TTCal
 
-function from_ttcal(ttcal_metadata; lmax=0)
+function from_ttcal(ttcal_metadata)
+    frame = ReferenceFrame()
+    Measures.set!(frame, mean(ttcal_metadata.positions))
+    Measures.set!(frame, ttcal_metadata.times[1])
+
     frequencies  = ttcal_metadata.frequencies
     bandwidth    = fill(24.0u"kHz", length(frequencies)) # default for OVRO-LWA
-    position     = ttcal_position(ttcal_metadata)
-    baselines    = ttcal_baselines(ttcal_metadata)
-    phase_center = ttcal_metadata.phase_centers[1]
+    positions    = measure.(frame, ttcal_metadata.positions, pos"ITRF")
+    phase_center = measure(frame, ttcal_metadata.phase_centers[1], dir"ITRF")
+
+    position  = mean(positions)
+    baselines = baselines_from_positions(positions)
+
     Metadata(frequencies, bandwidth, position, baselines, phase_center)
 end
 
-function ttcal_position(ttcal_metadata)
-    mean(ttcal_metadata.positions)
-end
-
-function ttcal_baselines(ttcal_metadata)
-    positions = ttcal_metadata.positions
+function baselines_from_positions(positions)
     baselines = Baseline[]
     Nant = length(positions)
     for antenna1 = 1:Nant, antenna2 = antenna1:Nant

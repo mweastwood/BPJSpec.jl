@@ -22,6 +22,8 @@ srand(123)
     end
 
     @testset "interferometer" begin
+        include("interferometer/metadata.jl")
+        include("interferometer/baseline-hierarchy.jl")
         include("interferometer/noise.jl")
     end
 

@@ -22,21 +22,21 @@ end
 function Base.show(io::IO, hierarchy::Hierarchy)
     total_space = 0.0
     total_baselines = 0
-    @printf("|--------------+-----------+-------------|\n")
-    @printf("| lmin to lmax | baselines |  disk space |\n")
-    @printf("|--------------+-----------+-------------|\n")
+    @printf(io, "|--------------+-----------+-------------|\n")
+    @printf(io, "| lmin to lmax | baselines |  disk space |\n")
+    @printf(io, "|--------------+-----------+-------------|\n")
     for idx = 1:length(hierarchy.divisions)-1
         lmin = hierarchy.divisions[idx]
         lmax = hierarchy.divisions[idx+1]
         Nbase = length(hierarchy.baselines[idx])
         space = Nbase*lmax*lmax*128/(8*1024^3)*hierarchy.Nfreq
-        @printf("| %4d to %4d |     %5d | %8.3f GB |\n", lmin, lmax, Nbase, space)
+        @printf(io, "| %4d to %4d |     %5d | %8.3f GB |\n", lmin, lmax, Nbase, space)
         total_space += space
         total_baselines += Nbase
     end
-    @printf("|--------------+-----------+-------------|\n")
-    @printf("|        total |     %5d | %8.3f GB |\n", total_baselines, total_space)
-    @printf("|--------------+-----------+-------------|\n")
+    @printf(io, "|--------------+-----------+-------------|\n")
+    @printf(io, "|        total |     %5d | %8.3f GB |\n", total_baselines, total_space)
+    @printf(io, "|--------------+-----------+-------------|\n")
 end
 
 function compute_baseline_hierarchy(metadata::Metadata, cutoff)
