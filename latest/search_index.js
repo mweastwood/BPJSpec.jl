@@ -48,4 +48,68 @@ var documenterSearchIndex = {"docs": [
     "text": "AbstractBlockMatrix"
 },
 
+{
+    "location": "wrappers/#",
+    "page": "Wrappers",
+    "title": "Wrappers",
+    "category": "page",
+    "text": ""
+},
+
+{
+    "location": "wrappers/#Wrappers-1",
+    "page": "Wrappers",
+    "title": "Wrappers",
+    "category": "section",
+    "text": ""
+},
+
+{
+    "location": "wrappers/#BPJSpec.CosmologyWrapper.comoving_distance",
+    "page": "Wrappers",
+    "title": "BPJSpec.CosmologyWrapper.comoving_distance",
+    "category": "function",
+    "text": "comoving_distance(z)\n\nCalculate the comoving distance (in units of Mpc) to the redshift z.\n\nUsage:\n\njulia> comoving_distance(1)\n3371.509961954628 Mpc\n\njulia> comoving_distance(10)\n9689.514711746533 Mpc\n\n\n\n"
+},
+
+{
+    "location": "wrappers/#BPJSpec.CosmologyWrapper.age",
+    "page": "Wrappers",
+    "title": "BPJSpec.CosmologyWrapper.age",
+    "category": "function",
+    "text": "age(z)\n\nCalculate the age of the universe (in units of Gyr) to the redshift z.\n\nUsage:\n\njulia> age(1)\n5.918077173774152 Gyr\n\njulia> age(10)\n0.4785005773464139 Gyr\n\n\n\n"
+},
+
+{
+    "location": "wrappers/#BPJSpec.CosmologyWrapper.frequency",
+    "page": "Wrappers",
+    "title": "BPJSpec.CosmologyWrapper.frequency",
+    "category": "function",
+    "text": "frequency(z)\n\nCalculate the frequency of the 21 cm line of Hydrogen at the redshift z.\n\nUsage:\n\njulia> frequency(1)\n710.202875885 MHz\n\njulia> frequency(10)\n129.12779561545454 MHz\n\n\n\n"
+},
+
+{
+    "location": "wrappers/#BPJSpec.CosmologyWrapper.redshift",
+    "page": "Wrappers",
+    "title": "BPJSpec.CosmologyWrapper.redshift",
+    "category": "function",
+    "text": "redshift(ν)\n\nCalculate the redshift from which the emission originates if the 21 cm line is observed at the frequency ν.\n\nUsage:\n\njulia> redshift(100u\"MHz\")\n13.2040575177\n\njulia> redshift(200u\"MHz\")\n6.10202875885\n\n\n\n"
+},
+
+{
+    "location": "wrappers/#CosmologyWrapper.jl-1",
+    "page": "Wrappers",
+    "title": "CosmologyWrapper.jl",
+    "category": "section",
+    "text": "CurrentModule = BPJSpec\nDocTestSetup = quote\n    using BPJSpec.CosmologyWrapper\n    using Unitful\nendcomoving_distance\nage\nfrequency\nredshift"
+},
+
+{
+    "location": "wrappers/#FastTransformsWrapper.jl-1",
+    "page": "Wrappers",
+    "title": "FastTransformsWrapper.jl",
+    "category": "section",
+    "text": ""
+},
+
 ]}
