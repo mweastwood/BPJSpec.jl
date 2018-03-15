@@ -77,7 +77,11 @@ end
 function Base.similar(matrix::AbstractBlockMatrix, storage::Mechanism=NoFile())
     T = typeof(matrix)
     fields = metadata_fields(matrix)
-    create(T, storage, fields...)
+    # Note that because the type of the storage mechanism might be used as a type parameter, we need
+    # to strip type parameters from `T` so that they can be re-inferred from the arguments. After
+    # playing around with this for a little bit, it looks like `T.name.wrapper` is the right way to
+    # do this.
+    create(T.name.wrapper, storage, fields...)
 end
 
 Base.getindex(matrix::AbstractBlockMatrix, idx::Int) = get(matrix, idx)

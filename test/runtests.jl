@@ -24,12 +24,14 @@ srand(123)
     @testset "interferometer" begin
         include("interferometer/metadata.jl")
         include("interferometer/baseline-hierarchy.jl")
-        include("interferometer/noise.jl")
+        include("interferometer/noise-model.jl")
     end
 
     @testset "block-matrices" begin
         include("block-matrices/storage-mechanisms.jl")
+        include("block-matrices/abstract-block-matrix.jl")
         include("block-matrices/concrete-block-matrices.jl")
+        include("block-matrices/random-block-vector.jl")
         include("block-matrices/broadcasting.jl")
     end
 

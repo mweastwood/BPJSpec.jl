@@ -23,12 +23,12 @@ Stokes-I is $(\rm xx + yy)/2$ we get the following expressions:
 
 Uncertainty on single polarization visibilities (in flux density units):
 ```math
-σ_{\rm xx} = \frac{\sqrt{2} k T_{\rm sys}}{A_e sqrt(Δν\,τ)}
+σ_{\rm xx} = \frac{\sqrt{2} k T_{\rm sys}}{A_e \sqrt{Δν\,τ}}
 ```
 
 Uncertainty on Stokes I visibilities (in flux density units):
 ```math
-σ_{\rm Stokes-I} = \frac{σ_{\rm xx}}{\sqrt{2}} = \frac{k T_{\rm sys}}{A_e sqrt(Δν\,τ)}
+σ_\text{Stokes-I} = \frac{σ_{\rm xx}}{\sqrt{2}} = \frac{k T_{\rm sys}}{A_e \sqrt{Δν\,τ}}
 ```
 
 Where $k$ is the Boltzmann constant, $T_{\rm sys}$ is the system temperature, $A_e$ is the effective
@@ -49,8 +49,8 @@ A_e = \frac{λ^2}{Ω}
 Finally we end  up with the following expression after including an additional contribution due to
 time smearing:
 ```math
-σ_{\rm m-modes} = \frac{k T_{\rm sys} Ω}{λ^2 \sqrt{Δν\,τ\,N_{\rm int}}}
-                  \sinc\left(\frac{m\tau}{\text{sidereal day}}\right)
+σ_\text{m-modes} = \frac{k T_{\rm sys} Ω}{λ^2 \sqrt{Δν\,τ\,N_{\rm int}}}
+                   {\rm sinc}\left(\frac{m\tau}{\text{sidereal day}}\right)
 ```
 
 **Fields:**

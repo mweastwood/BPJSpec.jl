@@ -71,7 +71,6 @@ using .CosmologyWrapper
 include("utilities/misc.jl")
 include("utilities/parallel.jl")
 include("utilities/recombination-lines.jl")
-include("utilities/random-vector.jl")
 
 abstract type SkyComponent end
 include("sky-components/foregrounds.jl")
@@ -79,11 +78,12 @@ include("sky-components/signal.jl")
 
 include("interferometer/metadata.jl")
 include("interferometer/baseline-hierarchy.jl")
-include("interferometer/noise.jl")
+include("interferometer/noise-model.jl")
 
 include("block-matrices/storage-mechanisms.jl")
 include("block-matrices/abstract-block-matrix.jl")
 include("block-matrices/concrete-block-matrices.jl")
+include("block-matrices/random-block-vector.jl")
 include("block-matrices/broadcasting.jl")
 
 include("fundamentals/transfer-matrix.jl")
