@@ -13,24 +13,6 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-"""
-Generally speaking we want to index all of our matrices by the integer m. However, our angular
-covariance matrices are block-diagonal in l, which is also an integer. We will therefore use this
-type to indicate that we'd like to index with l and indexing with an integer will continue to mean
-indexing with m.
-"""
-struct L <: Integer
-    l :: Int
-end
-Base.convert(::Type{L}, l::Int) = L(l)
-Base.convert(::Type{Int}, l::L) = l.l
-Base.promote_rule(::Type{L}, ::Type{Int}) = L
-Base.oneunit(::L) = L(1)
-Base.:<(lhs::L, rhs::L) = lhs.l < rhs.l
-Base.:≤(lhs::L, rhs::L) = lhs.l ≤ rhs.l
-Base.:+(lhs::L, rhs::L) = L(lhs.l + rhs.l)
-Base.:-(lhs::L, rhs::L) = L(lhs.l - rhs.l)
-
 struct AngularCovarianceMatrix{S} <: AbstractBlockMatrix{Matrix{Float64}, 1}
     storage :: S
     cache   :: Cache{Matrix{Float64}}

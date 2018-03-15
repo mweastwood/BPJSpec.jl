@@ -1,4 +1,4 @@
-function test_matrix(T, N, idx1, idx2, fields...)
+function test_matrix(T, eltype, N, idx1, idx2, fields...)
     path1 = tempname()
     path2 = tempname()
     for S in (NoFile, SingleFile, MultipleFiles)
@@ -6,11 +6,11 @@ function test_matrix(T, N, idx1, idx2, fields...)
             matrix1 = BPJSpec.create(T, S(path1), fields...)
             matrix2 = BPJSpec.create(T, S(path2), fields...)
             if N == 1
-                X = rand(Complex128, 5)
-                Y = rand(Complex128, 3)
+                X = rand(eltype, 5)
+                Y = rand(eltype, 3)
             else
-                X = rand(Complex128, 5, 5)
-                Y = rand(Complex128, 3, 3)
+                X = rand(eltype, 5, 5)
+                Y = rand(eltype, 3, 3)
             end
             matrix1[idx1...] = X
             matrix1[idx2...] = Y
@@ -40,28 +40,37 @@ end
 
 @testset "concrete-block-matrices.jl" begin
     length = 2
+    lmax   = 1
     mmax   = 1
     frequencies = [74.0u"MHz", 100.0u"MHz"]
     bandwidth   = [24u"kHz", 1.0u"MHz"]
 
     @testset "SimpleBlockArray" begin
-        test_matrix(SimpleBlockVector, 1, (1,), (2,), length)
-        test_matrix(SimpleBlockMatrix, 2, (1,), (2,), length)
+        test_matrix(SimpleBlockVector, Complex128, 1, (1,), (2,), length)
+        test_matrix(SimpleBlockMatrix, Complex128, 2, (1,), (2,), length)
     end
 
     @testset "MBlockArray" begin
-        test_matrix(MBlockVector, 1, (0,), (1,), mmax)
-        test_matrix(MBlockMatrix, 2, (0,), (1,), mmax)
+        test_matrix(MBlockVector, Complex128, 1, (0,), (1,), mmax)
+        test_matrix(MBlockMatrix, Complex128, 2, (0,), (1,), mmax)
     end
 
     @testset "FBlockArray" begin
-        test_matrix(FBlockVector, 1, (1,), (2,), frequencies, bandwidth)
-        test_matrix(FBlockMatrix, 2, (1,), (2,), frequencies, bandwidth)
+        test_matrix(FBlockVector, Complex128, 1, (1,), (2,), frequencies, bandwidth)
+        test_matrix(FBlockMatrix, Complex128, 2, (1,), (2,), frequencies, bandwidth)
     end
 
     @testset "MFBlockArray" begin
-        test_matrix(MFBlockVector, 1, (0, 1), (0, 2), 0, frequencies, bandwidth)
-        test_matrix(MFBlockMatrix, 2, (0, 1), (0, 2), 0, frequencies, bandwidth)
+        test_matrix(MFBlockVector, Complex128, 1, (0, 1), (0, 2), 0, frequencies, bandwidth)
+        test_matrix(MFBlockMatrix, Complex128, 2, (0, 1), (0, 2), 0, frequencies, bandwidth)
+    end
+
+    @testset "LBlockArray" begin
+        test_matrix(LBlockMatrix, Float64, 2, (0,), (1,), lmax, frequencies, bandwidth)
+    end
+
+    @testset "LMBlockArray" begin
+        test_matrix(LMBlockVector, Complex128, 1, (0, 0), (1, 0), lmax, 0, frequencies, bandwidth)
     end
 end
 

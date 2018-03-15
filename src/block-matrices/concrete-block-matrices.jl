@@ -19,9 +19,6 @@ struct SimpleBlockArray{T, N, S} <: AbstractBlockMatrix{Array{T, N}, 1}
     cache   :: Cache{Array{T, N}}
     length  :: Int
 end
-function SimpleBlockArray{T, N}(storage::S, cache, length) where {T, N, S}
-    SimpleBlockArray{T, N, S}(storage, cache, length)
-end
 metadata_fields(array::SimpleBlockArray) = (array.length,)
 nblocks(::Type{<:SimpleBlockArray}, length) = length
 linear_index(::SimpleBlockArray, idx) = idx
@@ -32,9 +29,6 @@ struct MBlockArray{T, N, S} <: AbstractBlockMatrix{Array{T, N}, 1}
     storage :: S
     cache   :: Cache{Array{T, N}}
     mmax    :: Int
-end
-function MBlockArray{T, N}(storage::S, cache, mmax) where {T, N, S}
-    MBlockArray{T, N, S}(storage, cache, mmax)
 end
 metadata_fields(array::MBlockArray) = (array.mmax,)
 nblocks(::Type{<:MBlockArray}, mmax) = mmax+1
@@ -47,9 +41,6 @@ struct FBlockArray{T, N, S} <: AbstractBlockMatrix{Array{T, N}, 1}
     cache   :: Cache{Array{T, N}}
     frequencies :: Vector{typeof(1.0u"Hz")}
     bandwidth   :: Vector{typeof(1.0u"Hz")}
-end
-function FBlockArray{T, N}(storage::S, cache, frequencies, bandwidth) where {T, N, S}
-    FBlockArray{T, N, S}(storage, cache, frequencies, bandwidth)
 end
 metadata_fields(array::FBlockArray) = (array.frequencies, array.bandwidth)
 nblocks(::Type{<:FBlockArray}, frequencies, bandwidth) = length(frequencies)
@@ -64,13 +55,41 @@ struct MFBlockArray{T, N, S} <: AbstractBlockMatrix{Array{T, N}, 2}
     frequencies :: Vector{typeof(1.0u"Hz")}
     bandwidth   :: Vector{typeof(1.0u"Hz")}
 end
-function MFBlockArray{T, N}(storage::S, cache, mmax, frequencies, bandwidth) where {T, N, S}
-    MFBlockArray{T, N, S}(storage, cache, mmax, frequencies, bandwidth)
-end
 metadata_fields(array::MFBlockArray) = (array.mmax, array.frequencies, array.bandwidth)
 nblocks(::Type{<:MFBlockArray}, mmax, frequencies, bandwidth) = (mmax+1)*length(frequencies)
 linear_index(array::MFBlockArray, m, β) = (array.mmax+1)*(β-1) + (m+1)
 indices(array::MFBlockArray) = ((m, β) for β = 1:length(array.frequencies) for m = 0:array.mmax)
+
+"Array that is split into blocks of l."
+struct LBlockArray{T, N, S} <: AbstractBlockMatrix{Array{T, N}, 1}
+    storage :: S
+    cache   :: Cache{Array{T, N}}
+    lmax    :: Int
+    frequencies :: Vector{typeof(1.0u"Hz")}
+    bandwidth   :: Vector{typeof(1.0u"Hz")}
+end
+metadata_fields(array::LBlockArray) = (array.lmax, array.frequencies, array.bandwidth)
+nblocks(::Type{<:LBlockArray}, lmax, frequencies, bandwidth) = lmax+1
+linear_index(array::LBlockArray, l) = l+1
+indices(array::LBlockArray) = L(0):L(array.lmax)
+
+"Array that is split into blocks of l and m."
+struct LMBlockArray{T, N, S} <: AbstractBlockMatrix{Array{T, N}, 2}
+    storage :: S
+    cache   :: Cache{Array{T, N}}
+    lmax    :: Int
+    mmax    :: Int
+    frequencies :: Vector{typeof(1.0u"Hz")}
+    bandwidth   :: Vector{typeof(1.0u"Hz")}
+end
+metadata_fields(array::LMBlockArray) =
+    (array.lmax, array.mmax, array.frequencies, array.bandwidth)
+nblocks(::Type{<:LMBlockArray}, lmax, mmax, frequencies, bandwidth) =
+    ((2lmax + 2 - mmax) * (mmax + 1)) ÷ 2
+linear_index(array::LMBlockArray, l, m) =
+    (m * (2array.lmax - m + 3)) ÷ 2 + l - m + 1
+indices(array::LMBlockArray) =
+    ((l, m) for m = 0:array.mmax for l = m:array.lmax)
 
 const SimpleBlockVector = SimpleBlockArray{Complex128, 1}
 const SimpleBlockMatrix = SimpleBlockArray{Complex128, 2}
@@ -80,6 +99,13 @@ const  FBlockVector =  FBlockArray{Complex128, 1}
 const  FBlockMatrix =  FBlockArray{Complex128, 2}
 const MFBlockVector = MFBlockArray{Complex128, 1}
 const MFBlockMatrix = MFBlockArray{Complex128, 2}
+# The following type uses Matrix{Float64} blocks because we want to use it as an angular covariance
+# matrix, which is block diagonal in l and has real elements.
+const  LBlockMatrix =  LBlockArray{   Float64, 2}
+const LMBlockVector = LMBlockArray{Complex128, 1}
+
+# Specialized indexing rules
+# ==========================
 
 function Base.getindex(matrix::MFBlockVector, m::Int)
     blocks = [matrix[m, β] for β = 1:length(matrix.frequencies)]

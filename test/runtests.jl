@@ -14,6 +14,7 @@ srand(123)
         include("utilities/misc.jl")
         include("utilities/parallel.jl")
         include("utilities/recombination-lines.jl")
+        include("utilities/white-noise.jl")
     end
 
     @testset "sky" begin
@@ -31,7 +32,6 @@ srand(123)
         include("block-matrices/storage-mechanisms.jl")
         include("block-matrices/abstract-block-matrix.jl")
         include("block-matrices/concrete-block-matrices.jl")
-        include("block-matrices/random-block-vector.jl")
         include("block-matrices/broadcasting.jl")
     end
 
@@ -40,6 +40,7 @@ srand(123)
         include("fundamentals/noise-covariance-matrix.jl")
         include("fundamentals/angular-covariance-matrix.jl")
         include("fundamentals/m-modes.jl")
+        include("fundamentals/random-block-vector.jl")
     end
 
     @testset "algorithms" begin

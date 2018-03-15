@@ -56,11 +56,18 @@ function construct(T::Type{<:AbstractBlockMatrix{B}},
     if storage isa NoFile
         set!(cache)
     end
-    T(storage, cache, fields...)
+    # Sometimes we will get here with a few (but not all) type parameters already specified. Usually
+    # we'd need to provide a special constructor to help with that case, but instead we can discard
+    # these type parameters and call the regular constructor.
+    T′ = discard_type_parameters(T)
+    # Now it seems like sometimes we struggle to get the types exactly right for some of the
+    # metadata fields. Try to convert them to the correct type here.
+    fields′ = ((convert(fieldtype(T, idx+2), fields[idx]) for idx = 1:length(fields))...)
+    # Finally call the constructor with the converted fields.
+    T′(storage, cache, fields′...)
 end
 
-function create(T::Type{<:AbstractBlockMatrix{B}},
-                storage::Mechanism, fields...) where B
+function create(T::Type{<:AbstractBlockMatrix}, storage::Mechanism, fields...)
     output = construct(T, storage, fields...)
     write_metadata(storage, MatrixMetadata(output))
     output
@@ -78,17 +85,18 @@ function Base.similar(matrix::AbstractBlockMatrix, storage::Mechanism=NoFile())
     T = typeof(matrix)
     fields = metadata_fields(matrix)
     # Note that because the type of the storage mechanism might be used as a type parameter, we need
-    # to strip type parameters from `T` so that they can be re-inferred from the arguments. After
-    # playing around with this for a little bit, it looks like `T.name.wrapper` is the right way to
-    # do this.
-    create(T.name.wrapper, storage, fields...)
+    # to strip type parameters from `T` so that they can be re-inferred from the arguments.
+    create(discard_type_parameters(T), storage, fields...)
 end
 
-Base.getindex(matrix::AbstractBlockMatrix, idx::Int) = get(matrix, idx)
-Base.getindex(matrix::AbstractBlockMatrix, idx::Int, jdx::Int) = get(matrix, idx, jdx)
-Base.setindex!(matrix::AbstractBlockMatrix, block, idx::Int) = set!(matrix, block, idx)
-Base.setindex!(matrix::AbstractBlockMatrix, block, idx::Int, jdx::Int) =
-    set!(matrix, block, idx, jdx)
+Base.getindex(matrix::AbstractBlockMatrix, idx) =
+    get(matrix, convert(Int, idx))
+Base.getindex(matrix::AbstractBlockMatrix, idx, jdx) =
+    get(matrix, convert(Int, idx), convert(Int, jdx))
+Base.setindex!(matrix::AbstractBlockMatrix, block, idx) =
+    set!(matrix, block, convert(Int, idx))
+Base.setindex!(matrix::AbstractBlockMatrix, block, idx, jdx) =
+    set!(matrix, block, convert(Int, idx), convert(Int, jdx))
 
 @inline Base.getindex(matrix::AbstractBlockMatrix, idx::Tuple) = matrix[idx...]
 @inline Base.setindex!(matrix::AbstractBlockMatrix, block, idx::Tuple) = matrix[idx...] = block

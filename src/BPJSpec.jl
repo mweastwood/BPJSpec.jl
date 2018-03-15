@@ -38,11 +38,10 @@ estimation.
 """
 module BPJSpec
 
-# Matrices
 export NoFile, SingleFile, MultipleFiles
 export SimpleBlockMatrix, SimpleBlockVector
-export MBlockMatrix, FBlockMatrix, MFBlockMatrix
-export MBlockVector, FBlockVector, MFBlockVector
+export MBlockMatrix, FBlockMatrix, MFBlockMatrix, LBlockMatrix
+export MBlockVector, FBlockVector, MFBlockVector, LMBlockVector
 export TransferMatrix, NoiseCovarianceMatrix, AngularCovarianceMatrix, MModes
 export ProgressBar, compute!, cache!, flush!
 
@@ -71,6 +70,7 @@ using .CosmologyWrapper
 include("utilities/misc.jl")
 include("utilities/parallel.jl")
 include("utilities/recombination-lines.jl")
+include("utilities/white-noise.jl")
 
 abstract type SkyComponent end
 include("sky-components/foregrounds.jl")
@@ -83,7 +83,6 @@ include("interferometer/noise-model.jl")
 include("block-matrices/storage-mechanisms.jl")
 include("block-matrices/abstract-block-matrix.jl")
 include("block-matrices/concrete-block-matrices.jl")
-include("block-matrices/random-block-vector.jl")
 include("block-matrices/broadcasting.jl")
 
 include("fundamentals/transfer-matrix.jl")
@@ -91,6 +90,7 @@ include("fundamentals/noise-covariance-matrix.jl")
 include("fundamentals/angular-covariance-matrix.jl")
 include("fundamentals/m-modes.jl")
 include("fundamentals/angular-block-vector.jl")
+include("fundamentals/random-block-vector.jl")
 
 include("algorithms/permute-m-modes.jl")
 include("algorithms/average-frequency-channels.jl")
