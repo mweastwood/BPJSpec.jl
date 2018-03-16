@@ -24,16 +24,24 @@ distribute_read(::NoFile) = false
 struct SingleFile <: Mechanism
     path :: String
 end
-Base.show(io::IO, storage::SingleFile) = print(io, storage.path)
+Base.show(io::IO, storage::SingleFile) = print(io, "\"", storage.path, "\"")
 distribute_write(::SingleFile) = false
 distribute_read(::SingleFile) = true
 
 struct MultipleFiles <: Mechanism
     path :: String
 end
-Base.show(io::IO, storage::MultipleFiles) = print(io, storage.path)
+Base.show(io::IO, storage::MultipleFiles) = print(io, "\"", storage.path, "/*\"")
 distribute_write(::MultipleFiles) = true
 distribute_read(::MultipleFiles) = true
+
+struct HierarchicalStorage <: Mechanism
+    path :: String
+    hierarchy :: Hierarchy
+end
+Base.show(io::IO, storage::HierarchicalStorage) = print(io, "\"", storage.path, "/+\"")
+distribute_write(::HierarchicalStorage) = false
+distribute_read(::HierarchicalStorage) = true
 
 function write_metadata(storage::Mechanism, metadata)
     isdir(storage.path) || mkpath(storage.path)
@@ -122,8 +130,70 @@ function Base.getindex(storage::MultipleFiles, idx::Int, jdx::Int)
     end
 end
 
+function Base.getindex(storage::HierarchicalStorage, m, β)
+    hierarchy = storage.hierarchy
+
+    # load each hierarchical component of the matrix
+    blocks = Matrix{Complex128}[]
+    dirname  = @sprintf("%04d",      β)
+    filename = @sprintf("%04d.jld2", m)
+    jldopen(joinpath(storage.path, dirname, filename), mode[r]..., IOStream) do file
+        for idx = 1:length(hierarchy.divisions)-1
+            lmax = hierarchy.divisions[idx+1]
+            lmax ≥ m || continue
+            objectname = @sprintf("%04d", lmax)
+            push!(blocks, file[objectname])
+        end
+    end
+
+    # stitch the components together into a single matrix
+    output = zeros(Complex128,
+                   sum(    size(block, 1) for block in blocks),
+                   maximum(size(block, 2) for block in blocks))
+    offset = 1
+    for block in blocks
+        range1 = offset:offset+size(block, 1)-1
+        range2 = 1:size(block, 2)
+        output_view = @view output[range1, range2]
+        copy!(output_view, block)
+        offset += size(block, 1)
+    end
+    output
+end
+
+function Base.setindex!(storage::HierarchicalStorage, block, lmax, m, β)
+    dirname    = @sprintf("%04d",      β)
+    filename   = @sprintf("%04d.jld2", m)
+    objectname = @sprintf("%04d",   lmax)
+    isdir(joinpath(storage.path, dirname)) || mkpath(joinpath(storage.path, dirname))
+    jldopen(joinpath(storage.path, dirname, filename), mode[a]..., IOStream) do file
+        file[objectname] = block
+    end
+    block
+end
+
 @inline Base.getindex(storage::Mechanism, idx::Tuple) = storage[idx...]
 @inline Base.setindex!(storage::Mechanism, block, idx::Tuple) = storage[idx...] = block
+
+function rm_old_blocks!(storage::Mechanism)
+    # check to see if this path at least has a METADATA.jld2 files to help prevent this function
+    # from being used to delete root or home or something catastrophic like that
+    isfile(joinpath(storage.path, "METADATA.jld2")) || return
+    # now delete all of the JLD2 files
+    for (root, directories, files) in walkdir(storage.path)
+        for file in files
+            if endswith(file, ".jld2")
+                rm(joinpath(root, file))
+            end
+        end
+    end
+    # finally delete all of the empty directories
+    for (root, directories, files) in walkdir(storage.path)
+        if length(files) == 0
+            rm(root)
+        end
+    end
+end
 
 struct Cache{T}
     used  :: Ref{Bool}

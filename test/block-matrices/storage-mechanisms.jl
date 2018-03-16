@@ -9,7 +9,7 @@
     @testset "single file" begin
         path = tempname()
         storage = SingleFile(path)
-        @test repr(storage) == path
+        @test repr(storage) == "\""*path*"\""
         @test BPJSpec.distribute_write(storage) == false
         @test BPJSpec.distribute_read(storage) == true
 
@@ -32,7 +32,7 @@
     @testset "multiple files" begin
         path = tempname()
         storage = MultipleFiles(path)
-        @test repr(storage) == path
+        @test repr(storage) == "\""*path*"/*\""
         @test BPJSpec.distribute_write(storage) == true
         @test BPJSpec.distribute_read(storage) == true
 

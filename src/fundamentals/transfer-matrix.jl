@@ -13,97 +13,26 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-struct HierarchicalStorage <: Mechanism
-    path :: String
-    hierarchy :: Hierarchy
-end
-Base.show(io::IO, storage::HierarchicalStorage) = print(io, storage.path)
-distribute_write(::HierarchicalStorage) = false
-distribute_read(::HierarchicalStorage) = true
-
-# IMPORTANT
-# =========
-# The HierarchicalStorage mechanism works differently to the other storage mechanisms, which take
-# one or two indices that range from 1 to some maximum value. This allows those other mechanisms to
-# be generally useful as backends for a variety of matrix types.
-#
-# For the transfer matrix, however, the user is forced to use the HierarchicalStorage mechanism,
-# which is specialized for reducing the storage space required for storing short baselines within
-# the transfer matrix. However, in order to make this hierarchical storage work, we need to know the
-# value of m relative to lmax, so we need to index with m and β directly.
-#
-# One consequence of this is that the caching mechanism for AbstractBlockMatrices doesn't currently
-# work for TransferMatrices, but this can be fixed by making the caching mechanism slightly more
-# general (TODO).
-
-function Base.getindex(storage::HierarchicalStorage, m, β)
-    hierarchy = storage.hierarchy
-
-    # load each hierarchical component of the transfer matrix
-    blocks = Matrix{Complex128}[]
-    dirname  = @sprintf("%04d",      β)
-    filename = @sprintf("%04d.jld2", m)
-    jldopen(joinpath(storage.path, dirname, filename), mode[r]..., IOStream) do file
-        for idx = 1:length(hierarchy.divisions)-1
-            lmax = hierarchy.divisions[idx+1]
-            lmax ≥ m || continue
-            objectname = @sprintf("%04d", lmax)
-            push!(blocks, file[objectname])
-        end
-    end
-
-    # stitch the components together into a single matrix
-    output = zeros(Complex128,
-                   sum(    size(block, 1) for block in blocks),
-                   maximum(size(block, 2) for block in blocks))
-    offset = 1
-    for block in blocks
-        range1 = offset:offset+size(block, 1)-1
-        range2 = 1:size(block, 2)
-        output_view = @view output[range1, range2]
-        copy!(output_view, block)
-        offset += size(block, 1)
-    end
-    output
-end
-
-function Base.setindex!(storage::HierarchicalStorage, block, lmax, m, β)
-    # There seems to be some insinuation that mmap is causing problems. In particular, occasionally
-    # I see objects that should have been written to disk, but are instead all zeroes. This results
-    # in an InvalidDataException() when we try to read it again. The following line apparently tells
-    # JLD2 not to use mmap, but it's an undocumented interface.
-    #
-    #     jldopen(file, true, true, false, IOStream)
-    #
-    # Note also that (true, true, false) corresponds to the "a+" mode.
-    dirname    = @sprintf("%04d",      β)
-    filename   = @sprintf("%04d.jld2", m)
-    objectname = @sprintf("%04d",   lmax)
-    isdir(joinpath(storage.path, dirname)) || mkpath(joinpath(storage.path, dirname))
-    jldopen(joinpath(storage.path, dirname, filename), mode[a]..., IOStream) do file
-        file[objectname] = block
-    end
-    block
-end
-
 doc"""
-    struct TransferMatrix <: AbstractBlockMatrix{Matrix{Complex128}, 2}
+    struct TransferMatrix
 
-This type represents the transfer matrix of an interferometer. This matrix effectively describes how
-an interferometer responds to the sky, including the antenna primary beam, bandpass, and baseline
-distribution.
+This singleton type represents the transfer matrix of an interferometer. This matrix effectively
+describes how an interferometer responds to the sky, including the antenna primary beam, bandpass,
+and baseline distribution.
 
 This matrix is hierarchical in the sense that we save on some computational and storage requirements
 by separating long baselines from short baselines.
+"""
+#struct TransferMatrix end
 
 # Fields
 
-* `storage` contains instructions on how to read the matrix from disk
-* `cache` is used if we want to keep the matrix in memory
-* `metadata` stores the interferometer's metadata
-* `lmax` is the largest value of the $l$ quantum number used by the matrix
-* `mmax` is the largest value of the $m$ quantum number used by the matrix
-"""
+#* `storage` contains instructions on how to read the matrix from disk
+#* `cache` is used if we want to keep the matrix in memory
+#* `metadata` stores the interferometer's metadata
+#* `lmax` is the largest value of the $l$ quantum number used by the matrix
+#* `mmax` is the largest value of the $m$ quantum number used by the matrix
+
 struct TransferMatrix <: AbstractBlockMatrix{Matrix{Complex128}, 2}
     storage  :: HierarchicalStorage
     cache    :: Cache{Matrix{Complex128}}
@@ -125,15 +54,6 @@ function create(::Type{TransferMatrix}, path::String, metadata::Metadata;
     rm && rm_old_blocks!(storage, mmax, length(metadata.frequencies))
     write_metadata(storage, MatrixMetadata(output))
     output
-end
-
-function rm_old_blocks!(storage::HierarchicalStorage, mmax, Nfreq)
-    for β = 1:Nfreq, m = 0:mmax
-        dirname    = @sprintf("%04d",      β)
-        filename   = @sprintf("%04d.jld2", m)
-        path = joinpath(storage.path, dirname, filename)
-        isfile(path) && rm(path)
-    end
 end
 
 function compute!(transfermatrix::TransferMatrix, beam; progress=false)

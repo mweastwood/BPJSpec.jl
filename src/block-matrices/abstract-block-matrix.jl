@@ -67,8 +67,9 @@ function construct(T::Type{<:AbstractBlockMatrix{B}},
     T′(storage, cache, fields′...)
 end
 
-function create(T::Type{<:AbstractBlockMatrix}, storage::Mechanism, fields...)
+function create(T::Type{<:AbstractBlockMatrix}, storage::Mechanism, fields...; rm=false)
     output = construct(T, storage, fields...)
+    rm && rm_old_blocks!(storage)
     write_metadata(storage, MatrixMetadata(output))
     output
 end

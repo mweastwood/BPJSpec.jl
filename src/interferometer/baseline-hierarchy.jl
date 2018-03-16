@@ -19,6 +19,10 @@ struct Hierarchy
     Nfreq     :: Int
 end
 
+function Hierarchy(metadata::Metadata; lmax=maximum(maximum_multipole_moment(metadata))+1)
+    compute_baseline_hierarchy(metadata, lmax)
+end
+
 function Base.show(io::IO, hierarchy::Hierarchy)
     total_space = 0.0
     total_baselines = 0
