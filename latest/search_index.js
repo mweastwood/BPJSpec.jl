@@ -133,7 +133,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Enormous Matrices",
     "title": "Enormous Matrices",
     "category": "section",
-    "text": ""
+    "text": "m-mode analysis fundamentally involves operations on block-diagonal matrices. Although the block-diagonal structure of these matrices makes it possible to store and perform computations on these matrices, they can still be enormous. That is, while each block individually may fit in the system memory, multiple blocks may not. Here we introduce some of the abstractions developed for working with block diagonal matrices that may each be multiple terabytes in size."
 },
 
 {
@@ -145,19 +145,83 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "enormous-matrices/#BPJSpec.TransferMatrix",
+    "location": "enormous-matrices/#BPJSpec.SimpleBlockVector",
     "page": "Enormous Matrices",
-    "title": "BPJSpec.TransferMatrix",
+    "title": "BPJSpec.SimpleBlockVector",
     "category": "type",
-    "text": "struct TransferMatrix <: AbstractBlockMatrix{Matrix{Complex128}, 2}\n\nThis type represents the transfer matrix of an interferometer. This matrix effectively describes how an interferometer responds to the sky, including the antenna primary beam, bandpass, and baseline distribution.\n\nThis matrix is hierarchical in the sense that we save on some computational and storage requirements by separating long baselines from short baselines.\n\nFields\n\nstorage contains instructions on how to read the matrix from disk\ncache is used if we want to keep the matrix in memory\nmetadata stores the interferometer\'s metadata\nlmax is the largest value of the l quantum number used by the matrix\nmmax is the largest value of the m quantum number used by the matrix\n\n\n\n"
+    "text": "struct SimpleBlockVector <: AbstractBlockMatrix{Vector{Complex128}, 1}\n\nThis type represents a (potentially enormous) complex-valued vector that has been split into blocks. Each of these blocks is indexed by a number that varies from 1 to length.\n\nFields:\n\nstorage contains instructions on how to read the vector from disk\ncache is used if we want to keep the vector in memory\nlength determines the number of blocks the vector is divided into\n\nUsage:\n\njulia> x = BPJSpec.create(SimpleBlockVector, 10)\nSimpleBlockVector(<no file>, cached=true, length=10)\n\njulia> x[5] = Complex128[1, 2, 3, 4, 5];\n\njulia> x[5]\n5-element Array{Complex{Float64},1}:\n 1.0+0.0im\n 2.0+0.0im\n 3.0+0.0im\n 4.0+0.0im\n 5.0+0.0im\n\nSee also: SimpleBlockMatrix, AbstractBlockMatrix\n\n\n\n"
 },
 
 {
-    "location": "enormous-matrices/#BPJSpec.MModes",
+    "location": "enormous-matrices/#BPJSpec.SimpleBlockMatrix",
     "page": "Enormous Matrices",
-    "title": "BPJSpec.MModes",
+    "title": "BPJSpec.SimpleBlockMatrix",
     "category": "type",
-    "text": "struct MModes{S} <: AbstractBlockMatrix{Vector{Complex128}, 2}\n\nThis type represents the m-modes measured by the interferometer.\n\nFields\n\nstorage contains instructions on how to read the m-modes from disk\ncache is used if we want to keep the m-modes in memory\nmmax is the largest value of the m quantum number\nfrequencies is the list of frequencies\nbandwidth is the bandwidth associated with each frequency channel\n\n\n\n"
+    "text": "struct SimpleBlockMatrix <: AbstractBlockMatrix{Matrix{Complex128}, 1}\n\nThis type represents a (potentially enormous) complex-valued matrix that has been split into blocks. Each of these blocks is indexed by a number that varies from 1 to length.\n\nFields:\n\nstorage contains instructions on how to read the matrix from disk\ncache is used if we want to keep the matrix in memory\nlength determines the number of blocks the matrix is divided into\n\nUsage:\n\njulia> x = BPJSpec.create(SimpleBlockMatrix, 10)\nSimpleBlockMatrix(<no file>, cached=true, length=10)\n\njulia> x[5] = Complex128[1 2; 3 4];\n\njulia> x[5]\n2×2 Array{Complex{Float64},2}:\n 1.0+0.0im  2.0+0.0im\n 3.0+0.0im  4.0+0.0im\n\nSee also: SimpleBlockVector, AbstractBlockMatrix\n\n\n\n"
+},
+
+{
+    "location": "enormous-matrices/#BPJSpec.MBlockVector",
+    "page": "Enormous Matrices",
+    "title": "BPJSpec.MBlockVector",
+    "category": "type",
+    "text": "struct MBlockVector <: AbstractBlockMatrix{Vector{Complex128}, 1}\n\nThis type represents a (potentially enormous) complex-valued vector that has been split into blocks. Each of these blocks is indexed by its value of m that varies from 0 to mmax.\n\nFields:\n\nstorage contains instructions on how to read the matrix from disk\ncache is used if we want to keep the matrix in memory\nmmax determines the largest value of the m quantum number used by the matrix\n\nUsage:\n\njulia> x = BPJSpec.create(MBlockVector, 10)\nMBlockVector(<no file>, cached=true, mmax=10)\n\njulia> x[0] = Complex128[1, 2, 3, 4, 5];\n\njulia> x[0]\n5-element Array{Complex{Float64},1}:\n 1.0+0.0im\n 2.0+0.0im\n 3.0+0.0im\n 4.0+0.0im\n 5.0+0.0im\n\nSee also: MBlockMatrix, AbstractBlockMatrix\n\n\n\n"
+},
+
+{
+    "location": "enormous-matrices/#BPJSpec.MBlockMatrix",
+    "page": "Enormous Matrices",
+    "title": "BPJSpec.MBlockMatrix",
+    "category": "type",
+    "text": "struct MBlockMatrix <: AbstractBlockMatrix{Matrix{Complex128}, 1}\n\nThis type represents a (potentially enormous) complex-valued matrix that has been split into blocks. Each of these blocks is indexed by its value of m that varies from 0 to mmax.\n\nFields:\n\nstorage contains instructions on how to read the matrix from disk\ncache is used if we want to keep the matrix in memory\nmmax determines the largest value of the m quantum number used by the matrix\n\nUsage:\n\njulia> x = BPJSpec.create(MBlockMatrix, 10)\nMBlockMatrix(<no file>, cached=true, mmax=10)\n\njulia> x[0] = Complex128[1 2; 3 4];\n\njulia> x[0]\n2×2 Array{Complex{Float64},2}:\n 1.0+0.0im  2.0+0.0im\n 3.0+0.0im  4.0+0.0im\n\nSee also: MBlockVector, AbstractBlockMatrix\n\n\n\n"
+},
+
+{
+    "location": "enormous-matrices/#BPJSpec.FBlockVector",
+    "page": "Enormous Matrices",
+    "title": "BPJSpec.FBlockVector",
+    "category": "type",
+    "text": "struct FBlockVector <: AbstractBlockMatrix{Vector{Complex128}, 1}\n\nThis type represents a (potentially enormous) complex-valued vector that has been split into blocks. Each of these blocks is indexed by the index of the corresponding frequency channel, which varies from 1 to length(frequencies).\n\nFields:\n\nstorage contains instructions on how to read the matrix from disk\ncache is used if we want to keep the matrix in memory\nfrequencies is a list of the frequency channels represented by this matrix\nbandwidth is a list of the corresponding bandwidth of each frequency channel\n\nUsage:\n\njulia> x = BPJSpec.create(FBlockVector, [74u\"MHz\", 100u\"MHz\"], [24u\"kHz\", 24u\"kHz\"])\nFBlockVector(<no file>, cached=true, frequencies=74.000 MHz…100.000 MHz, bandwidth~24 kHz)\n\njulia> x[1] = Complex128[1, 2, 3, 4, 5];\n\njulia> x[1]\n5-element Array{Complex{Float64},1}:\n 1.0+0.0im\n 2.0+0.0im\n 3.0+0.0im\n 4.0+0.0im\n 5.0+0.0im\n\nSee also: FBlockMatrix, AbstractBlockMatrix\n\n\n\n"
+},
+
+{
+    "location": "enormous-matrices/#BPJSpec.FBlockMatrix",
+    "page": "Enormous Matrices",
+    "title": "BPJSpec.FBlockMatrix",
+    "category": "type",
+    "text": "struct FBlockMatrix <: AbstractBlockMatrix{Matrix{Complex128}, 1}\n\nThis type represents a (potentially enormous) complex-valued matrix that has been split into blocks. Each of these blocks is indexed by the index of the corresponding frequency channel, which varies from 1 to length(frequencies).\n\nFields:\n\nstorage contains instructions on how to read the matrix from disk\ncache is used if we want to keep the matrix in memory\nfrequencies is a list of the frequency channels represented by this matrix\nbandwidth is a list of the corresponding bandwidth of each frequency channel\n\nUsage:\n\njulia> x = BPJSpec.create(FBlockMatrix, [74u\"MHz\", 100u\"MHz\"], [24u\"kHz\", 24u\"kHz\"])\nFBlockMatrix(<no file>, cached=true, frequencies=74.000 MHz…100.000 MHz, bandwidth~24 kHz)\n\njulia> x[1] = Complex128[1 2; 3 4];\n\njulia> x[1]\n2×2 Array{Complex{Float64},2}:\n 1.0+0.0im  2.0+0.0im\n 3.0+0.0im  4.0+0.0im\n\nSee also: FBlockVector, AbstractBlockMatrix\n\n\n\n"
+},
+
+{
+    "location": "enormous-matrices/#BPJSpec.MFBlockVector",
+    "page": "Enormous Matrices",
+    "title": "BPJSpec.MFBlockVector",
+    "category": "type",
+    "text": "struct MFBlockVector <: AbstractBlockMatrix{Vector{Complex128}, 2}\n\nThis type represents a (potentially enormous) complex-valued vector that has been split into blocks. Each of these blocks is indexed by its value of m, which varies from 0 to mmax, and the index of the corresponding frequency channel, which varies from 1 to length(frequencies).\n\nFields:\n\nstorage contains instructions on how to read the matrix from disk\ncache is used if we want to keep the matrix in memory\nmmax determines the largest value of the m quantum number used by the matrix\nfrequencies is a list of the frequency channels represented by this matrix\nbandwidth is a list of the corresponding bandwidth of each frequency channel\n\nUsage:\n\njulia> x = BPJSpec.create(MFBlockVector, 2, [74u\"MHz\", 100u\"MHz\"], [24u\"kHz\", 24u\"kHz\"])\nMFBlockVector(<no file>, cached=true, mmax=2, frequencies=74.000 MHz…100.000 MHz, bandwidth~24 kHz)\n\njulia> x[0, 1] = Complex128[1, 2, 3, 4, 5];\n\njulia> x[0, 1]\n5-element Array{Complex{Float64},1}:\n 1.0+0.0im\n 2.0+0.0im\n 3.0+0.0im\n 4.0+0.0im\n 5.0+0.0im\n\nSee also: MFBlockMatrix, AbstractBlockMatrix\n\n\n\n"
+},
+
+{
+    "location": "enormous-matrices/#BPJSpec.MFBlockMatrix",
+    "page": "Enormous Matrices",
+    "title": "BPJSpec.MFBlockMatrix",
+    "category": "type",
+    "text": "struct MFBlockMatrix <: AbstractBlockMatrix{Matrix{Complex128}, 2}\n\nThis type represents a (potentially enormous) complex-valued matrix that has been split into blocks. Each of these blocks is indexed by its value of m, which varies from 0 to mmax, and the index of the corresponding frequency channel, which varies from 1 to length(frequencies).\n\nFields:\n\nstorage contains instructions on how to read the matrix from disk\ncache is used if we want to keep the matrix in memory\nmmax determines the largest value of the m quantum number used by the matrix\nfrequencies is a list of the frequency channels represented by this matrix\nbandwidth is a list of the corresponding bandwidth of each frequency channel\n\nUsage:\n\njulia> x = BPJSpec.create(MFBlockMatrix, 2, [74u\"MHz\", 100u\"MHz\"], [24u\"kHz\", 24u\"kHz\"])\nMFBlockMatrix(<no file>, cached=true, mmax=2, frequencies=74.000 MHz…100.000 MHz, bandwidth~24 kHz)\n\njulia> x[0, 1] = Complex128[1 2; 3 4];\n\njulia> x[0, 1]\n2×2 Array{Complex{Float64},2}:\n 1.0+0.0im  2.0+0.0im\n 3.0+0.0im  4.0+0.0im\n\nSee also: MFBlockVector, AbstractBlockMatrix\n\n\n\n"
+},
+
+{
+    "location": "enormous-matrices/#BPJSpec.LBlockMatrix",
+    "page": "Enormous Matrices",
+    "title": "BPJSpec.LBlockMatrix",
+    "category": "type",
+    "text": "struct LBlockMatrix <: AbstractBlockMatrix{Matrix{Float64}, 1}\n\nThis type represents a (potentially enormous) complex-valued matrix that has been split into blocks. Each of these blocks is indexed by its value of l, which varies from 0 to lmax.\n\nFields:\n\nstorage contains instructions on how to read the matrix from disk\ncache is used if we want to keep the matrix in memory\nlmax determines the largest value of the l quantum number used by the matrix\nfrequencies is a list of the frequency channels represented by this matrix\nbandwidth is a list of the corresponding bandwidth of each frequency channel\n\nUsage:\n\njulia> x = BPJSpec.create(LBlockMatrix, 2, [74u\"MHz\", 100u\"MHz\"], [24u\"kHz\", 24u\"kHz\"])\nLBlockMatrix(<no file>, cached=true, lmax=2, frequencies=74.000 MHz…100.000 MHz, bandwidth~24 kHz)\n\njulia> x[0] = Float64[1 2; 3 4];\n\njulia> x[0]\n2×2 Array{Float64,2}:\n 1.0  2.0\n 3.0  4.0\n\nSee also: LMBlockVector, AbstractBlockMatrix\n\n\n\n"
+},
+
+{
+    "location": "enormous-matrices/#BPJSpec.LMBlockVector",
+    "page": "Enormous Matrices",
+    "title": "BPJSpec.LMBlockVector",
+    "category": "type",
+    "text": "struct LMBlockVector <: AbstractBlockMatrix{Vector{Complex128}, 2}\n\nThis type represents a (potentially enormous) complex-valued vector that has been split into blocks. Each of these blocks is indexed by its value of l, which varies from 0 to lmax, and m, which varies from 0 to mmax with the restriction that m  l.\n\nFields:\n\nstorage contains instructions on how to read the matrix from disk\ncache is used if we want to keep the matrix in memory\nlmax determines the largest value of the l quantum number used by the matrix\nmmax determines the largest value of the m quantum number used by the matrix\nfrequencies is a list of the frequency channels represented by this matrix\nbandwidth is a list of the corresponding bandwidth of each frequency channel\n\nUsage:\n\njulia> x = BPJSpec.create(LMBlockVector, 2, 2, [74u\"MHz\", 100u\"MHz\"], [24u\"kHz\", 24u\"kHz\"])\nLMBlockVector(<no file>, cached=true, lmax=2, mmax=2, frequencies=74.000 MHz…100.000 MHz, bandwidth~24 kHz)\n\njulia> x[0, 0] = Complex128[1, 2, 3, 4, 5];\n\njulia> x[0, 0]\n5-element Array{Complex{Float64},1}:\n 1.0+0.0im\n 2.0+0.0im\n 3.0+0.0im\n 4.0+0.0im\n 5.0+0.0im\n\nSee also: LBlockMatrix, AbstractBlockMatrix\n\n\n\n"
 },
 
 {
@@ -165,7 +229,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Enormous Matrices",
     "title": "API",
     "category": "section",
-    "text": "CurrentModule = BPJSpec\nDocTestSetup = quote\n    using BPJSpec\nendAbstractBlockMatrix\nTransferMatrix\nMModes"
+    "text": "CurrentModule = BPJSpec\nDocTestSetup = quote\n    using BPJSpec\n    using Unitful\nendAbstractBlockMatrix\nSimpleBlockVector\nSimpleBlockMatrix\nMBlockVector\nMBlockMatrix\nFBlockVector\nFBlockMatrix\nMFBlockVector\nMFBlockMatrix\nLBlockMatrix\nLMBlockVector"
 },
 
 {
