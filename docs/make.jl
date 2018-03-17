@@ -19,7 +19,7 @@ makedocs(
     format = :html,
     sitename  = "BPJSpec",
     authors   = "Michael Eastwood",
-    linkcheck = true,
+    linkcheck = ("local" in ARGS),
     html_prettyurls = !("local" in ARGS),
     pages = [
         "Home"                 => "index.md",
