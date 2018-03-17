@@ -43,7 +43,7 @@ export SimpleBlockMatrix, SimpleBlockVector
 export MBlockMatrix, FBlockMatrix, MFBlockMatrix, LBlockMatrix
 export MBlockVector, FBlockVector, MFBlockVector, LMBlockVector
 export TransferMatrix, NoiseCovarianceMatrix, AngularCovarianceMatrix, MModes
-export ProgressBar, compute!, cache!, flush!
+export ProgressBar, create, compute!, cache!, flush!
 
 using Unitful, UnitfulAstro # Travis CI fails with "invalid age range update" unless this is first
 
@@ -66,6 +66,11 @@ using .FastTransformsWrapper
 # include functionality from ApproxFun.jl to allow more rapid evaluation of these functions.
 include("wrappers/CosmologyWrapper.jl")
 using .CosmologyWrapper
+
+# Defines an itnerface to GSL.jl's spherical harmonic functions. GSL is a pretty large dependency,
+# but it provides robust spherical harmonic routines that I am confident I can rely on if necessary.
+include("wrappers/GSLWrapper.jl")
+using .GSLWrapper
 
 include("utilities/misc.jl")
 include("utilities/parallel.jl")

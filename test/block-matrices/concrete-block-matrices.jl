@@ -3,8 +3,8 @@ function test_matrix(T, eltype, N, idx1, idx2, fields...)
     path2 = tempname()
     for S in (NoFile, SingleFile, MultipleFiles)
         try
-            matrix1 = BPJSpec.create(T, S(path1), fields...)
-            matrix2 = BPJSpec.create(T, S(path2), fields...)
+            matrix1 = create(T, S(path1), fields...)
+            matrix2 = create(T, S(path2), fields...)
             if N == 1
                 X = rand(eltype, 5)
                 Y = rand(eltype, 3)

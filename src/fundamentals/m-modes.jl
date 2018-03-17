@@ -14,35 +14,26 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 doc"""
-    struct MModes{S} <: AbstractBlockMatrix{Vector{Complex128}, 2}
+    struct MModes
 
-This type represents the $m$-modes measured by the interferometer.
+This singleton type represents the $m$-modes measured by the interferometer. $m$-modes are computed
+from a Fourier transform of the measured visibilities over sidereal time $ϕ ∈ [0, 2π)$.
 
-# Fields
-
-* `storage` contains instructions on how to read the m-modes from disk
-* `cache` is used if we want to keep the $m$-modes in memory
-* `mmax` is the largest value of the $m$ quantum number
-* `frequencies` is the list of frequencies
-* `bandwidth` is the bandwidth associated with each frequency channel
+```math
+\text{m-mode} = \int_0^{2π} (\text{visibility}) \times e^{-imϕ} \, {\rm d}ϕ
+```
 """
-struct MModes{S} <: AbstractBlockMatrix{Vector{Complex128}, 2}
-    storage :: S
-    cache   :: Cache{Vector{Complex128}}
-    mmax    :: Int
-    frequencies :: Vector{typeof(1.0u"Hz")}
-    bandwidth   :: Vector{typeof(1.0u"Hz")}
+struct MModes end
+
+function create(::Type{MModes}, storage::Mechanism,
+                metadata::Metadata, hierarchy::Hierarchy; rm=false)
+    output = create(MFBlockVector, storage, hierarchy.lmax,
+                    metadata.frequencies, metadata.bandwidth, rm=rm)
+    output
 end
-function MModes(storage::S, cache, mmax, frequencies, bandwidth) where S
-    MModes{S}(storage, cache, mmax, frequencies, bandwidth)
-end
-metadata_fields(mmodes::MModes) = (mmodes.mmax, mmodes.frequencies, mmodes.bandwidth)
-nblocks(::Type{<:MModes}, mmax, frequencies, bandwidth) = (mmax+1)*length(frequencies)
-linear_index(mmodes::MModes, m, β) = (mmodes.mmax+1)*(β-1) + (m+1)
-indices(mmodes::MModes) = ((m, β) for β = 1:length(mmodes.frequencies) for m = 0:mmodes.mmax)
 
 "Compute m-modes from two dimensional matrix of visibilities (time × baseline)."
-function compute!(mmodes::MModes, visibilities::Matrix{Complex128}, β)
+function compute!(::Type{MModes}, mmodes::MFBlockVector, visibilities::Matrix{Complex128}, β)
     store!(mmodes, fourier_transform(visibilities), β)
 end
 

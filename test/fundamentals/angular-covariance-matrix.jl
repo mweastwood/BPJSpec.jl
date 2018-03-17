@@ -20,8 +20,7 @@ end
     frequencies = [45u"MHz", 74u"MHz"]
     bandwidth   = [ 1u"Hz",   2u"Hz" ]
     component = BPJSpec.galactic_synchrotron()
-    C = BPJSpec.create(AngularCovarianceMatrix, lmax, frequencies, bandwidth)
-    compute!(C, component)
+    C = create(AngularCovarianceMatrix, NoFile(), component, lmax, frequencies, bandwidth)
     @test C[1, 0] == C[1, 1] # independent of m
     for l = 0:lmax
         Cl = C[l, 0]
@@ -42,8 +41,7 @@ end
     component = SillySkyComponent()
     frequencies = [45u"MHz", 74u"MHz"]
     bandwidth   = [20u"MHz", 20u"MHz"] # add a lot of bandwidth to make bandwidth smearing important
-    C = BPJSpec.create(AngularCovarianceMatrix, lmax, frequencies, bandwidth)
-    compute!(C, component)
+    C = create(AngularCovarianceMatrix, NoFile(), component, lmax, frequencies, bandwidth)
     for l = 0:lmax
         Cl = C[l, 0]
         for β1 = 1:length(frequencies), β2 = 1:length(frequencies)
@@ -59,8 +57,7 @@ end
     # carefully chosen frequency and bandwidth to make this smear to zero
     frequencies = [100u"MHz"]
     bandwidth   = [20u"MHz"]
-    C = BPJSpec.create(AngularCovarianceMatrix, lmax, frequencies, bandwidth)
-    compute!(C, component)
+    C = create(AngularCovarianceMatrix, NoFile(), component, lmax, frequencies, bandwidth)
     for l = 0:lmax
         Cl = C[l, 0]
         for β1 = 1:length(frequencies), β2 = 1:length(frequencies)

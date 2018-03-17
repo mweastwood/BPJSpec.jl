@@ -4,6 +4,7 @@ CasaCore
 Cosmology
 Cubature
 FastTransforms
+GSL
 JLD2
 MacroTools
 ProgressMeter

@@ -17,5 +17,18 @@ frequency
 redshift
 ```
 
+## GSLWrapper.jl
+
+```@meta
+CurrentModule = BPJSpec
+DocTestSetup = quote
+    using BPJSpec.GSLWrapper
+end
+```
+
+```@docs
+Y
+```
+
 ## FastTransformsWrapper.jl
 

@@ -1,14 +1,3 @@
-let Nbase = 10
-    @test BPJSpec.initial_block_size(BPJSpec.DiagonalNoiseMatrix,Nbase,0) == (10,)
-    @test BPJSpec.initial_block_size(BPJSpec.DiagonalNoiseMatrix,Nbase,1) == (20,)
-    @test BPJSpec.initial_block_size(BPJSpec.DiagonalNoiseMatrix,Nbase,2) == (20,)
-
-    N = BPJSpec.DiagonalNoiseMatrix(Nbase,2,45e6)
-    @test size(N[1]) == (10,10)
-    @test size(N[2]) == (20,20)
-    @test size(N[3]) == (20,20)
-end
-
 # test NoiseModel
 let
     Tsys0 = 6420
@@ -41,28 +30,5 @@ let Nbase = 10, lmax = 2, mmax = 2
     N′ = P*N*P'
     @test typeof(N′) == BPJSpec.NoiseMatrix
     @test full(N′) ≈ full(P)*full(N)*full(P)'
-end
-
-# test noise covariance matrix i/o
-let Nbase = 100, mmax = 20
-    filename = tempname()*".jld"
-    ν = 45e6
-
-    N1 = BPJSpec.NoiseMatrix([BPJSpec.MatrixBlock(rand(Complex128,Nbase,Nbase)) for m = 0:mmax],
-                             BPJSpec.NoiseMeta(mmax,ν))
-    BPJSpec.save(filename,N1)
-
-    N2 = BPJSpec.load(filename,mmax,ν)
-    @test N1 == N2
-
-    # and make sure we can write multiple frequencies to the same file
-    N3 = BPJSpec.NoiseMatrix([BPJSpec.MatrixBlock(rand(Complex128,Nbase,Nbase)) for m = 0:mmax],
-                             BPJSpec.NoiseMeta(mmax,ν+1e6))
-    BPJSpec.save(filename,N3)
-
-    N4 = BPJSpec.load(filename,mmax,ν)
-    N5 = BPJSpec.load(filename,mmax,ν+1e6)
-    @test N1 == N4
-    @test N3 == N5
 end
 

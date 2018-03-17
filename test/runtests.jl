@@ -8,6 +8,7 @@ srand(123)
     @testset "wrappers" begin
         include("wrappers/FastTransformsWrapper.jl")
         include("wrappers/CosmologyWrapper.jl")
+        include("wrappers/GSLWrapper.jl")
     end
 
     @testset "utilities" begin

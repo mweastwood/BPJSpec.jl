@@ -74,8 +74,8 @@ function create(T::Type{<:AbstractBlockMatrix}, storage::Mechanism, fields...; r
     output
 end
 
-@inline    create(T, fields...) =    create(T, NoFile(), fields...)
-@inline construct(T, fields...) = construct(T, NoFile(), fields...)
+@inline    create(T::Type{<:AbstractBlockMatrix}, fields...) =    create(T, NoFile(), fields...)
+@inline construct(T::Type{<:AbstractBlockMatrix}, fields...) = construct(T, NoFile(), fields...)
 
 function load(path::String)
     storage, metadata = read_metadata(path)

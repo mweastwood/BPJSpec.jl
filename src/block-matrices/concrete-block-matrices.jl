@@ -60,6 +60,20 @@ nblocks(::Type{<:MFBlockArray}, mmax, frequencies, bandwidth) = (mmax+1)*length(
 linear_index(array::MFBlockArray, m, β) = (array.mmax+1)*(β-1) + (m+1)
 indices(array::MFBlockArray) = ((m, β) for β = 1:length(array.frequencies) for m = 0:array.mmax)
 
+"Diagonal array that is split into blocks of m and frequency."
+struct MFDiagonalBlockArray{T, S} <: AbstractBlockMatrix{Diagonal{T}, 2}
+    storage :: S
+    cache   :: Cache{Diagonal{T}}
+    mmax    :: Int
+    frequencies :: Vector{typeof(1.0u"Hz")}
+    bandwidth   :: Vector{typeof(1.0u"Hz")}
+end
+metadata_fields(array::MFDiagonalBlockArray) = (array.mmax, array.frequencies, array.bandwidth)
+nblocks(::Type{<:MFDiagonalBlockArray}, mmax, frequencies, bandwidth) = (mmax+1)*length(frequencies)
+linear_index(array::MFDiagonalBlockArray, m, β) = (array.mmax+1)*(β-1) + (m+1)
+indices(array::MFDiagonalBlockArray) =
+    ((m, β) for β = 1:length(array.frequencies) for m = 0:array.mmax)
+
 "Array that is split into blocks of l."
 struct LBlockArray{T, N, S} <: AbstractBlockMatrix{Array{T, N}, 1}
     storage :: S
@@ -106,7 +120,7 @@ Each of these blocks is indexed by a number that varies from `1` to `length`.
 **Usage:**
 
 ```jldoctest
-julia> x = BPJSpec.create(SimpleBlockVector, 10)
+julia> x = create(SimpleBlockVector, 10)
 SimpleBlockVector(<no file>, cached=true, length=10)
 
 julia> x[5] = Complex128[1, 2, 3, 4, 5];
@@ -143,7 +157,7 @@ Each of these blocks is indexed by a number that varies from `1` to `length`.
 **Usage:**
 
 ```jldoctest
-julia> x = BPJSpec.create(SimpleBlockMatrix, 10)
+julia> x = create(SimpleBlockMatrix, 10)
 SimpleBlockMatrix(<no file>, cached=true, length=10)
 
 julia> x[5] = Complex128[1 2; 3 4];
@@ -177,7 +191,7 @@ Each of these blocks is indexed by its value of $m$ that varies from `0` to `mma
 **Usage:**
 
 ```jldoctest
-julia> x = BPJSpec.create(MBlockVector, 10)
+julia> x = create(MBlockVector, 10)
 MBlockVector(<no file>, cached=true, mmax=10)
 
 julia> x[0] = Complex128[1, 2, 3, 4, 5];
@@ -214,7 +228,7 @@ Each of these blocks is indexed by its value of $m$ that varies from `0` to `mma
 **Usage:**
 
 ```jldoctest
-julia> x = BPJSpec.create(MBlockMatrix, 10)
+julia> x = create(MBlockMatrix, 10)
 MBlockMatrix(<no file>, cached=true, mmax=10)
 
 julia> x[0] = Complex128[1 2; 3 4];
@@ -250,7 +264,7 @@ from `1` to `length(frequencies)`.
 **Usage:**
 
 ```jldoctest
-julia> x = BPJSpec.create(FBlockVector, [74u"MHz", 100u"MHz"], [24u"kHz", 24u"kHz"])
+julia> x = create(FBlockVector, [74u"MHz", 100u"MHz"], [24u"kHz", 24u"kHz"])
 FBlockVector(<no file>, cached=true, frequencies=74.000 MHz…100.000 MHz, bandwidth~24 kHz)
 
 julia> x[1] = Complex128[1, 2, 3, 4, 5];
@@ -291,7 +305,7 @@ from `1` to `length(frequencies)`.
 **Usage:**
 
 ```jldoctest
-julia> x = BPJSpec.create(FBlockMatrix, [74u"MHz", 100u"MHz"], [24u"kHz", 24u"kHz"])
+julia> x = create(FBlockMatrix, [74u"MHz", 100u"MHz"], [24u"kHz", 24u"kHz"])
 FBlockMatrix(<no file>, cached=true, frequencies=74.000 MHz…100.000 MHz, bandwidth~24 kHz)
 
 julia> x[1] = Complex128[1 2; 3 4];
@@ -330,7 +344,7 @@ of the corresponding frequency channel, which varies from `1` to `length(frequen
 **Usage:**
 
 ```jldoctest
-julia> x = BPJSpec.create(MFBlockVector, 2, [74u"MHz", 100u"MHz"], [24u"kHz", 24u"kHz"])
+julia> x = create(MFBlockVector, 2, [74u"MHz", 100u"MHz"], [24u"kHz", 24u"kHz"])
 MFBlockVector(<no file>, cached=true, mmax=2, frequencies=74.000 MHz…100.000 MHz, bandwidth~24 kHz)
 
 julia> x[0, 1] = Complex128[1, 2, 3, 4, 5];
@@ -355,6 +369,18 @@ function Base.show(io::IO, vector::MFBlockVector)
             u(u"kHz", mean(vector.bandwidth)))
 end
 
+function Base.getindex(matrix::MFBlockVector, m::Int)
+    blocks = [matrix[m, β] for β = 1:length(matrix.frequencies)]
+    X = sum(size.(blocks, 1))
+    output = zeros(eltype(first(blocks)), X)
+    x = 1
+    for block in blocks
+        output[x:x+size(block, 1)-1] = block
+        x += size(block, 1)
+    end
+    output
+end
+
 doc"""
     struct MFBlockMatrix <: AbstractBlockMatrix{Matrix{Complex128}, 2}
 
@@ -373,7 +399,7 @@ of the corresponding frequency channel, which varies from `1` to `length(frequen
 **Usage:**
 
 ```jldoctest
-julia> x = BPJSpec.create(MFBlockMatrix, 2, [74u"MHz", 100u"MHz"], [24u"kHz", 24u"kHz"])
+julia> x = create(MFBlockMatrix, 2, [74u"MHz", 100u"MHz"], [24u"kHz", 24u"kHz"])
 MFBlockMatrix(<no file>, cached=true, mmax=2, frequencies=74.000 MHz…100.000 MHz, bandwidth~24 kHz)
 
 julia> x[0, 1] = Complex128[1 2; 3 4];
@@ -389,6 +415,64 @@ julia> x[0, 1]
 const MFBlockMatrix = MFBlockArray{Complex128, 2}
 function Base.show(io::IO, matrix::MFBlockMatrix)
     @printf(io, "MFBlockMatrix(%s, cached=%s, mmax=%d, ",
+            matrix.storage, used(matrix.cache) ? "true" : "false", matrix.mmax)
+    @printf(io, "frequencies=%.3f MHz…%.3f MHz, bandwidth~%.0f kHz)",
+            u(u"MHz", matrix.frequencies[1]), u(u"MHz", matrix.frequencies[end]),
+            u(u"kHz", mean(matrix.bandwidth)))
+end
+
+function Base.getindex(matrix::MFBlockMatrix, m::Int)
+    blocks = [matrix[m, β] for β = 1:length(matrix.frequencies)]
+    X = sum(size.(blocks, 1))
+    Y = sum(size.(blocks, 2))
+    output = zeros(eltype(first(blocks)), X, Y)
+    x = y = 1
+    for block in blocks
+        output[x:x+size(block, 1)-1, y:y+size(block, 2)-1] = block
+        x += size(block, 1)
+        y += size(block, 2)
+    end
+    output
+end
+
+# The following type uses Diagonaal{Float64} blocks because we want to use it as a noise covariance
+# matrix.
+
+doc"""
+    struct MFDiagonalBlockMatrix <: AbstractBlockMatrix{Diagonal{Float64}, 2}
+
+This type represents a (potentially enormous) complex-valued diagonal matrix that has been split
+into blocks.  Each of these blocks is indexed by its value of $m$, which varies from `0` to `mmax`,
+and the index of the corresponding frequency channel, which varies from `1` to
+`length(frequencies)`.
+
+**Fields:**
+
+* `storage` contains instructions on how to read the matrix from disk
+* `cache` is used if we want to keep the matrix in memory
+* `mmax` determines the largest value of the $m$ quantum number used by the matrix
+* `frequencies` is a list of the frequency channels represented by this matrix
+* `bandwidth` is a list of the corresponding bandwidth of each frequency channel
+
+**Usage:**
+
+```jldoctest
+julia> x = create(MFDiagonalBlockMatrix, 2, [74u"MHz", 100u"MHz"], [24u"kHz", 24u"kHz"])
+MFDiagonalBlockMatrix(<no file>, cached=true, mmax=2, frequencies=74.000 MHz…100.000 MHz, bandwidth~24 kHz)
+
+julia> x[0, 1] = Diagonal(Float64[1, 2]);
+
+julia> x[0, 1]
+2×2 Diagonal{Float64}:
+ 1.0   ⋅ 
+  ⋅   2.0
+```
+
+**See also:** [`MFBlockMatrix`](@ref), [`AbstractBlockMatrix`](@ref)
+"""
+const MFDiagonalBlockMatrix = MFDiagonalBlockArray{Float64}
+function Base.show(io::IO, matrix::MFDiagonalBlockMatrix)
+    @printf(io, "MFDiagonalBlockMatrix(%s, cached=%s, mmax=%d, ",
             matrix.storage, used(matrix.cache) ? "true" : "false", matrix.mmax)
     @printf(io, "frequencies=%.3f MHz…%.3f MHz, bandwidth~%.0f kHz)",
             u(u"MHz", matrix.frequencies[1]), u(u"MHz", matrix.frequencies[end]),
@@ -415,7 +499,7 @@ Each of these blocks is indexed by its value of $l$, which varies from `0` to `l
 **Usage:**
 
 ```jldoctest
-julia> x = BPJSpec.create(LBlockMatrix, 2, [74u"MHz", 100u"MHz"], [24u"kHz", 24u"kHz"])
+julia> x = create(LBlockMatrix, 2, [74u"MHz", 100u"MHz"], [24u"kHz", 24u"kHz"])
 LBlockMatrix(<no file>, cached=true, lmax=2, frequencies=74.000 MHz…100.000 MHz, bandwidth~24 kHz)
 
 julia> x[0] = Float64[1 2; 3 4];
@@ -437,6 +521,8 @@ function Base.show(io::IO, matrix::LBlockMatrix)
             u(u"kHz", mean(matrix.bandwidth)))
 end
 
+Base.getindex(matrix::LBlockMatrix, l::Int, m::Int) = matrix[L(l)]
+
 doc"""
     struct LMBlockVector <: AbstractBlockMatrix{Vector{Complex128}, 2}
 
@@ -456,7 +542,7 @@ varies from `0` to `mmax` with the restriction that $m ≤ l$.
 **Usage:**
 
 ```jldoctest
-julia> x = BPJSpec.create(LMBlockVector, 2, 2, [74u"MHz", 100u"MHz"], [24u"kHz", 24u"kHz"])
+julia> x = create(LMBlockVector, 2, 2, [74u"MHz", 100u"MHz"], [24u"kHz", 24u"kHz"])
 LMBlockVector(<no file>, cached=true, lmax=2, mmax=2, frequencies=74.000 MHz…100.000 MHz, bandwidth~24 kHz)
 
 julia> x[0, 0] = Complex128[1, 2, 3, 4, 5];
@@ -479,34 +565,5 @@ function Base.show(io::IO, vector::LMBlockVector)
     @printf(io, "frequencies=%.3f MHz…%.3f MHz, bandwidth~%.0f kHz)",
             u(u"MHz", vector.frequencies[1]), u(u"MHz", vector.frequencies[end]),
             u(u"kHz", mean(vector.bandwidth)))
-end
-
-# Specialized indexing rules
-# ==========================
-
-function Base.getindex(matrix::MFBlockVector, m::Int)
-    blocks = [matrix[m, β] for β = 1:length(matrix.frequencies)]
-    X = sum(size.(blocks, 1))
-    output = zeros(eltype(first(blocks)), X)
-    x = 1
-    for block in blocks
-        output[x:x+size(block, 1)-1] = block
-        x += size(block, 1)
-    end
-    output
-end
-
-function Base.getindex(matrix::MFBlockMatrix, m::Int)
-    blocks = [matrix[m, β] for β = 1:length(matrix.frequencies)]
-    X = sum(size.(blocks, 1))
-    Y = sum(size.(blocks, 2))
-    output = zeros(eltype(first(blocks)), X, Y)
-    x = y = 1
-    for block in blocks
-        output[x:x+size(block, 1)-1, y:y+size(block, 2)-1] = block
-        x += size(block, 1)
-        y += size(block, 2)
-    end
-    output
 end
 

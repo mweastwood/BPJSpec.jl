@@ -22,41 +22,25 @@ and baseline distribution.
 
 This matrix is hierarchical in the sense that we save on some computational and storage requirements
 by separating long baselines from short baselines.
+
+**Usage:**
+
+**See also:** [`MModes`](@ref), [`NoiseCovarianceMatrix`](@ref), [`MFBlockMatrix`](@ref)
 """
-#struct TransferMatrix end
+struct TransferMatrix end
 
-# Fields
-
-#* `storage` contains instructions on how to read the matrix from disk
-#* `cache` is used if we want to keep the matrix in memory
-#* `metadata` stores the interferometer's metadata
-#* `lmax` is the largest value of the $l$ quantum number used by the matrix
-#* `mmax` is the largest value of the $m$ quantum number used by the matrix
-
-struct TransferMatrix <: AbstractBlockMatrix{Matrix{Complex128}, 2}
-    storage  :: HierarchicalStorage
-    cache    :: Cache{Matrix{Complex128}}
-    metadata :: Metadata
-    lmax :: Int
-    mmax :: Int
-end
-metadata_fields(matrix::TransferMatrix) = (matrix.metadata, matrix.lmax, matrix.mmax)
-nblocks(::Type{TransferMatrix}, metadata, lmax, mmax) = (mmax+1)*length(metadata.frequencies)
-linear_index(matrix::TransferMatrix, m, β) = (marxi.mmax+1)*(β-1) + (m+1)
-indices(matrix::TransferMatrix) = ((m, β) for β = 1:length(array.frequencies) for m = 0:array.mmax)
-
-function create(::Type{TransferMatrix}, path::String, metadata::Metadata;
-                lmax=maximum(maximum_multipole_moment(metadata))+1, rm=false)
-    hierarchy = compute_baseline_hierarchy(metadata, lmax)
+function create(::Type{TransferMatrix}, path::String, metadata::Metadata, beam;
+                lmax=-1, compute=true, rm=false, progress=false)
+    hierarchy = Hierarchy(metadata, lmax=lmax)
     storage   = HierarchicalStorage(path, hierarchy)
-    mmax = lmax = maximum(hierarchy.divisions)
-    output = construct(TransferMatrix, storage, metadata, lmax, mmax)
-    rm && rm_old_blocks!(storage, mmax, length(metadata.frequencies))
-    write_metadata(storage, MatrixMetadata(output))
+    output = create(MFBlockMatrix, storage, hierarchy.lmax,
+                    metadata.frequencies, metadata.bandwidth, rm=rm)
+    compute && compute!(TransferMatrix, output, metadata, beam, progress=progress)
     output
 end
 
-function compute!(transfermatrix::TransferMatrix, beam; progress=false)
+function compute!(::Type{TransferMatrix}, matrix::MFBlockMatrix{HierarchicalStorage},
+                  metadata::Metadata, beam; progress=false)
     if progress
         println("")
         println("| Starting transfer matrix calculation")
@@ -69,10 +53,10 @@ function compute!(transfermatrix::TransferMatrix, beam; progress=false)
 
     if progress
         println(workers)
-        println(transfermatrix.storage.hierarchy)
+        println(matrix.storage.hierarchy)
     end
 
-    queue = collect(1:length(transfermatrix.metadata.frequencies))
+    queue = collect(1:length(metadata.frequencies))
     if progress
         lck = ReentrantLock()
         prg = Progress(length(queue))
@@ -82,15 +66,14 @@ function compute!(transfermatrix::TransferMatrix, beam; progress=false)
     @sync for worker in leaders(workers)
         @async while length(queue) > 0
             β = shift!(queue)
-            remotecall_fetch(compute_one_frequency!, worker, transfermatrix, workers, beam, β)
+            remotecall_fetch(compute_one_frequency!, worker, matrix, workers, metadata, beam, β)
             progress && increment()
         end
     end
 end
 
-function compute_one_frequency!(transfermatrix::TransferMatrix, workers, beam, β)
-    metadata  = transfermatrix.metadata
-    hierarchy = transfermatrix.storage.hierarchy
+function compute_one_frequency!(matrix, workers, metadata, beam, β)
+    hierarchy = matrix.storage.hierarchy
 
     my_machine   = chomp(readstring(`hostname`))
     subordinates = copy(workers.dict[my_machine])
@@ -101,26 +84,26 @@ function compute_one_frequency!(transfermatrix::TransferMatrix, workers, beam, �
 
     for idx = 1:length(hierarchy.divisions)-1
         lmax = hierarchy.divisions[idx+1]
-        baselines = transfermatrix.metadata.baselines[hierarchy.baselines[idx]]
-        blocks = compute_baseline_group_one_frequency!(transfermatrix, subordinates,
-                                                       beam, baselines, lmax, β)
+        baselines = metadata.baselines[hierarchy.baselines[idx]]
+        blocks = compute_baseline_group_one_frequency!(matrix, subordinates,
+                                                       metadata, beam, baselines, lmax, β)
         resize!(blocks, 0)
         finalize(blocks)
         gc(); gc() # please please please garbage collect `blocks`
     end
 end
 
-function compute_baseline_group_one_frequency!(transfermatrix::TransferMatrix,
-                                               subordinates, beam, baselines, lmax, β)
+function compute_baseline_group_one_frequency!(matrix, subordinates, metadata,
+                                               beam, baselines, lmax, β)
     pool = CachingPool(subordinates)
 
     # "... but in this world nothing can be said to be certain, except death
     #  and taxes and lmax=mmax"
     #   - Benjamin Franklin, 1789
     mmax = lmax
-    ν = transfermatrix.metadata.frequencies[β]
-    phase_center = transfermatrix.metadata.phase_center
-    beam_map = create_beam_map(beam, transfermatrix.metadata, (lmax+1, 2mmax+1))
+    ν = metadata.frequencies[β]
+    phase_center = metadata.phase_center
+    beam_map = create_beam_map(beam, metadata, (lmax+1, 2mmax+1))
     rhat = unit_vectors(beam_map)
     plan = FastTransformsWrapper.plan_sht(lmax, mmax, size(rhat))
 
@@ -141,7 +124,7 @@ function compute_baseline_group_one_frequency!(transfermatrix::TransferMatrix,
     end
 
     for m = 0:mmax
-        transfermatrix.storage[lmax, m, β] = blocks[m+1]
+        matrix.storage[lmax, m, β] = blocks[m+1]
     end
     blocks
 end
@@ -223,24 +206,5 @@ function create_beam_map(f, metadata, size)
         map[idx, jdx] = f(azimuth, elevation)
     end
     map
-end
-
-"Get the baseline permutation vector for the given value of m."
-function baseline_permutation(transfermatrix::TransferMatrix, m)
-    hierarchy = transfermatrix.storage.hierarchy
-    indices = Int[]
-    for idx = 1:length(hierarchy.divisions)-1
-        lmax = hierarchy.divisions[idx+1]
-        m > lmax && continue
-        if m == 0
-            append!(indices, hierarchy.baselines[idx])
-        else
-            for baseline in hierarchy.baselines[idx]
-                push!(indices, 2*baseline-1) # positive m
-                push!(indices, 2*baseline-0) # negative m
-            end
-        end
-    end
-    indices
 end
 

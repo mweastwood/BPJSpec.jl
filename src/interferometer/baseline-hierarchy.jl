@@ -16,10 +16,14 @@
 struct Hierarchy
     divisions :: Vector{Int}
     baselines :: Vector{Vector{Int}}
+    lmax      :: Int
     Nfreq     :: Int
 end
 
-function Hierarchy(metadata::Metadata; lmax=maximum(maximum_multipole_moment(metadata))+1)
+function Hierarchy(metadata::Metadata; lmax=-1)
+    if lmax < 0
+        lmax = maximum(maximum_multipole_moment(metadata))+1
+    end
     compute_baseline_hierarchy(metadata, lmax)
 end
 
@@ -49,7 +53,7 @@ function compute_baseline_hierarchy(metadata::Metadata, cutoff)
     divisions = remove_empty_intervals(divisions)
     divisions = establish_minimum_lmax(divisions)
     baselines = categorize_baselines(lmax, divisions)
-    Hierarchy(divisions, baselines, length(metadata.frequencies))
+    Hierarchy(divisions, baselines, maximum(divisions), length(metadata.frequencies))
 end
 
 """
@@ -126,9 +130,7 @@ function establish_minimum_lmax(divisions)
     [[0, 32]; divisions[idx+1:end]]
 end
 
-"""
-Categorize each baseline based on the divisions computed above.
-"""
+"Categorize each baseline based on the divisions computed above."
 function categorize_baselines(lmax, divisions)
     [find(divisions[idx] .≤ lmax .< divisions[idx+1]) for idx = 1:length(divisions)-1]
 end
@@ -141,5 +143,23 @@ function Nbase(hierarchy::Hierarchy, l)
         output += length(hierarchy.baselines[idx])
     end
     output
+end
+
+"Get the baseline permutation vector for the given value of m."
+function baseline_permutation(hierarchy::Hierarchy, m)
+    indices = Int[]
+    for idx = 1:length(hierarchy.divisions)-1
+        lmax = hierarchy.divisions[idx+1]
+        m > lmax && continue
+        if m == 0
+            append!(indices, hierarchy.baselines[idx])
+        else
+            for baseline in hierarchy.baselines[idx]
+                push!(indices, 2baseline-1) # positive m
+                push!(indices, 2baseline-0) # negative m
+            end
+        end
+    end
+    indices
 end
 

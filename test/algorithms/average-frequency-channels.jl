@@ -3,7 +3,7 @@
     frequencies = [45u"MHz", 74u"MHz", 100u"MHz", 150u"MHz"]
     bandwidth   = [24u"kHz", 24u"kHz",   1u"MHz",   2u"kHz"]
 
-    input = BPJSpec.create(MFBlockMatrix, mmax, frequencies, bandwidth)
+    input = create(MFBlockMatrix, mmax, frequencies, bandwidth)
     for β = 1:length(frequencies), m = 0:mmax
         input[m, β] = fill(complex(β, 1.0), 1, 1)
     end

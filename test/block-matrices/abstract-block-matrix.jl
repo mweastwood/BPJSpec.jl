@@ -10,7 +10,7 @@ BPJSpec.linear_index(::TestBlockMatrix, idx) = idx-100
 BPJSpec.indices(matrix::TestBlockMatrix) = 101:length(matrix.metadata2)+100
 
 @testset "abstract-block-matrix.jl" begin
-    matrix = BPJSpec.create(TestBlockMatrix, 1.0, "hello")
+    matrix = create(TestBlockMatrix, 1.0, "hello")
     for idx = 101:100+length("hello")
         matrix[idx] = [idx, idx+1]
         @test matrix[idx] == [idx, idx+1]
@@ -18,7 +18,7 @@ BPJSpec.indices(matrix::TestBlockMatrix) = 101:length(matrix.metadata2)+100
     @test length(matrix.cache) == length("hello")
 
     path = tempname()
-    matrix1 = BPJSpec.create(TestBlockMatrix, MultipleFiles(path), 3.14, "hi")
+    matrix1 = create(TestBlockMatrix, MultipleFiles(path), 3.14, "hi")
     try
         for idx = 101:100+length("hi")
             matrix1[idx] = rand(Int, 10)

@@ -188,7 +188,7 @@ function rm_old_blocks!(storage::Mechanism)
         end
     end
     # finally delete all of the empty directories
-    for (root, directories, files) in walkdir(storage.path)
+    for (root, directories, files) in walkdir(storage.path, topdown=false)
         if length(files) == 0
             rm(root)
         end

@@ -13,44 +13,55 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-struct AngularCovarianceMatrix{S} <: AbstractBlockMatrix{Matrix{Float64}, 1}
-    storage :: S
-    cache   :: Cache{Matrix{Float64}}
-    lmax    :: Int
-    frequencies :: Vector{typeof(1.0u"Hz")}
-    bandwidth   :: Vector{typeof(1.0u"Hz")}
-end
-function AngularCovarianceMatrix(storage::S, cache, lmax, frequencies, bandwidth) where S
-    AngularCovarianceMatrix{S}(storage, cache, lmax, frequencies, bandwidth)
-end
-metadata_fields(matrix::AngularCovarianceMatrix) =
-    (matrix.lmax, matrix.frequencies, matrix.bandwidth)
-nblocks(::Type{<:AngularCovarianceMatrix}, lmax, frequencies, bandwidth) = lmax+1
-linear_index(matrix::AngularCovarianceMatrix, l) = l+1
-indices(matrix::AngularCovarianceMatrix) = L(0):L(matrix.lmax)
+#struct AngularCovarianceMatrix{S} <: AbstractBlockMatrix{Matrix{Float64}, 1}
+#    storage :: S
+#    cache   :: Cache{Matrix{Float64}}
+#    lmax    :: Int
+#    frequencies :: Vector{typeof(1.0u"Hz")}
+#    bandwidth   :: Vector{typeof(1.0u"Hz")}
+#end
+#function AngularCovarianceMatrix(storage::S, cache, lmax, frequencies, bandwidth) where S
+#    AngularCovarianceMatrix{S}(storage, cache, lmax, frequencies, bandwidth)
+#end
+#metadata_fields(matrix::AngularCovarianceMatrix) =
+#    (matrix.lmax, matrix.frequencies, matrix.bandwidth)
+#nblocks(::Type{<:AngularCovarianceMatrix}, lmax, frequencies, bandwidth) = lmax+1
+#linear_index(matrix::AngularCovarianceMatrix, l) = l+1
+#indices(matrix::AngularCovarianceMatrix) = L(0):L(matrix.lmax)
+#
+#Base.getindex(matrix::AngularCovarianceMatrix, l::L) = get(matrix, l.l)
+#Base.getindex(matrix::AngularCovarianceMatrix, l::Int, m::Int) = matrix[L(l)]
+#Base.setindex!(matrix::AngularCovarianceMatrix, block, l::L) = set!(matrix, block, l.l)
+#
+#function Base.getindex(matrix::AngularCovarianceMatrix, m::Int)
+#    blocks = [matrix[l] for l = L(m):L(matrix.lmax)]
+#    Nfreq  = length(matrix.frequencies)
+#    Nl     = matrix.lmax-m+1
+#    Ntotal = Nfreq*Nl
+#    output = zeros(Float64, Ntotal, Ntotal)
+#    for l = m:matrix.lmax
+#        block = blocks[l-m+1]
+#        for β1 = 1:Nfreq, β2 = 1:Nfreq
+#            idx1 = (β1-1)*Nl + l - m + 1
+#            idx2 = (β2-1)*Nl + l - m + 1
+#            output[idx1, idx2] = block[β1, β2]
+#        end
+#    end
+#    output
+#end
 
-Base.getindex(matrix::AngularCovarianceMatrix, l::L) = get(matrix, l.l)
-Base.getindex(matrix::AngularCovarianceMatrix, l::Int, m::Int) = matrix[L(l)]
-Base.setindex!(matrix::AngularCovarianceMatrix, block, l::L) = set!(matrix, block, l.l)
+struct AngularCovarianceMatrix end
 
-function Base.getindex(matrix::AngularCovarianceMatrix, m::Int)
-    blocks = [matrix[l] for l = L(m):L(matrix.lmax)]
-    Nfreq  = length(matrix.frequencies)
-    Nl     = matrix.lmax-m+1
-    Ntotal = Nfreq*Nl
-    output = zeros(Float64, Ntotal, Ntotal)
-    for l = m:matrix.lmax
-        block = blocks[l-m+1]
-        for β1 = 1:Nfreq, β2 = 1:Nfreq
-            idx1 = (β1-1)*Nl + l - m + 1
-            idx2 = (β2-1)*Nl + l - m + 1
-            output[idx1, idx2] = block[β1, β2]
-        end
-    end
+function create(::Type{AngularCovarianceMatrix}, storage::Mechanism, component::SkyComponent,
+                lmax, frequencies, bandwidth;
+                rm=false, progress=false)
+    output = create(LBlockMatrix, storage, lmax, frequencies, bandwidth, rm=rm)
+    compute!(AngularCovarianceMatrix, output, component, progress=progress)
     output
 end
 
-function compute!(matrix::AngularCovarianceMatrix, component::SkyComponent; progress=false)
+function compute!(::Type{AngularCovarianceMatrix}, matrix::LBlockMatrix,
+                  component::SkyComponent; progress=false)
     ν  = matrix.frequencies
     Δν = matrix.bandwidth
     Nfreq = length(ν)
