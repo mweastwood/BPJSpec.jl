@@ -47,7 +47,7 @@ srand(123)
 
     @testset "algorithms" begin
         include("algorithms/average-frequency-channels.jl")
-        #include("algorithms/full-rank-compress.jl")
+        include("algorithms/full-rank-compress.jl")
         include("algorithms/tikhonov-regularization.jl")
     end
 

@@ -25,6 +25,8 @@ makedocs(
         "Home"                 => "index.md",
         "Noise Model"          => "noise-model.md",
         "Foreground Filtering" => "foreground-filtering.md",
+        "Imaging"              => "imaging.md",
+        "Power Spectrum Estimation" => "power-spectrum-estimation.md",
         "Enormous Matrices"    => "enormous-matrices.md",
         "Wrappers"             => "wrappers.md"
     ]

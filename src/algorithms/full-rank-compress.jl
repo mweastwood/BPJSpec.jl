@@ -13,35 +13,48 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-# Design decision
-# ===============
-# We are going to be compressing the transfer matrix using its singular value decomposition, however
-# we'd like to also use the results of the SVD to compress the m-modes. The essential problem
-# however is that the SVD is just as large as the transfer matrix itself, so it will take a lot of
-# disk space to store. Therefore we will compute the SVD, compress both the transfer matrix and the
-# m-modes before discarding the SVD.
+doc"""
+    full_rank_compress!(output_mmodes, output_transfermatrix, output_noisematrix,
+                        input_mmodes,  input_transfermatrix,  input_noisematrix;
+                        progress=false)
 
-function full_rank_compress(input_mmodes, input_transfermatrix, input_noisematrix;
-                            mmodes_storage=NoFile(),
-                            transfermatrix_storage=NoFile(),
-                            noisematrix_storage=NoFile(),
-                            progress=false)
+In the case where the interferometer has more baselines than there are spherical harmonic
+coefficients to measure, the transfer matrix is tall and skinny. This also indicates that we have
+made redundant measurements that can be averaged together with no information loss.
 
-    output_mmodes         = similar(input_mmodes,                 mmodes_storage)
-    output_transfermatrix = similar(input_transfermatrix, transfermatrix_storage)
-    output_noisematrix    = create(MFBlockMatrix, noisematrix_storage, input_noisematrix.mmax,
-                                   input_noisematrix.frequencies, input_noisematrix.bandwidth)
+In this routine we use the singular value decomposition (SVD) of the transfer matrix to compress the
+measurements. However, the SVD is just as large as the transfer matrix itself, and will take a lot
+of disk space to store. Therefore we will compute the SVD, compress everything with it all at once
+so that there is no need to store the SVD as well.
 
+**Arguments:**
+
+* `output_mmodes` the output compressed $m$-modes
+* `output_transfermatrix` the output compressed transfer matrix
+* `output_noisematrix` the output compressed noise covariance matrix
+* `input_mmodes` the input $m$-modes that will be compressed
+* `input_transfermatrix` the input transfer matrix that will be used to generate the compression
+* `input_noisematrix` the input noise covariance matrix
+
+**Keyword Arguments:**
+
+* `progress` if set to `true`, a progress bar will be displayed
+"""
+function full_rank_compress!(output_mmodes, output_transfermatrix, output_noisematrix,
+                             input_mmodes,  input_transfermatrix,  input_noisematrix;
+                             progress=false)
     multi_broadcast!(_full_rank_compress,
                      (output_mmodes, output_transfermatrix, output_noisematrix),
-                     (input_mmodes, input_transfermatrix, input_noisematrix), progress=progress)
+                     (input_mmodes,  input_transfermatrix,  input_noisematrix),
+                     progress=progress)
 end
 
 function _full_rank_compress(v, B, N)
     F = svdfact(B)
-    v′ = F[:U]'*v
-    B′ = F[:U]'*B
-    N′ = fix(F[:U]'*N*F[:U])
+    U = F[:U]
+    v′ = U'*v
+    B′ = U'*B
+    N′ = fix(U'*N*U)
     v′, B′, N′
 end
 
