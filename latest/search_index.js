@@ -121,6 +121,70 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
+    "location": "imaging/#",
+    "page": "Imaging",
+    "title": "Imaging",
+    "category": "page",
+    "text": ""
+},
+
+{
+    "location": "imaging/#Imaging-1",
+    "page": "Imaging",
+    "title": "Imaging",
+    "category": "section",
+    "text": ""
+},
+
+{
+    "location": "imaging/#BPJSpec.tikhonov",
+    "page": "Imaging",
+    "title": "BPJSpec.tikhonov",
+    "category": "function",
+    "text": "tikhonov(transfermatrix, mmodes; regularization=1e-2, mfs=false)\n\nCreate a dirty image of the sky using Tikhonov regularization.\n\nArguments:\n\ntransfermatrix the interferometer\'s transfer matrix, describing its response to the sky\nmmodes the m-modes measured by the interferometer\n\nKeyword Arguments:\n\nregularization the amplitude of the Tikhonov regularization parameter\nmfs determines whether or not to perform Multi-Frequency Synthesis imaging. If this parameter is set to true, all frequency channels will be used to generate a single image of the sky. If this parameter is set to false, an image of the sky will be generated for each frequency channel.\n\n\n\n"
+},
+
+{
+    "location": "imaging/#API-1",
+    "page": "Imaging",
+    "title": "API",
+    "category": "section",
+    "text": "CurrentModule = BPJSpec\nDocTestSetup = quote\n    using BPJSpec\nendtikhonov"
+},
+
+{
+    "location": "power-spectrum-estimation/#",
+    "page": "Power Spectrum Estimation",
+    "title": "Power Spectrum Estimation",
+    "category": "page",
+    "text": ""
+},
+
+{
+    "location": "power-spectrum-estimation/#Power-Spectrum-Estimation-1",
+    "page": "Power Spectrum Estimation",
+    "title": "Power Spectrum Estimation",
+    "category": "section",
+    "text": ""
+},
+
+{
+    "location": "power-spectrum-estimation/#BPJSpec.full_rank_compress!",
+    "page": "Power Spectrum Estimation",
+    "title": "BPJSpec.full_rank_compress!",
+    "category": "function",
+    "text": "full_rank_compress!(output_mmodes, output_transfermatrix, output_noisematrix,\n                    input_mmodes,  input_transfermatrix,  input_noisematrix;\n                    progress=false)\n\nIn the case where the interferometer has more baselines than there are spherical harmonic coefficients to measure, the transfer matrix is tall and skinny. This also indicates that we have made redundant measurements that can be averaged together with no information loss.\n\nIn this routine we use the singular value decomposition (SVD) of the transfer matrix to compress the measurements. However, the SVD is just as large as the transfer matrix itself, and will take a lot of disk space to store. Therefore we will compute the SVD, compress everything with it all at once so that there is no need to store the SVD as well.\n\nArguments:\n\noutput_mmodes the output compressed m-modes\noutput_transfermatrix the output compressed transfer matrix\noutput_noisematrix the output compressed noise covariance matrix\ninput_mmodes the input m-modes that will be compressed\ninput_transfermatrix the input transfer matrix that will be used to generate the compression\ninput_noisematrix the input noise covariance matrix\n\nKeyword Arguments:\n\nprogress if set to true, a progress bar will be displayed\n\n\n\n"
+},
+
+{
+    "location": "power-spectrum-estimation/#API-1",
+    "page": "Power Spectrum Estimation",
+    "title": "API",
+    "category": "section",
+    "text": "CurrentModule = BPJSpec\nDocTestSetup = quote\n    using BPJSpec\nendfull_rank_compress!"
+},
+
+{
     "location": "enormous-matrices/#",
     "page": "Enormous Matrices",
     "title": "Enormous Matrices",
