@@ -17,6 +17,6 @@
     W   = BPJSpec.window_functions(F, M⁻¹)
     Σ   = BPJSpec.windowed_covariance(F, M⁻¹)
     @test all(sum(W, 2) .≈ 1)
-    @test norm(Σ - diagm(diag(Σ))) < 1e-13
+    @test norm(Σ - diagm(diag(Σ))) < 1e-12
 end
 
