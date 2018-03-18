@@ -46,6 +46,7 @@ export TransferMatrix, NoiseCovarianceMatrix, AngularCovarianceMatrix
 export MModes, MultiFrequencyAlm
 export RandomBlockVector, WhiteNoiseBlockVector
 export ProgressBar, create, compute!, cache!, flush!
+export tikhonov
 
 using Unitful, UnitfulAstro # Travis CI fails with "invalid age range update" unless this is first
 

@@ -13,12 +13,58 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-function tikhonov(transfermatrix, mmodes; regularization=1e-2)
-    lmax = mmax = transfermatrix.lmax
-    alm  = Alm(lmax, mmax)
+doc"""
+    tikhonov(transfermatrix, mmodes; regularization=1e-2, mfs=false)
+
+Create a dirty image of the sky using Tikhonov regularization.
+
+**Arguments:**
+
+* `transfermatrix` the interferometer's transfer matrix, describing its response to the sky
+* `mmodes` the $m$-modes measured by the interferometer
+
+**Keyword Arguments:**
+
+* `regularization` the amplitude of the Tikhonov regularization parameter
+* `mfs` determines whether or not to perform Multi-Frequency Synthesis imaging. If this parameter is
+  set to `true`, all frequency channels will be used to generate a single image of the sky. If this
+  parameter is set to `false`, an image of the sky will be generated for each frequency channel.
+"""
+function tikhonov(transfermatrix, mmodes; regularization=1.0, mfs=false)
+    if mfs
+        return tikhonov_mfs(transfermatrix, mmodes, regularization)
+    else
+        return tikhonov_nothing_special(transfermatrix, mmodes, regularization)
+    end
+end
+
+function tikhonov_nothing_special(transfermatrix, mmodes, regularization)
+    alm = similar(mmodes, NoFile())
+    invert(B, v) = _tikhonov_nothing_special(B, v, regularization)
+    @. alm = invert(transfermatrix, mmodes)
+    alm
+end
+
+function _tikhonov_nothing_special(B, v, regularization)
+    BLAS.set_num_threads(16)
+    B′ = B'
+    _tikhonov_inversion(B′*B, B′*v, regularization)
+end
+
+function _tikhonov_inversion(BB, Bv, regularization)
+    (BB + regularization*I) \ Bv
+end
+
+function tikhonov_mfs(transfermatrix, mmodes, regularization)
+    lmax = mmax = transfermatrix.mmax
+    alm  = create(MBlockVector, mmax)
+
+    # Try to make the scaling of the regularization parameter consistent between regular and
+    # multi-frequency synthesis images
+    regularization *= length(transfermatrix.frequencies)
 
     pool  = CachingPool(workers())
-    queue = reverse(collect(0:mmax))
+    queue = collect(0:mmax)
 
     lck = ReentrantLock()
     prg = Progress(length(queue))
@@ -26,40 +72,31 @@ function tikhonov(transfermatrix, mmodes; regularization=1e-2)
 
     @sync for worker in workers()
         @async while length(queue) > 0
-            m = pop!(queue)
-            _alm = remotecall_fetch(_tikhonov, pool, transfermatrix, mmodes,
-                                    regularization, lmax, m)
-            for l = m:lmax
-                alm[l, m] = _alm[l-m+1]
-            end
+            m = shift!(queue)
+            alm[m] = remotecall_fetch(_tikhonov_mfs, pool, transfermatrix, mmodes,
+                                      regularization, lmax, m)
             increment()
         end
     end
     alm
 end
 
-function _tikhonov(transfermatrix, mmodes, regularization, lmax, m)
+function _tikhonov_mfs(transfermatrix, mmodes, regularization, lmax, m)
     BLAS.set_num_threads(16)
     BB = zeros(Complex128, lmax-m+1, lmax-m+1)
     Bv = zeros(Complex128, lmax-m+1)
-    permutation = baseline_permutation(transfermatrix, m)
-    for β = 1:length(frequencies(mmodes))
-        _tikhonov_accumulate!(BB, Bv, transfermatrix[m, β], mmodes[m, β], permutation)
+    for β = 1:length(mmodes.frequencies)
+        _tikhonov_accumulate!(BB, Bv, transfermatrix[m, β], mmodes[m, β])
     end
     _tikhonov_inversion(BB, Bv, regularization)
 end
 
-function _tikhonov_accumulate!(BB, Bv, B, v, permutation)
-    v = v[permutation]
+function _tikhonov_accumulate!(BB, Bv, B, v)
     f = v .== 0 # flags
     v = v[.!f]
     B = B[.!f, :]
     B′ = B'
     BB .+= B′*B
     Bv .+= B′*v
-end
-
-function _tikhonov_inversion(BB, Bv, regularization)
-    (BB + regularization*I) \ Bv
 end
 
