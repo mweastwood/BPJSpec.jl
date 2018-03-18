@@ -50,8 +50,15 @@ function MatrixMetadata(matrix::AbstractBlockMatrix)
     MatrixMetadata(T, fields)
 end
 
-function construct(T::Type{<:AbstractBlockMatrix{B}},
-                   storage::Mechanism, fields...) where B
+@inline function construct(T::Type{<:AbstractBlockMatrix}, args...)
+    if first(args) isa Mechanism
+        _construct(T, args[1], args[2:end]...)
+    else
+        _constrct(T, NoFile(), args...)
+    end
+end
+
+function _construct(T::Type{<:AbstractBlockMatrix{B}}, storage::Mechanism, fields...) where B
     cache = Cache{B}(nblocks(T, fields...))
     if storage isa NoFile
         set!(cache)
@@ -67,27 +74,33 @@ function construct(T::Type{<:AbstractBlockMatrix{B}},
     T′(storage, cache, fields′...)
 end
 
-function create(T::Type{<:AbstractBlockMatrix}, storage::Mechanism, fields...; rm=false)
+@inline function create(T::Type{<:AbstractBlockMatrix}, args...; kwargs...)
+    if first(args) isa Mechanism
+        _create(T, args[1], args[2:end]...; kwargs...)
+    else
+        _create(T, NoFile(), args...; kwargs...)
+    end
+end
+
+function _create(T::Type{<:AbstractBlockMatrix}, storage::Mechanism, fields...; rm=false)
     output = construct(T, storage, fields...)
     rm && rm_old_blocks!(storage)
     write_metadata(storage, MatrixMetadata(output))
     output
 end
 
-@inline    create(T::Type{<:AbstractBlockMatrix}, fields...) =    create(T, NoFile(), fields...)
-@inline construct(T::Type{<:AbstractBlockMatrix}, fields...) = construct(T, NoFile(), fields...)
-
 function load(path::String)
     storage, metadata = read_metadata(path)
     construct(metadata.T, storage, metadata.fields...)
 end
 
-function Base.similar(matrix::AbstractBlockMatrix, storage::Mechanism=NoFile())
+function Base.similar(matrix::AbstractBlockMatrix, storage::Mechanism=NoFile(), fields...)
     T = typeof(matrix)
-    fields = metadata_fields(matrix)
-    # Note that because the type of the storage mechanism might be used as a type parameter, we need
-    # to strip type parameters from `T` so that they can be re-inferred from the arguments.
-    create(discard_type_parameters(T), storage, fields...)
+    if fields === ()
+        create(T, storage, metadata_fields(matrix)...)
+    else
+        create(T, storage, fields...)
+    end
 end
 
 Base.getindex(matrix::AbstractBlockMatrix, idx) =

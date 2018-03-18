@@ -13,8 +13,10 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-function average_frequency_channels(input, Navg; storage=NoFile(), progress=false)
-    ν, Δν = νΔν(input)
+function average_frequency_channels(input::Union{MFBlockVector, MFBlockMatrix},
+                                    Navg; storage=NoFile(), progress=false)
+    ν  = input.frequencies
+    Δν = input.bandwidth
     Nfreq = length(ν)
 
     partition = collect(Iterators.partition(1:Nfreq, Navg))
@@ -30,7 +32,7 @@ function average_frequency_channels(input, Navg; storage=NoFile(), progress=fals
     end
 
     # Perform the averaging.
-    output = average_frequency_channels_output(input, storage, input.mmax, ν′, Δν′)
+    output = similar(input, storage, input.mmax, ν′, Δν′)
     queue  = collect(indices(output))
     pool   = CachingPool(workers())
     if progress
@@ -60,18 +62,5 @@ function _average_frequency_channels(input, output, Δν, Δν′, m, β, channe
     end
 
     output[m, β] = B
-end
-
-νΔν(matrix::AbstractBlockMatrix) = matrix.frequencies, matrix.bandwidth
-νΔν(matrix::TransferMatrix) = matrix.metadata.frequencies, matrix.metadata.bandwidth
-
-function average_frequency_channels_output(input::AbstractBlockMatrix{<:Vector, 2},
-                                           storage, mmax, frequencies, bandwidth)
-    create(MFBlockVector, storage, mmax, frequencies, bandwidth)
-end
-
-function average_frequency_channels_output(input::AbstractBlockMatrix{<:Matrix, 2},
-                                           storage, mmax, frequencies, bandwidth)
-    create(MFBlockMatrix, storage, mmax, frequencies, bandwidth)
 end
 
