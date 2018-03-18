@@ -15,7 +15,7 @@
     ϕ = linspace(0, 2π, 6629)[1:6628]
     X = reshape(cis.(ϕ) .+ 1, 6628, 1)
 
-    compute!(MModes, mmodes, X, 1)
+    compute!(MModes, mmodes, hierarchy, X, 1)
 
     @test mmodes[0, 1] ≈ [1]
     @test mmodes[1, 1] ≈ [1, 0]

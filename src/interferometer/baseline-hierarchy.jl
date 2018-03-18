@@ -151,14 +151,7 @@ function baseline_permutation(hierarchy::Hierarchy, m)
     for idx = 1:length(hierarchy.divisions)-1
         lmax = hierarchy.divisions[idx+1]
         m > lmax && continue
-        if m == 0
-            append!(indices, hierarchy.baselines[idx])
-        else
-            for baseline in hierarchy.baselines[idx]
-                push!(indices, 2baseline-1) # positive m
-                push!(indices, 2baseline-0) # negative m
-            end
-        end
+        append!(indices, hierarchy.baselines[idx])
     end
     indices
 end

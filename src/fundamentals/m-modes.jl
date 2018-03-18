@@ -33,8 +33,9 @@ function create(::Type{MModes}, storage::Mechanism,
 end
 
 "Compute m-modes from two dimensional matrix of visibilities (time × baseline)."
-function compute!(::Type{MModes}, mmodes::MFBlockVector, visibilities::Matrix{Complex128}, β)
-    store!(mmodes, fourier_transform(visibilities), β)
+function compute!(::Type{MModes}, mmodes::MFBlockVector, hierarchy::Hierarchy,
+                  visibilities::Matrix{Complex128}, β)
+    store!(mmodes, hierarchy, fourier_transform(visibilities), β)
 end
 
 function fourier_transform(matrix)
@@ -43,12 +44,12 @@ function fourier_transform(matrix)
     (planned_fft*matrix) ./ Ntime
 end
 
-function store!(mmodes, transformed_visibilities, β)
+function store!(mmodes, hierarchy, transformed_visibilities, β)
     Ntime, Nbase = size(transformed_visibilities)
 
     # m = 0
     block = zeros(Complex128, Nbase)
-    for α = 1:Nbase
+    for α in baseline_permutation(hierarchy, 0)
         block[α] = transformed_visibilities[1, α]
     end
     mmodes[0, β] = block
@@ -56,7 +57,7 @@ function store!(mmodes, transformed_visibilities, β)
     # m > 0
     block = zeros(Complex128, 2Nbase)
     for m = 1:mmodes.mmax
-        for α = 1:Nbase
+        for α in baseline_permutation(hierarchy, m)
             α1 = 2α-1 # positive m
             α2 = 2α-0 # negative m
             block[α1] =      transformed_visibilities[      m+1, α]

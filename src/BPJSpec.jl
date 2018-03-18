@@ -99,7 +99,6 @@ include("fundamentals/m-modes.jl")
 include("fundamentals/multi-frequency-alm.jl")
 include("fundamentals/random-block-vector.jl")
 
-include("algorithms/permute-m-modes.jl")
 include("algorithms/propagate-flags.jl")
 include("algorithms/average-frequency-channels.jl")
 include("algorithms/full-rank-compress.jl")
