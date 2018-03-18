@@ -41,6 +41,7 @@ srand(123)
         include("fundamentals/noise-covariance-matrix.jl")
         include("fundamentals/angular-covariance-matrix.jl")
         include("fundamentals/m-modes.jl")
+        include("fundamentals/multi-frequency-alm.jl")
         include("fundamentals/random-block-vector.jl")
     end
 

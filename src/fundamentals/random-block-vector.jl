@@ -13,56 +13,19 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-#struct WhiteNoiseBlockVector
-#end
-#
-#struct RandomBlockVector
-#end
+struct WhiteNoiseBlockVector end
+@inline Base.getindex(vector::WhiteNoiseBlockVector, idx...) = WhiteNoise()
 
+struct RandomBlockVector{B}
+    covariance :: B
+end
 
-
-
-
-#struct RandomVector{B}
-#    covariance :: B
-#end
-#
-#function Base.getindex(vector::RandomVector, idx)
-#    C = vector.covariance[idx]
-#    N = size(C, 1)
-#    U = chol(C)
-#    x = complex.(randn(N), randn(N)) ./ √2
-#    U'*x # random variable with the correct covariance
-#end
-#
-#struct WhiteNoiseVector  end
-#struct WhiteNoiseMachine end
-#
-#@inline Base.getindex(vector::WhiteNoiseVector, idx) = WhiteNoiseMachine()
-#@inline (machine::WhiteNoiseMachine)() = complex(randn(), randn())/√2
-#
-#function Base.:*(A::Matrix, w::WhiteNoiseMachine)
-#    N, M = size(A)
-#    v = [w() for idx = 1:M]
-#    A*v
-#end
-#
-#function Base.:*(w::WhiteNoiseMachine, A::Matrix)
-#    N, M = size(A)
-#    v = [w() for idx = 1:N]
-#    v'*A
-#end
-#
-#function Base.:/(w::WhiteNoiseMachine, A::Matrix)
-#    N, M = size(A)
-#    v = [w() for idx = 1:M]
-#    v'/A
-#end
-#
-#function Base.:+(v::Vector, w::WhiteNoiseMachine)
-#    [element+w() for element in v]
-#end
-#Base.:+(w::WhiteNoiseMachine, v::Vector) = v + w
-#
-#Base.transpose(w::WhiteNoiseMachine) = w
+function Base.getindex(vector::RandomBlockVector, idx...)
+    # TODO: cache the results of the Cholesky decomposition
+    C = vector.covariance[idx...]
+    N = size(C, 1)
+    U = chol(C)
+    x = complex.(randn(N), randn(N)) ./ √2
+    U'*x # random variable with the correct covariance
+end
 

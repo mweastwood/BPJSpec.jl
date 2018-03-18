@@ -174,3 +174,11 @@ distribute_write(matrix::AbstractBlockMatrix) =
 distribute_read(matrix::AbstractBlockMatrix) =
     distribute_read(matrix.storage) && !used(matrix.cache)
 
+function Base.dot(lhs::AbstractBlockMatrix, rhs::AbstractBlockMatrix)
+    output = zero(Complex128)
+    for idx in indices(lhs)
+        output += dot(lhs[idx...], rhs[idx...])
+    end
+    output
+end
+

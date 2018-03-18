@@ -42,7 +42,9 @@ export NoFile, SingleFile, MultipleFiles
 export SimpleBlockMatrix, SimpleBlockVector
 export MBlockMatrix, FBlockMatrix, MFBlockMatrix, LBlockMatrix
 export MBlockVector, FBlockVector, MFBlockVector, LMBlockVector
-export TransferMatrix, NoiseCovarianceMatrix, AngularCovarianceMatrix, MModes
+export TransferMatrix, NoiseCovarianceMatrix, AngularCovarianceMatrix
+export MModes, MultiFrequencyAlm
+export RandomBlockVector, WhiteNoiseBlockVector
 export ProgressBar, create, compute!, cache!, flush!
 
 using Unitful, UnitfulAstro # Travis CI fails with "invalid age range update" unless this is first
@@ -94,7 +96,7 @@ include("fundamentals/transfer-matrix.jl")
 include("fundamentals/noise-covariance-matrix.jl")
 include("fundamentals/angular-covariance-matrix.jl")
 include("fundamentals/m-modes.jl")
-include("fundamentals/angular-block-vector.jl")
+include("fundamentals/multi-frequency-alm.jl")
 include("fundamentals/random-block-vector.jl")
 
 include("algorithms/permute-m-modes.jl")
