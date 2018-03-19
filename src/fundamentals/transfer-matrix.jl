@@ -87,7 +87,7 @@ function compute_one_frequency!(matrix, workers, metadata, beam, β)
         baselines = metadata.baselines[hierarchy.baselines[idx]]
         blocks = compute_baseline_group_one_frequency!(matrix, subordinates,
                                                        metadata, beam, baselines, lmax, β)
-        resize!(blocks, 0)
+        Base.resize!(blocks, 0)
         finalize(blocks)
         gc(); gc() # please please please garbage collect `blocks`
     end

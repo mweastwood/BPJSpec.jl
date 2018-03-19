@@ -59,10 +59,7 @@ end
 end
 
 function _construct(T::Type{<:AbstractBlockMatrix{B}}, storage::Mechanism, fields...) where B
-    cache = Cache{B}(nblocks(T, fields...))
-    if storage isa NoFile
-        set!(cache)
-    end
+    cache = Cache{B}()
     # Sometimes we will get here with a few (but not all) type parameters already specified. Usually
     # we'd need to provide a special constructor to help with that case, but instead we can discard
     # these type parameters and call the regular constructor.
@@ -71,7 +68,12 @@ function _construct(T::Type{<:AbstractBlockMatrix{B}}, storage::Mechanism, field
     # metadata fields. Try to convert them to the correct type here.
     fields′ = ((convert(fieldtype(T, idx+2), fields[idx]) for idx = 1:length(fields))...)
     # Finally call the constructor with the converted fields.
-    T′(storage, cache, fields′...)
+    output = T′(storage, cache, fields′...)
+    if storage isa NoFile
+        resize!(cache, nblocks(output))
+        set!(cache)
+    end
+    output
 end
 
 @inline function create(T::Type{<:AbstractBlockMatrix}, args...; kwargs...)
@@ -115,6 +117,8 @@ Base.setindex!(matrix::AbstractBlockMatrix, block, idx, jdx) =
 @inline Base.getindex(matrix::AbstractBlockMatrix, idx::Tuple) = matrix[idx...]
 @inline Base.setindex!(matrix::AbstractBlockMatrix, block, idx::Tuple) = matrix[idx...] = block
 
+nblocks(matrix) = length(collect(indices(matrix)))
+
 function linear_index(matrix::M, tuple::Tuple) where M<:AbstractBlockMatrix
     linear_index(matrix, tuple[1], tuple[2])
 end
@@ -154,6 +158,7 @@ function set!(matrix::AbstractBlockMatrix{B, 2}, block::B, idx, jdx) where B
 end
 
 function cache!(matrix::AbstractBlockMatrix)
+    resize!(matrix.cache, nblocks(matrix))
     for idx in indices(matrix)
         matrix.cache[linear_index(matrix, idx)] = matrix[idx]
     end
@@ -166,6 +171,7 @@ function flush!(matrix::AbstractBlockMatrix)
     for idx in indices(matrix)
         matrix[idx] = matrix.cache[linear_index(matrix, idx)]
     end
+    resize!(matrix.cache, 0)
     matrix
 end
 

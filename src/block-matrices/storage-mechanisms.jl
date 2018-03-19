@@ -200,8 +200,8 @@ struct Cache{T}
     cache :: Vector{T}
 end
 
-function Cache{T}(length::Int) where T
-    Cache{T}(Ref(false), Vector{T}(length))
+function Cache{T}() where T
+    Cache{T}(Ref(false), Vector{T}(0))
 end
 
 Base.length(cache::Cache) = length(cache.cache)
@@ -210,4 +210,5 @@ Base.setindex!(cache::Cache, X, idx) = cache.cache[idx] = copy(X)
 used(cache::Cache) = cache.used[]
 set!(cache::Cache) = (cache.used[] = true; cache)
 unset!(cache::Cache) = (cache.used[] = false; cache)
+resize!(cache::Cache, length) = Base.resize!(cache.cache, length)
 

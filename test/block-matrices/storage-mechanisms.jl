@@ -53,7 +53,8 @@
     end
 
     @testset "cache" begin
-        cache = BPJSpec.Cache{Vector{Float64}}(3)
+        cache = BPJSpec.Cache{Vector{Float64}}()
+        BPJSpec.resize!(cache, 3)
         @test cache.used[] == false
         @test typeof(cache.cache) == Vector{Vector{Float64}}
         @test size(cache.cache) == (3,)

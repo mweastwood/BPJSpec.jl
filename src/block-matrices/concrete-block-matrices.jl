@@ -20,7 +20,6 @@ struct SimpleBlockArray{T, N, S} <: AbstractBlockMatrix{Array{T, N}, 1}
     length  :: Int
 end
 metadata_fields(array::SimpleBlockArray) = (array.length,)
-nblocks(::Type{<:SimpleBlockArray}, length) = length
 linear_index(::SimpleBlockArray, idx) = idx
 indices(array::SimpleBlockArray) = 1:array.length
 
@@ -31,7 +30,6 @@ struct MBlockArray{T, N, S} <: AbstractBlockMatrix{Array{T, N}, 1}
     mmax    :: Int
 end
 metadata_fields(array::MBlockArray) = (array.mmax,)
-nblocks(::Type{<:MBlockArray}, mmax) = mmax+1
 linear_index(::MBlockArray, m) = m+1
 indices(array::MBlockArray) = 0:array.mmax
 
@@ -43,7 +41,6 @@ struct FBlockArray{T, N, S} <: AbstractBlockMatrix{Array{T, N}, 1}
     bandwidth   :: Vector{typeof(1.0u"Hz")}
 end
 metadata_fields(array::FBlockArray) = (array.frequencies, array.bandwidth)
-nblocks(::Type{<:FBlockArray}, frequencies, bandwidth) = length(frequencies)
 linear_index(::FBlockArray, β) = β
 indices(array::FBlockArray) = 1:length(array.frequencies)
 
@@ -56,7 +53,6 @@ struct MFBlockArray{T, N, S} <: AbstractBlockMatrix{Array{T, N}, 2}
     bandwidth   :: Vector{typeof(1.0u"Hz")}
 end
 metadata_fields(array::MFBlockArray) = (array.mmax, array.frequencies, array.bandwidth)
-nblocks(::Type{<:MFBlockArray}, mmax, frequencies, bandwidth) = (mmax+1)*length(frequencies)
 linear_index(array::MFBlockArray, m, β) = (array.mmax+1)*(β-1) + (m+1)
 indices(array::MFBlockArray) = ((m, β) for β = 1:length(array.frequencies) for m = 0:array.mmax)
 
@@ -69,7 +65,6 @@ struct MFDiagonalBlockArray{T, S} <: AbstractBlockMatrix{Diagonal{T}, 2}
     bandwidth   :: Vector{typeof(1.0u"Hz")}
 end
 metadata_fields(array::MFDiagonalBlockArray) = (array.mmax, array.frequencies, array.bandwidth)
-nblocks(::Type{<:MFDiagonalBlockArray}, mmax, frequencies, bandwidth) = (mmax+1)*length(frequencies)
 linear_index(array::MFDiagonalBlockArray, m, β) = (array.mmax+1)*(β-1) + (m+1)
 indices(array::MFDiagonalBlockArray) =
     ((m, β) for β = 1:length(array.frequencies) for m = 0:array.mmax)
@@ -83,7 +78,6 @@ struct LBlockArray{T, N, S} <: AbstractBlockMatrix{Array{T, N}, 1}
     bandwidth   :: Vector{typeof(1.0u"Hz")}
 end
 metadata_fields(array::LBlockArray) = (array.lmax, array.frequencies, array.bandwidth)
-nblocks(::Type{<:LBlockArray}, lmax, frequencies, bandwidth) = lmax+1
 linear_index(array::LBlockArray, l) = l+1
 indices(array::LBlockArray) = L(0):L(array.lmax)
 
@@ -98,8 +92,6 @@ struct LMBlockArray{T, N, S} <: AbstractBlockMatrix{Array{T, N}, 2}
 end
 metadata_fields(array::LMBlockArray) =
     (array.lmax, array.mmax, array.frequencies, array.bandwidth)
-nblocks(::Type{<:LMBlockArray}, lmax, mmax, frequencies, bandwidth) =
-    ((2lmax + 2 - mmax) * (mmax + 1)) ÷ 2
 linear_index(array::LMBlockArray, l, m) =
     (m * (2array.lmax - m + 3)) ÷ 2 + l - m + 1
 indices(array::LMBlockArray) =
