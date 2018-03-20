@@ -47,8 +47,15 @@ end
 
 function _tikhonov_nothing_special(B, v, regularization)
     BLAS.set_num_threads(16)
-    B′ = B'
-    _tikhonov_inversion(B′*B, B′*v, regularization)
+    B, v = _tikhonov_propagate_flags(B, v)
+    _tikhonov_inversion(B'*B, B'*v, regularization)
+end
+
+function _tikhonov_propagate_flags(B, v)
+    f = v .== 0 # flags
+    v = v[.!f]
+    B = B[.!f, :]
+    B, v
 end
 
 function _tikhonov_inversion(BB, Bv, regularization)
@@ -92,11 +99,8 @@ function _tikhonov_mfs(transfermatrix, mmodes, regularization, lmax, m)
 end
 
 function _tikhonov_accumulate!(BB, Bv, B, v)
-    f = v .== 0 # flags
-    v = v[.!f]
-    B = B[.!f, :]
-    B′ = B'
-    BB .+= B′*B
-    Bv .+= B′*v
+    B, v = _tikhonov_propagate_flags(B, v)
+    BB .+= B'*B
+    Bv .+= B'*v
 end
 

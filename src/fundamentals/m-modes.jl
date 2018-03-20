@@ -45,23 +45,23 @@ function fourier_transform(matrix)
 end
 
 function store!(mmodes, hierarchy, transformed_visibilities, β)
-    Ntime, Nbase = size(transformed_visibilities)
+    Ntime = size(transformed_visibilities, 1)
 
     # m = 0
-    block = zeros(Complex128, Nbase)
-    for α in baseline_permutation(hierarchy, 0)
-        block[α] = transformed_visibilities[1, α]
+    block = zeros(Complex128, Nbase(hierarchy, 0))
+    for (α, α′) in enumerate(baseline_permutation(hierarchy, 0))
+        block[α] = transformed_visibilities[1, α′]
     end
     mmodes[0, β] = block
 
     # m > 0
-    block = zeros(Complex128, 2Nbase)
     for m = 1:mmodes.mmax
-        for α in baseline_permutation(hierarchy, m)
+        block = zeros(Complex128, 2Nbase(hierarchy, m))
+        for (α, α′) in enumerate(baseline_permutation(hierarchy, m))
             α1 = 2α-1 # positive m
             α2 = 2α-0 # negative m
-            block[α1] =      transformed_visibilities[      m+1, α]
-            block[α2] = conj(transformed_visibilities[Ntime+1-m, α])
+            block[α1] =      transformed_visibilities[      m+1, α′]
+            block[α2] = conj(transformed_visibilities[Ntime+1-m, α′])
         end
         mmodes[m, β] = block
     end
