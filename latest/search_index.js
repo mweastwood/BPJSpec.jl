@@ -65,6 +65,14 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
+    "location": "foreground-filtering/#BPJSpec.foreground_filter!",
+    "page": "Foreground Filtering",
+    "title": "BPJSpec.foreground_filter!",
+    "category": "function",
+    "text": "foreground_filter!(output_mmodes, output_transfermatrix, output_covariance,\n                   output_foreground_filter, output_noise_whitener,\n                   input_mmodes, input_transfermatrix, input_noisematrix,\n                   input_signalmatrix, input_foregroundmatrix;\n                   threshold=0.1, tempdir=\"/tmp\", cleanup=true)\n\nFilter foreground emission from the dataset and whiten the noise.\n\nArguments:\n\noutput_mmodes will be populated with the foreground filtered m-modes\noutput_transfermatrix will be populated with the foreground-filtered transfer-matrix\noutput_covariance will be populated with the covariance matrix of the output m-modes\noutput_foreground_filter is the matrix used to filter foreground emission\noutput_noise_whitener is the matrix used to whiten the noise covariance (the thermal noise and the foreground contribution)\ninput_mmodes is the measured input m-modes\ninput_transfermatrix is the transfer matrix describing the response of the interferometer\ninput_noisematrix is the thermal noise covariance matrix\ninput_signalmatrix is the covariance matrix due to the 21-cm power spectrum\ninput_foregroundmatrix is the covariance matrix due to the foreground radio emission\n\nwarn: Warn\nPlease pay attention to the argument order. Swapping arguments could lead to this function filtering all of the 21-cm signal while leaving the foreground emission in tact!\n\nKeyword Arguments:\n\nthreshold is the maximum allowed foreground-signal ratio\ntempdir is a path to a directory where temporary files can be placed\ncleanup determines whether or not files placed in the tempdir are automatically removed. This can be set to false if you wish to check some of the intermediate output.\n\n\n\n"
+},
+
+{
     "location": "foreground-filtering/#BPJSpec.ForegroundComponent",
     "page": "Foreground Filtering",
     "title": "BPJSpec.ForegroundComponent",
@@ -117,7 +125,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Foreground Filtering",
     "title": "API",
     "category": "section",
-    "text": "CurrentModule = BPJSpec\nDocTestSetup = quote\n    using BPJSpec\n    using Unitful, UnitfulAstro\nendForegroundComponent\nCylindricalPS\nextragalactic_point_sources\nextragalactic_free_free\ngalactic_synchrotron\ngalactic_free_free"
+    "text": "CurrentModule = BPJSpec\nDocTestSetup = quote\n    using BPJSpec\n    using Unitful, UnitfulAstro\nendforeground_filter!\nForegroundComponent\nCylindricalPS\nextragalactic_point_sources\nextragalactic_free_free\ngalactic_synchrotron\ngalactic_free_free"
 },
 
 {
@@ -169,6 +177,14 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
+    "location": "power-spectrum-estimation/#BPJSpec.q_estimator",
+    "page": "Power Spectrum Estimation",
+    "title": "BPJSpec.q_estimator",
+    "category": "function",
+    "text": "q_estimator(mmodes, transfermatrix, covariancematrix, basis)\n\nEvaluate the q estimator:\n\nq_a = v^* C^-1 B C_a B^* C^-1 v\n\nArguments:\n\nmmodes or v specifies the list of measured m-modes\ntransfermatrix or B specifies the interferometer\'s response to the sky\ncovariancematrix or C specifies the covariance of the measured m-modes\nbasis or C_a is a list of angular covariance matrices that represent the change in the covariance with respect to an increase in power of each 21-cm power spectrum bin\n\n\n\n"
+},
+
+{
     "location": "power-spectrum-estimation/#BPJSpec.full_rank_compress!",
     "page": "Power Spectrum Estimation",
     "title": "BPJSpec.full_rank_compress!",
@@ -181,7 +197,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Power Spectrum Estimation",
     "title": "API",
     "category": "section",
-    "text": "CurrentModule = BPJSpec\nDocTestSetup = quote\n    using BPJSpec\nendfull_rank_compress!"
+    "text": "CurrentModule = BPJSpec\nDocTestSetup = quote\n    using BPJSpec\nendq_estimator\nfull_rank_compress!"
 },
 
 {
@@ -277,7 +293,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Enormous Matrices",
     "title": "BPJSpec.LBlockMatrix",
     "category": "type",
-    "text": "struct LBlockMatrix <: AbstractBlockMatrix{Matrix{Float64}, 1}\n\nThis type represents a (potentially enormous) complex-valued matrix that has been split into blocks. Each of these blocks is indexed by its value of l, which varies from 0 to lmax.\n\nFields:\n\nstorage contains instructions on how to read the matrix from disk\ncache is used if we want to keep the matrix in memory\nlmax determines the largest value of the l quantum number used by the matrix\nfrequencies is a list of the frequency channels represented by this matrix\nbandwidth is a list of the corresponding bandwidth of each frequency channel\n\nUsage:\n\njulia> x = create(LBlockMatrix, 2, [74u\"MHz\", 100u\"MHz\"], [24u\"kHz\", 24u\"kHz\"])\nLBlockMatrix(<no file>, cached=true, lmax=2, frequencies=74.000 MHz…100.000 MHz, bandwidth~24 kHz)\n\njulia> x[0] = Float64[1 2; 3 4];\n\njulia> x[0]\n2×2 Array{Float64,2}:\n 1.0  2.0\n 3.0  4.0\n\nSee also: LMBlockVector, AbstractBlockMatrix\n\n\n\n"
+    "text": "struct LBlockMatrix <: AbstractBlockMatrix{Matrix{Float64}, 1}\n\nThis type represents a (potentially enormous) complex-valued matrix that has been split into blocks. Each of these blocks is indexed by its value of l, which varies from 0 to lmax.\n\nFields:\n\nstorage contains instructions on how to read the matrix from disk\ncache is used if we want to keep the matrix in memory\nlmax determines the largest value of the l quantum number used by the matrix\nfrequencies is a list of the frequency channels represented by this matrix\nbandwidth is a list of the corresponding bandwidth of each frequency channel\n\nUsage:\n\njulia> x = create(LBlockMatrix, 2, [74u\"MHz\", 100u\"MHz\"], [24u\"kHz\", 24u\"kHz\"])\nLBlockMatrix(<no file>, cached=true, lmax=2, frequencies=74.000 MHz…100.000 MHz, bandwidth~24 kHz)\n\njulia> l = BPJSpec.L(0);\n\njulia> x[l] = Float64[1 2; 3 4];\n\njulia> x[l]\n2×2 Array{Float64,2}:\n 1.0  2.0\n 3.0  4.0\n\nSee also: LMBlockVector, AbstractBlockMatrix\n\n\n\n"
 },
 
 {
