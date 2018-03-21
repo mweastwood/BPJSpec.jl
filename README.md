@@ -9,7 +9,7 @@ Tikhonov-regularized m-mode analysis imaging as described by [Eastwood et al.
 2017](http://adsabs.harvard.edu/abs/2017arXiv171100466E).
 
 [![Build Status](https://travis-ci.org/mweastwood/BPJSpec.jl.svg?branch=master)](https://travis-ci.org/mweastwood/BPJSpec.jl)
-[![Coverage Status](https://img.shields.io/codecov/c/github/mweastwood/BPJSpec.jl.svg)](https://codecov.io/github/mweastwood/BPJSpec.jl)
+[![codecov](https://codecov.io/gh/mweastwood/BPJSpec.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/mweastwood/BPJSpec.jl)
 
 **Documentation:** http://mweastwood.github.io/BPJSpec.jl/latest/
 
@@ -20,4 +20,3 @@ Tikhonov-regularized m-mode analysis imaging as described by [Eastwood et al.
 ## Tikhonov-Regularized m-Mode Analysis Imaging
 
 [![OVRO-LWA Sky Map](docs/src/assets/ovro-lwa-sky-map.png)](https://arxiv.org/abs/1711.00466)
-
