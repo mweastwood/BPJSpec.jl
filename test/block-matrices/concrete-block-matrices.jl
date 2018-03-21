@@ -66,7 +66,7 @@ end
     end
 
     @testset "LBlockArray" begin
-        test_matrix(LBlockMatrix, Float64, 2, (0,), (1,), lmax, frequencies, bandwidth)
+        test_matrix(LBlockMatrix, Float64, 2, (BPJSpec.L(0),), (BPJSpec.L(1),), lmax, frequencies, bandwidth)
     end
 
     @testset "LMBlockArray" begin

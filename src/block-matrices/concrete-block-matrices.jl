@@ -414,17 +414,7 @@ function Base.show(io::IO, matrix::MFBlockMatrix)
 end
 
 function Base.getindex(matrix::MFBlockMatrix, m::Int)
-    blocks = [matrix[m, β] for β = 1:length(matrix.frequencies)]
-    X = sum(size.(blocks, 1))
-    Y = sum(size.(blocks, 2))
-    output = zeros(eltype(first(blocks)), X, Y)
-    x = y = 1
-    for block in blocks
-        output[x:x+size(block, 1)-1, y:y+size(block, 2)-1] = block
-        x += size(block, 1)
-        y += size(block, 2)
-    end
-    output
+    stack_diagonally([matrix[m, β] for β = 1:length(matrix.frequencies)])
 end
 
 # The following type uses Diagonaal{Float64} blocks because we want to use it as a noise covariance
@@ -514,6 +504,21 @@ function Base.show(io::IO, matrix::LBlockMatrix)
 end
 
 Base.getindex(matrix::LBlockMatrix, l::Int, m::Int) = matrix[L(l)]
+
+function Base.getindex(matrix::LBlockMatrix, m::Int)
+    Nfreq  = length(matrix.frequencies)
+    Nalm   = matrix.lmax - m + 1
+    output = zeros(Nfreq*Nalm, Nfreq*Nalm)
+    for l = m:matrix.lmax
+        block = matrix[l, m]
+        for β1 = 1:Nfreq, β2 = 1:Nfreq
+            idx1 = Nalm*(β1-1) + l - m + 1
+            idx2 = Nalm*(β2-1) + l - m + 1
+            output[idx1, idx2] = block[β1, β2]
+        end
+    end
+    output
+end
 
 doc"""
     struct LMBlockVector <: AbstractBlockMatrix{Vector{Complex128}, 2}

@@ -13,50 +13,71 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-function kltransforms(mmodes, transfermatrix, noisematrix,
-                      foregroundmatrix, signalmatrix,
-                      observed_foregroundmatrix_storage = NoFile(),
-                      observed_signalmatrix_storage     = NoFile(),
-                      foreground_filter_storage         = NoFile(),
-                      filtered_signalmatrix_storage     = NoFile(),
-                      filtered_noisematrix_storage      = NoFile(),
-                      whitening_matrix_storage          = NoFile(),
-                      mmodes_storage                    = NoFile(),
-                      transfermatrix_storage            = NoFile(),
-                      covariancematrix_storage          = NoFile();
-                      threshold = 0.1)
-    mmax = mmodes.mmax
+function foreground_filter!(output_mmodes, output_transfermatrix, output_covariance,
+                            output_foreground_filter, output_noise_whitener,
+                            input_mmodes,  input_transfermatrix,  input_noisematrix,
+                            input_signalmatrix, input_foregroundmatrix;
+                            threshold=0.1, tempdir="/tmp", cleanup=true)
+    mmax = input_mmodes.mmax
+    storage(name) = MultipleFiles(joinpath(tempdir, name))
+
+    # temporary matrices
+    F  = create(MBlockMatrix, storage("observed-foreground-matrix"), mmax) |> ProgressBar
+    S  = create(MBlockMatrix, storage("observed-signal-matrix"),     mmax) |> ProgressBar
+    S′ = create(MBlockMatrix, storage("filtered-signal-matrix"),     mmax) |> ProgressBar
+    N′ = create(MBlockMatrix, storage("filtered-noise-matrix"),      mmax) |> ProgressBar
+
+    double_kl_transform!(ProgressBar(output_mmodes),
+                         ProgressBar(output_transfermatrix),
+                         ProgressBar(output_covariance),
+                         ProgressBar(output_foreground_filter),
+                         ProgressBar(output_noise_whitener),
+                         input_mmodes, input_transfermatrix, input_noisematrix,
+                         input_signalmatrix, input_foregroundmatrix,
+                         F, S, S′, N′, threshold)
+
+    if cleanup
+        rm_old_blocks!(unwrap(F).storage)
+        rm_old_blocks!(unwrap(S).storage)
+        rm_old_blocks!(unwrap(S′).storage)
+        rm_old_blocks!(unwrap(N′).storage)
+    end
+
+    output = (output_mmodes, output_transfermatrix, output_covariance,
+              output_foreground_filter, output_noise_whitener)
+    output
+end
+
+function double_kl_transform!(output_mmodes, output_transfermatrix, output_covariance,
+                              output_foreground_filter, output_noise_whitener,
+                              input_mmodes,  input_transfermatrix,  input_noisematrix,
+                              input_signalmatrix, input_foregroundmatrix,
+                              F, S, S′, N′, threshold)
 
     # Run the sky covariances through the interferometer's response.
-    F = create(MBlockMatrix, observed_foregroundmatrix_storage, mmax) |> ProgressBar
-    S = create(MBlockMatrix, observed_signalmatrix_storage,     mmax) |> ProgressBar
-    @. F = fix(transfermatrix * foregroundmatrix * T(transfermatrix))
-    @. S = fix(transfermatrix *     signalmatrix * T(transfermatrix))
+    @. F = fix(input_transfermatrix * input_foregroundmatrix * T(input_transfermatrix))
+    @. S = fix(input_transfermatrix *     input_signalmatrix * T(input_transfermatrix))
+    N = input_noisematrix
 
     # Compute the foreground filter...
-    V = create(MBlockMatrix, foreground_filter_storage, mmax) |> ProgressBar
+    V = output_foreground_filter
     construct_filter′(F, S) = construct_filter(F, S, threshold)
     @. V = construct_filter′(F, S)
 
     # ...and apply that filter.
-    S′ = create(MBlockMatrix, filtered_signalmatrix_storage, mmax) |> ProgressBar
-    N′ = create(MBlockMatrix, filtered_noisematrix_storage,  mmax) |> ProgressBar
     @. S′ = fix(T(V) * S * V)
-    @. N′ = fix(T(V) * noisematrix * V) + H(T(V) * F * V)
+    @. N′ = fix(T(V) * (N + F) * V)
 
     # Whiten the noise.
-    W = create(MBlockMatrix, whitening_matrix_storage, mmax) |> ProgressBar
+    W = output_noise_whitener
     @. W = construct_whiten(S′, N′)
 
     # Compute the final m-modes, transfer matrix, and covariance matrix.
-    v = create(MBlockVector, mmodes_storage,           mmax) |> ProgressBar
-    B = create(MBlockMatrix, transfermatrix_storage,   mmax) |> ProgressBar
-    C = create(MBlockMatrix, covariancematrix_storage, mmax) |> ProgressBar
-    @. v = T(W) * (T(V) * mmodes)
-    @. B = T(W) * (T(V) * transfermatrix)
-    @. C = H(T(W) * S′ * W) + H(T(W) * N′ * W)
+    @. output_mmodes         = T(W) * (T(V) * input_mmodes)
+    @. output_transfermatrix = T(W) * (T(V) * input_transfermatrix)
+    @. output_covariance     = fix(T(W) * (S′ + N′) * W)
 
-    unwrap(v), unwrap(B), unwrap(C)
+    nothing
 end
 
 function construct_filter(F, S, threshold)

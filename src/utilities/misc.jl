@@ -50,3 +50,17 @@ Base.:-(lhs::L, rhs::L) = L(lhs.l - rhs.l)
 "Discards type parameters from the given type (eg. `Array{Int, 2}` → `Array`)"
 discard_type_parameters(::Type{T}) where {T} = Base.unwrap_unionall(T).name.wrapper
 
+"Stack a bunch of matrix blocks diagonally, with zeroes elsewhere."
+function stack_diagonally(blocks)
+    X = sum(size.(blocks, 1))
+    Y = sum(size.(blocks, 2))
+    output = zeros(eltype(first(blocks)), X, Y)
+    x = y = 1
+    for block in blocks
+        output[x:x+size(block, 1)-1, y:y+size(block, 2)-1] = block
+        x += size(block, 1)
+        y += size(block, 2)
+    end
+    output
+end
+
