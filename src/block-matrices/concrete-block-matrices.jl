@@ -484,9 +484,11 @@ Each of these blocks is indexed by its value of $l$, which varies from `0` to `l
 julia> x = create(LBlockMatrix, 2, [74u"MHz", 100u"MHz"], [24u"kHz", 24u"kHz"])
 LBlockMatrix(<no file>, cached=true, lmax=2, frequencies=74.000 MHz…100.000 MHz, bandwidth~24 kHz)
 
-julia> x[0] = Float64[1 2; 3 4];
+julia> l = BPJSpec.L(0);
 
-julia> x[0]
+julia> x[l] = Float64[1 2; 3 4];
+
+julia> x[l]
 2×2 Array{Float64,2}:
  1.0  2.0
  3.0  4.0

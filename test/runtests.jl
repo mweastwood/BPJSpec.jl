@@ -53,6 +53,7 @@ srand(123)
     end
 
     @testset "quadratic-estimator" begin
+        include("quadratic-estimator/q-estimator.jl")
         include("quadratic-estimator/mixing-matrix.jl")
     end
 end

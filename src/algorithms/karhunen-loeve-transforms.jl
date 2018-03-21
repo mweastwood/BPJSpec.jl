@@ -13,6 +13,40 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+doc"""
+    foreground_filter!(output_mmodes, output_transfermatrix, output_covariance,
+                       output_foreground_filter, output_noise_whitener,
+                       input_mmodes, input_transfermatrix, input_noisematrix,
+                       input_signalmatrix, input_foregroundmatrix;
+                       threshold=0.1, tempdir="/tmp", cleanup=true)
+
+Filter foreground emission from the dataset *and* whiten the noise.
+
+**Arguments:**
+
+* `output_mmodes` will be populated with the foreground filtered $m$-modes
+* `output_transfermatrix` will be populated with the foreground-filtered transfer-matrix
+* `output_covariance` will be populated with the covariance matrix of the output $m$-modes
+* `output_foreground_filter` is the matrix used to filter foreground emission
+* `output_noise_whitener` is the matrix used to whiten the noise covariance (the thermal noise and
+  the foreground contribution)
+* `input_mmodes` is the measured input $m$-modes
+* `input_transfermatrix` is the transfer matrix describing the response of the interferometer
+* `input_noisematrix` is the thermal noise covariance matrix
+* `input_signalmatrix` is the covariance matrix due to the 21-cm power spectrum
+* `input_foregroundmatrix` is the covariance matrix due to the foreground radio emission
+
+!!! warn
+    Please pay attention to the argument order. Swapping arguments could lead to this function
+    filtering all of the 21-cm signal while leaving the foreground emission in tact!
+
+**Keyword Arguments:**
+
+* `threshold` is the maximum allowed foreground-signal ratio
+* `tempdir` is a path to a directory where temporary files can be placed
+* `cleanup` determines whether or not files placed in the `tempdir` are automatically removed. This
+  can be set to `false` if you wish to check some of the intermediate output.
+"""
 function foreground_filter!(output_mmodes, output_transfermatrix, output_covariance,
                             output_foreground_filter, output_noise_whitener,
                             input_mmodes,  input_transfermatrix,  input_noisematrix,

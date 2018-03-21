@@ -10,6 +10,7 @@ end
 ```
 
 ```@docs
+q_estimator
 full_rank_compress!
 ```
 

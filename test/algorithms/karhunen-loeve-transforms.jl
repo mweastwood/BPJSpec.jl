@@ -29,7 +29,7 @@
 
         alm[m] = complex.(randn(Y), randn(Y))
     end
-    for l = 0:mmax
+    for l = 0:lmax
         C = randn(Nfreq, Nfreq)
         C = C'*C
         input_signalmatrix[BPJSpec.L(l)] = C

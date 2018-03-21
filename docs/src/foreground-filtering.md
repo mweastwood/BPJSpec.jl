@@ -12,6 +12,7 @@ end
 ```
 
 ```@docs
+foreground_filter!
 ForegroundComponent
 CylindricalPS
 extragalactic_point_sources
