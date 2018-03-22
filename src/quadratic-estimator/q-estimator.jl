@@ -39,7 +39,7 @@ end
 
 function q_estimator!(output, mmodes, transfermatrix, covariancematrix, basis)
     N = length(basis)
-    lmax = mmax = mmodes.mmax
+    lmax = mmax = transfermatrix.mmax
     frequencies = first(basis).frequencies
     bandwidth   = first(basis).bandwidth
 

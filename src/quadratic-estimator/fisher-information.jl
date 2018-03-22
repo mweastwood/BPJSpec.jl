@@ -13,59 +13,106 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+doc"""
+    fisher_information(transfermatrix, covariancematrix, basis; iterations=10)
+
+Compute a Monte-Carlo approximation of the Fisher information matrix.
+
+```math
+F_{ab} = {\rm tr}\left( C^{-1} C_a C^{-1} C_b \right)
+```
+
+**Arguments:**
+
+* `transfermatrix` or $B$ specifies the interferometer's response to the sky
+* `covariancematrix` or $C$ specifies the covariance of the measured $m$-modes
+* `basis` or $C_a$ is a list of angular covariance matrices that represent the change in the
+  covariance with respect to an increase in power of each 21-cm power spectrum bin
+
+**Keyword Arguments:**
+
+* `iterations` is the number of Monte Carlo simulations to perform
+"""
 function fisher_information(transfermatrix, covariancematrix, basis; iterations=10)
-    N = length(basis)
-    M = length(workers())
-    F = zeros(N, N)
-    @sync for worker in workers()
-        @async begin
-            F′ = remotecall_fetch(_fisher, worker, transfermatrix, covariancematrix,
-                                  basis, cld(iterations, M))
-            F .+= F′
-        end
-    end
-    F ./= M
-    F
+    μ, Σ = fisher_monte_carlo(:fisher, transfermatrix, covariancematrix, basis, iterations)
+    Σ
 end
 
-function _fisher(transfermatrix, covariancematrix, basis, iterations)
+"""
+    noise_bias(transfermatrix, covariancematrix, basis; iterations=10)
+
+Compute a Monte-Carlo approximation of the noise bias to the quadratic estimator.
+"""
+function noise_bias(transfermatrix, covariancematrix, basis; iterations=10)
+    μ, Σ = fisher_monte_carlo(:bias, transfermatrix, covariancematrix, basis, iterations)
+    μ
+end
+
+function fisher_monte_carlo(instruction, transfermatrix, covariancematrix, basis, iterations)
+    queue = collect(1:iterations)
+    lck = ReentrantLock()
+    prg = Progress(length(queue))
+    increment() = (lock(lck); next!(prg); unlock(lck))
+
+    N = length(basis)
+    Q = zeros(N, iterations)
+
+    @sync for worker in workers()
+        @async begin
+            input  = RemoteChannel()
+            output = RemoteChannel()
+            remotecall(fisher_remote_processing_loop, worker, input, output,
+                       transfermatrix, covariancematrix, basis)
+            try
+                while length(queue) > 0
+                    iteration = shift!(queue)
+                    put!(input, instruction)
+                    Q[:, iteration] = take!(output)
+                    increment()
+                end
+            finally
+                put!(input, :quit)
+            end
+        end
+    end
+
+    μ = mean(Q, 2)
+    Σ = zeros(N, N)
+    for iteration = 1:iterations
+        q = Q[:, iteration]
+        Σ .+= (q.-μ)*(q.-μ)'
+    end
+    Σ ./= iterations - 1
+    μ, Σ
+end
+
+function fisher_remote_processing_loop(input, output, transfermatrix, covariancematrix, basis)
     cache!(transfermatrix)
     cache!(covariancematrix)
     foreach(cache!, basis)
-    compute_fisher(transfermatrix, covariancematrix, basis, iterations)
+    while true
+        instruction = take!(input)
+        if instruction == :quit
+            break
+        elseif instruction == :fisher
+            q = compute_fisher_q(transfermatrix, covariancematrix, basis)
+            put!(output, q)
+        elseif instruction == :bias
+            q = compute_bias_q(transfermatrix, covariancematrix, basis)
+            put!(output, q)
+        else
+            put!(output, :error)
+        end
+    end
 end
 
-function compute_fisher(B, C, basis, iterations)
-    N = length(basis)
-    lmax = mmax = B.mmax
-
-    v   = RandomVector(C)
-    Bv  = create(MBlockVector, mmax)
-    CBv = create(AngularBlockVector, lmax, mmax)
-
-    q  = zeros(N)
-    μ  = zeros(N)
-    σ² = zeros(N, N)
-
-    for iter = 1:iterations
-        fisher_iteration!(q, B, C, basis, v, Bv, CBv)
-        μ  .+= q
-        σ² .+= q*q'
-    end
-    μ  ./= iterations
-    σ² ./= iterations
-    σ² .- μ*μ'
+function compute_fisher_q(transfermatrix, covariancematrix, basis)
+    mmodes = RandomBlockVector(covariancematrix)
+    q_estimator(mmodes, transfermatrix, covariancematrix, basis)
 end
 
-function fisher_iteration!(q, B, C, basis, v, Bv, CBv)
-    N = length(basis)
-    @. Bv = T(B) * (C \ v)
-    Bv′ = AngularBlockVector(Bv)
-    for a = 1:N
-        Ca = basis[a]
-        @. CBv = Ca * Bv′
-        q[a] = real(dot(CBv, Bv′))
-    end
-    q
+function compute_bias_q(transfermatrix, covariancematrix, basis)
+    mmodes = WhiteNoiseBlockVector()
+    q_estimator(mmodes, transfermatrix, covariancematrix, basis)
 end
 

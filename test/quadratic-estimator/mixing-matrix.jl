@@ -1,3 +1,9 @@
+# I keep getting random failures in this file, presumably due to getting a random matrix that
+# happens to be more singular than usual. So we'll just set the random seed here so that we at least
+# get a deterministic random matrix.
+
+srand(456)
+
 @testset "mixing-matrix.jl" begin
     A = randn(5, 5)
     F = A'*A

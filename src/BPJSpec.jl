@@ -47,7 +47,7 @@ export MModes, MultiFrequencyAlm
 export RandomBlockVector, WhiteNoiseBlockVector
 export ProgressBar, create, compute!, cache!, flush!
 export tikhonov, full_rank_compress!, foreground_filter!
-export q_estimator
+export q_estimator, fisher_information, noise_bias
 
 using Unitful, UnitfulAstro # Travis CI fails with "invalid age range update" unless this is first
 
@@ -109,7 +109,6 @@ include("algorithms/tikhonov-regularization.jl")
 
 include("quadratic-estimator/q-estimator.jl")
 include("quadratic-estimator/fisher-information.jl")
-include("quadratic-estimator/noise-bias.jl")
 include("quadratic-estimator/mixing-matrix.jl")
 
 end
