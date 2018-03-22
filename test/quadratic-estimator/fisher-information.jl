@@ -27,7 +27,7 @@
         end
     end
 
-    iterations = get(ENV, "CI", false) ? 10 : 1000
+    iterations = get(ENV, "CI", "false") == "true" ? 10 : 1000
     F = fisher_information(transfermatrix, covariancematrix, basis, iterations=iterations)
 
     # manually compute tr(C⁻¹ Ca C⁻¹ Cb)
