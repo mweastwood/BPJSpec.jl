@@ -185,6 +185,22 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
+    "location": "power-spectrum-estimation/#BPJSpec.fisher_information",
+    "page": "Power Spectrum Estimation",
+    "title": "BPJSpec.fisher_information",
+    "category": "function",
+    "text": "fisher_information(transfermatrix, covariancematrix, basis; iterations=10)\n\nCompute a Monte-Carlo approximation of the Fisher information matrix.\n\nF_ab = rm trleft( C^-1 C_a C^-1 C_b right)\n\nArguments:\n\ntransfermatrix or B specifies the interferometer\'s response to the sky\ncovariancematrix or C specifies the covariance of the measured m-modes\nbasis or C_a is a list of angular covariance matrices that represent the change in the covariance with respect to an increase in power of each 21-cm power spectrum bin\n\nKeyword Arguments:\n\niterations is the number of Monte Carlo simulations to perform\n\n\n\n"
+},
+
+{
+    "location": "power-spectrum-estimation/#BPJSpec.noise_bias",
+    "page": "Power Spectrum Estimation",
+    "title": "BPJSpec.noise_bias",
+    "category": "function",
+    "text": "noise_bias(transfermatrix, covariancematrix, basis; iterations=10)\n\nCompute a Monte-Carlo approximation of the noise bias to the quadratic estimator.\n\n\n\n"
+},
+
+{
     "location": "power-spectrum-estimation/#BPJSpec.full_rank_compress!",
     "page": "Power Spectrum Estimation",
     "title": "BPJSpec.full_rank_compress!",
@@ -197,7 +213,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Power Spectrum Estimation",
     "title": "API",
     "category": "section",
-    "text": "CurrentModule = BPJSpec\nDocTestSetup = quote\n    using BPJSpec\nendq_estimator\nfull_rank_compress!"
+    "text": "CurrentModule = BPJSpec\nDocTestSetup = quote\n    using BPJSpec\nendq_estimator\nfisher_information\nnoise_bias\nfull_rank_compress!"
 },
 
 {
