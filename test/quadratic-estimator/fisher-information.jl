@@ -27,7 +27,8 @@
         end
     end
 
-    F = fisher_information(transfermatrix, covariancematrix, basis, iterations=1000)
+    iterations = get(ENV, "CI", false) ? 10 : 1000
+    F = fisher_information(transfermatrix, covariancematrix, basis, iterations=iterations)
 
     # manually compute tr(C⁻¹ Ca C⁻¹ Cb)
     F′ = similar(F)
@@ -45,6 +46,6 @@
         F′[a, b] = output
     end
 
-    @test all(abs.(F .- F′) ./ abs.(F′) .< 0.2)
+    @test all(abs.(F .- F′) ./ abs.(F′) .< 0.2 * sqrt(1000/iterations))
 end
 
