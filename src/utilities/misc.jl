@@ -51,7 +51,7 @@ Base.:-(lhs::L, rhs::L) = L(lhs.l - rhs.l)
 discard_type_parameters(::Type{T}) where {T} = Base.unwrap_unionall(T).name.wrapper
 
 "Stack a bunch of matrix blocks diagonally, with zeroes elsewhere."
-function stack_diagonally(blocks)
+function stack_diagonally(blocks::Vector{<:AbstractMatrix})
     X = sum(size.(blocks, 1))
     Y = sum(size.(blocks, 2))
     output = zeros(eltype(first(blocks)), X, Y)
@@ -60,6 +60,17 @@ function stack_diagonally(blocks)
         output[x:x+size(block, 1)-1, y:y+size(block, 2)-1] = block
         x += size(block, 1)
         y += size(block, 2)
+    end
+    output
+end
+
+function stack_diagonally(blocks::Vector{<:AbstractVector})
+    X = sum(length.(blocks))
+    output = zeros(eltype(first(blocks)), X)
+    x = 1
+    for block in blocks
+        output[x:x+size(block, 1)-1] = block
+        x += length(block)
     end
     output
 end

@@ -31,5 +31,17 @@
         @test BPJSpec.discard_type_parameters(BPJSpec.AbstractBlockMatrix{Matrix{Float64}, 2}) ==
                 BPJSpec.AbstractBlockMatrix
     end
+
+    @testset "stacking diagonally" begin
+        A = complex.(randn(5, 6), randn(5, 6))
+        B = complex.(randn(4, 3), randn(4, 3))
+        Z1 = zeros(size(A, 1), size(B, 2))
+        Z2 = zeros(size(B, 1), size(A, 2))
+        @test BPJSpec.stack_diagonally([A, B]) == [A Z1; Z2 B]
+
+        a = complex.(randn(5), randn(5))
+        b = complex.(randn(4), randn(4))
+        @test BPJSpec.stack_diagonally([a, b]) == [a; b]
+    end
 end
 

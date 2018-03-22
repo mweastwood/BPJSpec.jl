@@ -362,15 +362,7 @@ function Base.show(io::IO, vector::MFBlockVector)
 end
 
 function Base.getindex(matrix::MFBlockVector, m::Int)
-    blocks = [matrix[m, β] for β = 1:length(matrix.frequencies)]
-    X = sum(size.(blocks, 1))
-    output = zeros(eltype(first(blocks)), X)
-    x = 1
-    for block in blocks
-        output[x:x+size(block, 1)-1] = block
-        x += size(block, 1)
-    end
-    output
+    stack_diagonally([matrix[m, β] for β = 1:length(matrix.frequencies)])
 end
 
 doc"""
