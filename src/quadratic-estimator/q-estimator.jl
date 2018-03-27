@@ -32,6 +32,10 @@ q_a = v^* C^{-1} B C_a B^* C^{-1} v
 """
 function q_estimator(mmodes, transfermatrix, covariancematrix, basis)
     N = length(basis)
+    cache!(mmodes)
+    cache!(transfermatrix)
+    cache!(covariancematrix)
+    foreach(cache!, basis)
     output = zeros(N)
     q_estimator!(output, mmodes, transfermatrix, covariancematrix, basis)
     output

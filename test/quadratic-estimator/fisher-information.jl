@@ -23,7 +23,7 @@
         for a = 1:length(basis)
             C = randn(Nfreq, Nfreq)
             C = C'*C
-            basis[a][BPJSpec.L(l)] = C
+            basis[a][L(l)] = C
         end
     end
 
@@ -37,8 +37,8 @@
     for a = 1:length(basis), b = 1:length(basis)
         Ca = basis[a]
         Cb = basis[b]
-        @. lhs = covariancematrix \ (transfermatrix * Ca * BPJSpec.T(transfermatrix))
-        @. rhs = covariancematrix \ (transfermatrix * Cb * BPJSpec.T(transfermatrix))
+        @. lhs = covariancematrix \ (transfermatrix * Ca * T(transfermatrix))
+        @. rhs = covariancematrix \ (transfermatrix * Cb * T(transfermatrix))
         output = 0.0
         for m = 0:mmax
             output += real(sum(lhs[m] .* transpose(rhs[m])))
@@ -46,6 +46,6 @@
         F′[a, b] = output
     end
 
-    @test all(abs.(F .- F′) ./ abs.(F′) .< 0.2 * sqrt(1000/iterations))
+    @test all(abs.(F .- F′) ./ abs.(F′) .< 0.5 * sqrt(1000/iterations))
 end
 

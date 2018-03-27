@@ -32,11 +32,11 @@
     for l = 0:lmax
         C = randn(Nfreq, Nfreq)
         C = C'*C
-        input_signalmatrix[BPJSpec.L(l)] = C
+        input_signalmatrix[L(l)] = C
 
         C = randn(Nfreq, Nfreq)
         C = C'*C
-        input_foregroundmatrix[BPJSpec.L(l)] = C
+        input_foregroundmatrix[L(l)] = C
     end
 
     @. input_mmodes = input_transfermatrix * alm
@@ -53,8 +53,8 @@
     # test that the 21-cm signal power is greater than the foreground power after filtering
     F = create(MBlockMatrix, mmax)
     S = create(MBlockMatrix, mmax)
-    @. F = BPJSpec.fix(BPJSpec.T(V) * B * input_foregroundmatrix * BPJSpec.T(B) * V)
-    @. S = BPJSpec.fix(BPJSpec.T(V) * B * input_signalmatrix     * BPJSpec.T(B) * V)
+    @. F = BPJSpec.fix(T(V) * B * input_foregroundmatrix * T(B) * V)
+    @. S = BPJSpec.fix(T(V) * B * input_signalmatrix     * T(B) * V)
     for m = 0:mmax
         @test all(eigvals(F[m], S[m]) .< 1.0)
     end

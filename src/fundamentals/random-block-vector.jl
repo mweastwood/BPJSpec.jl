@@ -24,7 +24,7 @@ function Base.getindex(vector::RandomBlockVector, idx...)
     # TODO: cache the results of the Cholesky decomposition
     C = vector.covariance[idx...]
     N = size(C, 1)
-    U = chol(C)
+    U = chol(Hermitian(C))
     x = complex.(randn(N), randn(N)) ./ √2
     U'*x # random variable with the correct covariance
 end

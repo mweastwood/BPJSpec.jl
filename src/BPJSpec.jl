@@ -48,6 +48,8 @@ export RandomBlockVector, WhiteNoiseBlockVector
 export ProgressBar, create, compute!, cache!, flush!
 export tikhonov, full_rank_compress!, foreground_filter!
 export q_estimator, fisher_information, noise_bias
+export L # spherical harmonic L
+export T # conjugate transpose
 
 using Unitful, UnitfulAstro # Travis CI fails with "invalid age range update" unless this is first
 

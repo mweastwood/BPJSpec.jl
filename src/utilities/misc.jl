@@ -41,6 +41,8 @@ end
 Base.convert(::Type{L}, l::Int) = L(l)
 Base.convert(::Type{Int}, l::L) = l.l
 Base.promote_rule(::Type{L}, ::Type{Int}) = L
+Base.convert(::Type{<:AbstractFloat}, l::L) = float(l.l)
+Base.promote_rule(::Type{L}, ::Type{<:AbstractFloat}) = Float64
 Base.oneunit(::L) = L(1)
 Base.:<(lhs::L, rhs::L) = lhs.l < rhs.l
 Base.:≤(lhs::L, rhs::L) = lhs.l ≤ rhs.l
@@ -62,6 +64,11 @@ function stack_diagonally(blocks::Vector{<:AbstractMatrix})
         y += size(block, 2)
     end
     output
+end
+
+function stack_diagonally(blocks::Vector{<:Diagonal})
+    diagonal = stack_diagonally(diag.(blocks))
+    Diagonal(diagonal)
 end
 
 function stack_diagonally(blocks::Vector{<:AbstractVector})

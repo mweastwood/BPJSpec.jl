@@ -41,7 +41,7 @@ function internal_broadcast!(f, output, args...; progress=false)
 end
 
 function local_broadcast!(f, output, args; progress=false)
-    queue = indices(output)
+    queue = collect(indices(output))
     progress && (prg = Progress(length(queue)))
     for indices in queue
         just_do_it!(f, output, args, indices)

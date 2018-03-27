@@ -21,9 +21,9 @@ end
     bandwidth   = [ 1u"Hz",   2u"Hz" ]
     component = BPJSpec.galactic_synchrotron()
     C = create(AngularCovarianceMatrix, NoFile(), component, lmax, frequencies, bandwidth)
-    @test C[1, 0] == C[1, 1] # independent of m
+    @test C[L(1), 0] == C[L(1), 1] # independent of m
     for l = 0:lmax
-        Cl = C[l, 0]
+        Cl = C[L(l), 0]
         @test ishermitian(Cl)
         @test isposdef(Cl)
         for β1 = 1:length(frequencies), β2 = 1:length(frequencies)
@@ -43,7 +43,7 @@ end
     bandwidth   = [20u"MHz", 20u"MHz"] # add a lot of bandwidth to make bandwidth smearing important
     C = create(AngularCovarianceMatrix, NoFile(), component, lmax, frequencies, bandwidth)
     for l = 0:lmax
-        Cl = C[l, 0]
+        Cl = C[L(l), 0]
         for β1 = 1:length(frequencies), β2 = 1:length(frequencies)
             ν1 = frequencies[β1]
             ν2 = frequencies[β2]
@@ -59,7 +59,7 @@ end
     bandwidth   = [20u"MHz"]
     C = create(AngularCovarianceMatrix, NoFile(), component, lmax, frequencies, bandwidth)
     for l = 0:lmax
-        Cl = C[l, 0]
+        Cl = C[L(l), 0]
         for β1 = 1:length(frequencies), β2 = 1:length(frequencies)
             ν1 = frequencies[β1]
             ν2 = frequencies[β2]

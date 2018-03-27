@@ -95,7 +95,7 @@ metadata_fields(array::LMBlockArray) =
 linear_index(array::LMBlockArray, l, m) =
     (m * (2array.lmax - m + 3)) ÷ 2 + l - m + 1
 indices(array::LMBlockArray) =
-    ((l, m) for m = 0:array.mmax for l = m:array.lmax)
+    ((l, m) for m = 0:array.mmax for l = L(m):L(array.lmax))
 
 """
     struct SimpleBlockVector <: AbstractBlockMatrix{Vector{Complex128}, 1}
@@ -453,6 +453,10 @@ function Base.show(io::IO, matrix::MFDiagonalBlockMatrix)
             u(u"kHz", mean(matrix.bandwidth)))
 end
 
+function Base.getindex(matrix::MFDiagonalBlockMatrix, m::Int)
+    stack_diagonally([matrix[m, β] for β = 1:length(matrix.frequencies)])
+end
+
 # The following type uses Matrix{Float64} blocks because we want to use it as an angular covariance
 # matrix, which is block diagonal in l and has real elements.
 
@@ -497,13 +501,13 @@ function Base.show(io::IO, matrix::LBlockMatrix)
             u(u"kHz", mean(matrix.bandwidth)))
 end
 
-Base.getindex(matrix::LBlockMatrix, l::Int, m::Int) = matrix[L(l)]
+Base.getindex(matrix::LBlockMatrix, l::L, m::Int) = matrix[L(l)]
 
 function Base.getindex(matrix::LBlockMatrix, m::Int)
     Nfreq  = length(matrix.frequencies)
     Nalm   = matrix.lmax - m + 1
     output = zeros(Nfreq*Nalm, Nfreq*Nalm)
-    for l = m:matrix.lmax
+    for l = L(m):L(matrix.lmax)
         block = matrix[l, m]
         for β1 = 1:Nfreq, β2 = 1:Nfreq
             idx1 = Nalm*(β1-1) + l - m + 1

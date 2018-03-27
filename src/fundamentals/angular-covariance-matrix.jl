@@ -30,7 +30,7 @@ function compute!(::Type{AngularCovarianceMatrix}, matrix::LBlockMatrix,
     Nfreq = length(ν)
     args  = precomputation(component)
     progress && (prg = Progress(matrix.lmax+1))
-    for l = 0:matrix.lmax
+    for l = L(0):L(matrix.lmax)
         block = zeros(Float64, Nfreq, Nfreq)
         for β1 = 1:Nfreq
             ν1  =  ν[β1]

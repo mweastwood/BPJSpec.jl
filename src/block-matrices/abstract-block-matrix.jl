@@ -158,22 +158,31 @@ function set!(matrix::AbstractBlockMatrix{B, 2}, block::B, idx, jdx) where B
 end
 
 function cache!(matrix::AbstractBlockMatrix)
-    resize!(matrix.cache, nblocks(matrix))
-    for idx in indices(matrix)
-        matrix.cache[linear_index(matrix, idx)] = matrix[idx]
+    if !used(matrix.cache)
+        resize!(matrix.cache, nblocks(matrix))
+        for idx in indices(matrix)
+            matrix.cache[linear_index(matrix, idx)] = matrix[idx]
+        end
+        set!(matrix.cache)
     end
-    set!(matrix.cache)
     matrix
 end
 
 function flush!(matrix::AbstractBlockMatrix)
-    unset!(matrix.cache)
-    for idx in indices(matrix)
-        matrix[idx] = matrix.cache[linear_index(matrix, idx)]
+    if used(matrix.cache)
+        unset!(matrix.cache)
+        for idx in indices(matrix)
+            matrix[idx] = matrix.cache[linear_index(matrix, idx)]
+        end
+        resize!(matrix.cache, 0)
     end
-    resize!(matrix.cache, 0)
     matrix
 end
+
+# This fallback is so that we can indiscriminately call `cache!` on m-modes in `q_estimator`
+# regardless of whether or not these m-modes are an `AbsractBlockVector` or a `RandomBlockVector`,
+# which doesn't implement a cache.
+cache!(x) = x
 
 distribute_write(matrix::AbstractBlockMatrix) =
     distribute_write(matrix.storage) && !used(matrix.cache)

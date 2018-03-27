@@ -4,8 +4,8 @@
         B = A*A'
         C = BPJSpec.fix(diagm([1.0, 0.2, -1e-16]))
         D = BPJSpec.fix([1.0 0.1; 0 -1.0])
-        @test BPJSpec.T(A) == A'
-        @test BPJSpec.T(B) == B
+        @test T(A) == A'
+        @test T(B) == B
         @test BPJSpec.H(A) == 0.5*(A+A')
         @test BPJSpec.H(B) == B
         @test C == C'
@@ -21,8 +21,8 @@
     end
 
     @testset "L" begin
-        @test BPJSpec.L(1) + BPJSpec.L(2) == BPJSpec.L(3)
-        @test collect(BPJSpec.L(1):BPJSpec.L(3)) == [BPJSpec.L(1), BPJSpec.L(2), BPJSpec.L(3)]
+        @test L(1) + L(2) == L(3)
+        @test collect(L(1):L(3)) == [L(1), L(2), L(3)]
     end
 
     @testset "type utilities" begin

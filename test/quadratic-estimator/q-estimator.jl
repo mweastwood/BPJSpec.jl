@@ -25,7 +25,7 @@
         for a = 1:length(basis)
             C = randn(Nfreq, Nfreq)
             C = C'*C
-            basis[a][BPJSpec.L(l)] = C
+            basis[a][L(l)] = C
         end
     end
 

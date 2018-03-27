@@ -13,8 +13,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-function average_frequency_channels(input::Union{MFBlockVector, MFBlockMatrix},
-                                    Navg; storage=NoFile(), progress=false)
+function average_frequency_channels(input, Navg; storage=NoFile(), progress=false)
     ν  = input.frequencies
     Δν = input.bandwidth
     Nfreq = length(ν)
@@ -43,8 +42,8 @@ function average_frequency_channels(input::Union{MFBlockVector, MFBlockMatrix},
     @sync for worker in workers()
         @async while length(queue) > 0
             m, β = shift!(queue)
-            remotecall_fetch(_average_frequency_channels, pool,
-                             input, output, Δν, Δν′, m, β, partition[β])
+            remotecall_wait(_average_frequency_channels, pool,
+                            input, output, Δν, Δν′, m, β, partition[β])
             progress && increment()
         end
     end
@@ -52,13 +51,35 @@ function average_frequency_channels(input::Union{MFBlockVector, MFBlockMatrix},
 end
 
 function _average_frequency_channels(input, output, Δν, Δν′, m, β, channels)
+    # NOTE: we are using regular multiplication (*) here instead of broadcasted multiplication (.*)
+    # because broadcasting changes `Diagonal` matrices to `SparseMatrixCSC`, which is undesirable
+    # behavior for our noise covariance matrices.
+    #
+    # julia> x = Diagonal([1.0, 2.0, 3.0])
+    # 3×3 Diagonal{Float64}:
+    #  1.0   ⋅    ⋅
+    #   ⋅   2.0   ⋅
+    #   ⋅    ⋅   3.0
+    #
+    # julia> x .* 3
+    # 3×3 SparseMatrixCSC{Float64,Int64} with 3 stored entries:
+    #   [1, 1]  =  3.0
+    #   [2, 2]  =  6.0
+    #   [3, 3]  =  9.0
+    #
+    # julia> x * 3
+    # 3×3 Diagonal{Float64}:
+    #  3.0   ⋅    ⋅
+    #   ⋅   6.0   ⋅
+    #   ⋅    ⋅   9.0
+
     β′ = channels[1]
     weight = u(NoUnits, Δν[β′]/Δν′[β])
-    B = input[m, β′] .* weight
+    B = input[m, β′] * weight
 
     for β′ in channels[2:end]
         weight = u(NoUnits, Δν[β′]/Δν′[β])
-        B .+= input[m, β′] .* weight
+        B += input[m, β′] * weight
     end
 
     output[m, β] = B

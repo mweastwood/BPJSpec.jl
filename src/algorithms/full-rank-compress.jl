@@ -50,11 +50,20 @@ function full_rank_compress!(output_mmodes, output_transfermatrix, output_noisem
 end
 
 function _full_rank_compress(v, B, N)
+    v, B, N = _full_rank_compress_propagate_flags(v, B, N)
     F = svdfact(B)
     U = F[:U]
     v′ = U'*v
     B′ = U'*B
     N′ = fix(U'*N*U)
     v′, B′, N′
+end
+
+function _full_rank_compress_propagate_flags(v, B, N)
+    f = v .== 0 # flags
+    v = v[.!f]
+    B = B[.!f, :]
+    N = N[.!f, .!f]
+    v, B, N
 end
 
