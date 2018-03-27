@@ -11,13 +11,17 @@
         end
         input[m, β] = block
     end
-    output = create(MultiFrequencyAlm, input)
-    for m = 0:mmax, l = m:lmax
+    output  = create(MultiFrequencyAlm, input)
+    output′ = create(MFBlockVector, output)
+    for m = 0:mmax, l = L(m):L(lmax)
         block = zeros(Complex128, length(frequencies))
         for β = 1:length(frequencies)
             block[β] = complex(l*m, β)
         end
         @test output[l, m] == block
+    end
+    for β = 1:length(frequencies), m = 0:mmax
+        @test input[m, β] == output′[m, β]
     end
 
     input = create(MBlockVector, mmax)
@@ -31,7 +35,7 @@
         input[m] = block
     end
     output = create(MultiFrequencyAlm, input, frequencies, bandwidth)
-    for m = 0:mmax, l = m:lmax
+    for m = 0:mmax, l = L(m):L(lmax)
         block = zeros(Complex128, length(frequencies))
         for β = 1:length(frequencies)
             block[β] = complex(l*m, β)

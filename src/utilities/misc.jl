@@ -48,6 +48,7 @@ Base.:<(lhs::L, rhs::L) = lhs.l < rhs.l
 Base.:≤(lhs::L, rhs::L) = lhs.l ≤ rhs.l
 Base.:+(lhs::L, rhs::L) = L(lhs.l + rhs.l)
 Base.:-(lhs::L, rhs::L) = L(lhs.l - rhs.l)
+Base.:*(lhs::L, rhs::L) = L(lhs.l * rhs.l)
 
 "Discards type parameters from the given type (eg. `Array{Int, 2}` → `Array`)"
 discard_type_parameters(::Type{T}) where {T} = Base.unwrap_unionall(T).name.wrapper
