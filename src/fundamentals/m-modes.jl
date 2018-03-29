@@ -34,8 +34,8 @@ end
 
 "Compute m-modes from two dimensional matrix of visibilities (time × baseline)."
 function compute!(::Type{MModes}, mmodes::MFBlockVector, hierarchy::Hierarchy,
-                  visibilities::Matrix{Complex128}, β)
-    store!(mmodes, hierarchy, fourier_transform(visibilities), β)
+                  visibilities::Matrix{Complex128}, β; dϕ=0.0)
+    store!(mmodes, hierarchy, fourier_transform(visibilities), β, dϕ)
 end
 
 function fourier_transform(matrix)
@@ -44,7 +44,7 @@ function fourier_transform(matrix)
     (planned_fft*matrix) ./ Ntime
 end
 
-function store!(mmodes, hierarchy, transformed_visibilities, β)
+function store!(mmodes, hierarchy, transformed_visibilities, β, dϕ)
     Ntime = size(transformed_visibilities, 1)
 
     # m = 0
@@ -57,11 +57,12 @@ function store!(mmodes, hierarchy, transformed_visibilities, β)
     # m > 0
     for m = 1:mmodes.mmax
         block = zeros(Complex128, 2Nbase(hierarchy, m))
+        rotation = cis(m*dϕ)
         for (α, α′) in enumerate(baseline_permutation(hierarchy, m))
             α1 = 2α-1 # positive m
             α2 = 2α-0 # negative m
-            block[α1] =      transformed_visibilities[      m+1, α′]
-            block[α2] = conj(transformed_visibilities[Ntime+1-m, α′])
+            block[α1] =      transformed_visibilities[      m+1, α′]  * rotation
+            block[α2] = conj(transformed_visibilities[Ntime+1-m, α′]) * rotation
         end
         mmodes[m, β] = block
     end

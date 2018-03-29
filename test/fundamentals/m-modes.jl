@@ -21,5 +21,12 @@
     @test mmodes[1, 1] ≈ [1, 0]
     @test norm(mmodes[2, 1]) < eps(Float64)
 
+    # offset from the time origin
+    Y = X[2:2:end, :]
+    compute!(MModes, mmodes, hierarchy, Y, 1, dϕ=-2π/length(ϕ))
+    @test mmodes[0, 1] ≈ [1]
+    @test mmodes[1, 1] ≈ [1, 0]
+    @test norm(mmodes[2, 1]) < eps(Float64)
+
 end
 
