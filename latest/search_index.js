@@ -149,7 +149,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Imaging",
     "title": "BPJSpec.tikhonov",
     "category": "function",
-    "text": "tikhonov(transfermatrix, mmodes; regularization=1e-2, mfs=false)\n\nCreate a dirty image of the sky using Tikhonov regularization.\n\nArguments:\n\ntransfermatrix the interferometer\'s transfer matrix, describing its response to the sky\nmmodes the m-modes measured by the interferometer\n\nKeyword Arguments:\n\nregularization the amplitude of the Tikhonov regularization parameter\nmfs determines whether or not to perform Multi-Frequency Synthesis imaging. If this parameter is set to true, all frequency channels will be used to generate a single image of the sky. If this parameter is set to false, an image of the sky will be generated for each frequency channel.\n\n\n\n"
+    "text": "tikhonov(transfermatrix, mmodes; regularization=1e-2, mfs=false, storage=NoFile())\n\nCreate a dirty image of the sky using Tikhonov regularization.\n\nArguments:\n\ntransfermatrix the interferometer\'s transfer matrix, describing its response to the sky\nmmodes the m-modes measured by the interferometer\n\nKeyword Arguments:\n\nregularization the amplitude of the Tikhonov regularization parameter\nmfs determines whether or not to perform Multi-Frequency Synthesis imaging. If this parameter is set to true, all frequency channels will be used to generate a single image of the sky. If this parameter is set to false, an image of the sky will be generated for each frequency channel.\nstorage determines how the computed spherical harmonic coefficients will be stored\n\n\n\n"
 },
 
 {
