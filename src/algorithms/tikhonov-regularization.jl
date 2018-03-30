@@ -14,7 +14,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 doc"""
-    tikhonov(transfermatrix, mmodes; regularization=1e-2, mfs=false)
+    tikhonov(transfermatrix, mmodes; regularization=1e-2, mfs=false, storage=NoFile())
 
 Create a dirty image of the sky using Tikhonov regularization.
 
@@ -29,17 +29,18 @@ Create a dirty image of the sky using Tikhonov regularization.
 * `mfs` determines whether or not to perform Multi-Frequency Synthesis imaging. If this parameter is
   set to `true`, all frequency channels will be used to generate a single image of the sky. If this
   parameter is set to `false`, an image of the sky will be generated for each frequency channel.
+* `storage` determines how the computed spherical harmonic coefficients will be stored
 """
-function tikhonov(transfermatrix, mmodes; regularization=1.0, mfs=false)
+function tikhonov(transfermatrix, mmodes; regularization=1.0, mfs=false, storage=NoFile())
     if mfs
-        return tikhonov_mfs(transfermatrix, mmodes, regularization)
+        return tikhonov_mfs(transfermatrix, mmodes, regularization, storage)
     else
-        return tikhonov_nothing_special(transfermatrix, mmodes, regularization)
+        return tikhonov_nothing_special(transfermatrix, mmodes, regularization, storage)
     end
 end
 
-function tikhonov_nothing_special(transfermatrix, mmodes, regularization)
-    alm = similar(mmodes, NoFile())
+function tikhonov_nothing_special(transfermatrix, mmodes, regularization, storage)
+    alm = similar(mmodes, storage)
     invert(B, v) = _tikhonov_nothing_special(B, v, regularization)
     @. alm = invert(transfermatrix, mmodes)
     alm
@@ -62,9 +63,9 @@ function _tikhonov_inversion(BB, Bv, regularization)
     (BB + regularization*I) \ Bv
 end
 
-function tikhonov_mfs(transfermatrix, mmodes, regularization)
+function tikhonov_mfs(transfermatrix, mmodes, regularization, storage)
     lmax = mmax = transfermatrix.mmax
-    alm  = create(MBlockVector, mmax)
+    alm  = create(MBlockVector, storage, mmax)
 
     # Try to make the scaling of the regularization parameter consistent between regular and
     # multi-frequency synthesis images
