@@ -40,10 +40,10 @@ function tikhonov(transfermatrix, mmodes; regularization=1.0, mfs=false, storage
 end
 
 function tikhonov_nothing_special(transfermatrix, mmodes, regularization, storage)
-    alm = similar(mmodes, storage)
+    alm = similar(mmodes, storage) |> ProgressBar
     invert(B, v) = _tikhonov_nothing_special(B, v, regularization)
     @. alm = invert(transfermatrix, mmodes)
-    alm
+    unwrap(alm)
 end
 
 function _tikhonov_nothing_special(B, v, regularization)
