@@ -8,7 +8,7 @@
     Ω  = 2.41u"sr"
     A  = λ^2 / Ω
     @test BPJSpec.standard_error(Tsys, ν, Δν, τ, N, Ω) ≈
-            u"k"*Tsys / (A * sqrt(Δν * τ * N))
+            √2 * u"k"*Tsys / (A * sqrt(Δν * τ * N))
 
     model = BPJSpec.NoiseModel(Tsys, τ, N, Ω)
     @test model(0, ν, Δν) == BPJSpec.standard_error(Tsys, ν, Δν, τ, N, Ω)

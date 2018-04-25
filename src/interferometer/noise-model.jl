@@ -19,16 +19,21 @@ doc"""
 This type represents the thermal noise contributed to the measurement of a set of $m$-modes.
 
 A careful reading of Taylor, Carilli, Perley chapter 9 reveals that under the convention that
-Stokes-I is $(\rm xx + yy)/2$ we get the following expressions:
+Stokes-I is $(\rm xx + yy)/2$ we get the following expressions (see Equation 9-13):
 
-Uncertainty on single polarization visibilities (in flux density units):
+RMS of the real or imaginary component of single polarization visibilities (in flux-density units):
 ```math
-σ_{\rm xx} = \frac{\sqrt{2} k T_{\rm sys}}{A_e \sqrt{Δν\,τ}}
+σ_\text{real,xx} = \frac{\sqrt{2} k T_{\rm sys}}{A_e \sqrt{Δν\,τ}}
 ```
 
-Uncertainty on Stokes I visibilities (in flux density units):
+RMS of the real or imaginary component of Stokes-I visibilities (in flux-density units):
 ```math
-σ_\text{Stokes-I} = \frac{σ_{\rm xx}}{\sqrt{2}} = \frac{k T_{\rm sys}}{A_e \sqrt{Δν\,τ}}
+σ_\text{real,I} = \frac{σ_\text{real,xx}}{\sqrt{2}} = \frac{k T_{\rm sys}}{A_e \sqrt{Δν\,τ}}
+```
+
+RMS of the complex-valued Stokes-I visibilities (in flux-density units):
+```math
+σ_\text{complex,I} = \sqrt{2} σ_\text{real,I} = \frac{\sqrt{2} k T_{\rm sys}}{A_e \sqrt{Δν\,τ}}
 ```
 
 Where $k$ is the Boltzmann constant, $T_{\rm sys}$ is the system temperature, $A_e$ is the effective
@@ -72,10 +77,10 @@ julia> model(100, 74u"MHz", 24u"kHz")
 """
 struct NoiseModel
     # TODO: the system temperature should increase at lower frequencies
-    Tsys  :: typeof(1.0u"K")  # system temperature
-    τ     :: typeof(1.0u"s")  # integration time (for a single time slice)
-    Nint  :: Int              # total number of integrations used in the dataset
-    Ω     :: typeof(1.0u"sr") # the solid angle of the primary beam
+    Tsys :: typeof(1.0u"K")  # system temperature
+    τ    :: typeof(1.0u"s")  # integration time (for a single time slice)
+    Nint :: Int              # total number of integrations used in the dataset
+    Ω    :: typeof(1.0u"sr") # the solid angle of the primary beam
 end
 
 function Base.show(io::IO, model::NoiseModel)
@@ -88,7 +93,7 @@ function standard_error(Tsys, ν, Δν, τ, Nint, Ω)
     λ  = uconvert(u"m", u"c"/ν)       # wavelength
     Ae = uconvert(u"m^2", λ^2/Ω)      # effective collecting area
     N  = uconvert(NoUnits, Δν*τ*Nint) # number of independent samples
-    σ  = u"k"*Tsys/(Ae*√N)            # standard error of a visibility
+    σ  = √2*u"k"*Tsys/(Ae*√N)         # standard error of a visibility
     uconvert(u"Jy", σ)
 end
 
