@@ -126,3 +126,32 @@ function galactic_free_free()
     ForegroundComponent(130.0u"MHz", 0.088u"mK^2", 3.0, 2.15, 35)
 end
 
+doc"""
+    struct GeneralizedForegroundComponent <: SkyComponent
+
+This type allows for a more general representation of the foreground emission. Instead of using a
+parametric model, the multi-frequency angular power spectrum is discretized.
+
+Furthermore, we assume that the power spectrum is a function of only the geometric mean of the two
+frequencies (ie. $\sqrt{\nu_1 \nu_2}$). This is driven by the expectation that there is very little
+decorrelation of the foreground emission between frequency channels. Instead, this allows for a
+power-law spectrum of the foreground emission.
+"""
+struct GeneralForegroundComponent <: SkyComponent
+    l :: Vector{Int}
+    ν :: Vector{typeof(1.0u"Hz")}
+    amplitude :: Matrix{typeof(1.0u"K^2")}
+end
+
+function (component::GeneralForegroundComponent)(l, ν1, ν2)
+    ν = sqrt(ν1 * ν2) # geometric mean
+    idx = searchsortedlast(component.l, l)
+    jdx = searchsortedlast(component.ν, ν)
+    weight_l = (component.l[idx+1] - l) / (component.l[idx+1] - component.l[idx])
+    weight_ν = (component.ν[idx+1] - ν) / (component.ν[idx+1] - component.ν[idx])
+    (component.amplitude[idx, jdx] * weight_l * weight_ν
+        + component.amplitude[idx+1, jdx] * (1-weight_l) * weight_ν
+        + component.amplitude[idx, jdx+1] * weight_l * (1-weight_ν)
+        + component.amplitude[idx+1, jdx+1] * (1-weight_l) * (1-weight-ν))
+end
+
