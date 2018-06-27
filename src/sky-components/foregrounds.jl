@@ -140,18 +140,24 @@ power-law spectrum of the foreground emission.
 struct GeneralForegroundComponent <: SkyComponent
     l :: Vector{Int}
     ν :: Vector{typeof(1.0u"Hz")}
-    amplitude :: Matrix{typeof(1.0u"K^2")}
+    power :: Matrix{typeof(1.0u"K^2")}
 end
 
 function (component::GeneralForegroundComponent)(l, ν1, ν2)
     ν = sqrt(ν1 * ν2) # geometric mean
-    idx = searchsortedlast(component.l, l)
-    jdx = searchsortedlast(component.ν, ν)
-    weight_l = (component.l[idx+1] - l) / (component.l[idx+1] - component.l[idx])
-    weight_ν = (component.ν[idx+1] - ν) / (component.ν[idx+1] - component.ν[idx])
-    (component.amplitude[idx, jdx] * weight_l * weight_ν
-        + component.amplitude[idx+1, jdx] * (1-weight_l) * weight_ν
-        + component.amplitude[idx, jdx+1] * weight_l * (1-weight_ν)
-        + component.amplitude[idx+1, jdx+1] * (1-weight_l) * (1-weight-ν))
+    if l == component.l[end]
+        jdx = searchsortedlast(component.ν, ν)
+        weight_ν = (component.ν[jdx+1] - ν) / (component.ν[jdx+1] - component.ν[jdx])
+        return component.power[end, jdx] * weight_ν + component.power[end, jdx+1] * (1-weight_ν)
+    else
+        idx = searchsortedlast(component.l, l)
+        jdx = searchsortedlast(component.ν, ν)
+        weight_l = (component.l[idx+1] - l) / (component.l[idx+1] - component.l[idx])
+        weight_ν = (component.ν[jdx+1] - ν) / (component.ν[jdx+1] - component.ν[jdx])
+        return (component.power[idx, jdx] * weight_l * weight_ν
+                    + component.power[idx+1, jdx] * (1-weight_l) * weight_ν
+                    + component.power[idx, jdx+1] * weight_l * (1-weight_ν)
+                    + component.power[idx+1, jdx+1] * (1-weight_l) * (1-weight_ν))
+    end
 end
 
