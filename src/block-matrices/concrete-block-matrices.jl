@@ -518,6 +518,17 @@ function Base.getindex(matrix::LBlockMatrix, m::Int)
     output
 end
 
+function Base.getindex(matrix::LBlockMatrix, m::Int, β::Int)
+    Nalm   = matrix.lmax - m + 1
+    output = zeros(Nalm, Nalm)
+    for l = L(m):L(matrix.lmax)
+        block = matrix[l, m]
+        idx = l - m + 1
+        output[idx, idx] = block[β, β]
+    end
+    output
+end
+
 doc"""
     struct LMBlockVector <: AbstractBlockMatrix{Vector{Complex128}, 2}
 
